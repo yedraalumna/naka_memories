@@ -1,22 +1,23 @@
-import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
 class ImagePickerService {
   final ImagePicker _picker = ImagePicker();
 
-  //con esto elegimos la imagen de la galeria
-  Future<File> pickImageFromGallery() async {
-    final image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image is! XFile) {
-      return File('');
-    }
-
-    return File(image.path);
+  //Para elegir la imagen de la galeria
+  Future<String?> pickImageFromGallery() async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80, //Se reduce un poco la calidad para ahorrar espacio
+    );
+    return image?.path;
   }
 
-  // Ya no es necesario, pero si existe en el archivo, da igual si no se usa.
-  Future<File?> pickImageFromCamera() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
-    return image != null ? File(image.path) : null;
+  //Para subir una foto directamente sacada con la cámara
+  Future<String?> pickImageFromCamera() async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 80,  
+    );
+    return image?.path;
   }
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
+import 'dart:io'; // Necesario para cargar archivos de la cámara/galería
+import '../services/ImagePickerService.dart'; // Importamos el servicio
 
 class MemoryForm extends StatefulWidget {
   final LatLng location;
@@ -25,6 +27,8 @@ class _MemoryFormState extends State<MemoryForm> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
+  final ImagePickerService _pickerService =
+      ImagePickerService(); //Instancia del servicio
 
   String? _selectedAsset;
 
@@ -63,6 +67,62 @@ class _MemoryFormState extends State<MemoryForm> {
         _dateController.text = picked.toString().split(' ')[0];
       });
     }
+  }
+
+  // NUEVO: Método para elegir entre Cámara, Galería o los Assets existentes
+  void _pickImageOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Seleccionar origen de imagen',
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold, color: pinkDark),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: pinkPrimary),
+                title: const Text('Sacar una foto'),
+                onTap: () async {
+                  final path = await _pickerService.pickImageFromCamera();
+                  if (path != null) {
+                    setState(() => _selectedAsset = path);
+                  }
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: pinkPrimary),
+                title: const Text('Elegir desde galeria'),
+                onTap: () async {
+                  final path = await _pickerService.pickImageFromGallery();
+                  if (path != null) {
+                    setState(() => _selectedAsset = path);
+                  }
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.image_search, color: pinkPrimary),
+                title: const Text('Imagenes Predeterminadas'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _selectAsset(); //LLAMAMOS AL MÉTODO DE LAS IMAGENES PREDETERMINADAS QUE HAY EN ASSETS
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // metodo para seleccionar las imagenes
@@ -104,7 +164,9 @@ class _MemoryFormState extends State<MemoryForm> {
                       child: Container(
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: _selectedAsset == asset ? pinkPrimary : Colors.transparent,
+                            color: _selectedAsset == asset
+                                ? pinkPrimary
+                                : Colors.transparent,
                             width: 3,
                           ),
                           borderRadius: BorderRadius.circular(10),
@@ -114,7 +176,8 @@ class _MemoryFormState extends State<MemoryForm> {
                           child: Image.asset(
                             asset,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
                               color: pinkLighter,
                               child: const Icon(Icons.error),
                             ),
@@ -132,6 +195,30 @@ class _MemoryFormState extends State<MemoryForm> {
     );
   }
 
+  //Metodo para mostrar la imagen correctamente (sea Asset o Archivo)
+  Widget _showSelectedImage() {
+    if (_selectedAsset == null || _selectedAsset!.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.photo_library, color: pinkPrimary, size: 40),
+            SizedBox(height: 5),
+            Text('Seleccionar imagen', style: TextStyle(color: pinkPrimary)),
+          ],
+        ),
+      );
+    }
+
+    //Si la ruta empieza por 'assets/', es una imagen interna
+    if (_selectedAsset!.startsWith('assets/')) {
+      return Image.asset(_selectedAsset!, fit: BoxFit.cover);
+    } else {
+      //Si no, es un archivo del tlfno (camara o galeria)
+      return Image.file(File(_selectedAsset!), fit: BoxFit.cover);
+    }
+  }
+
   //guardamos el recuerdo
   void _saveMemory() {
     if (_titleController.text.isEmpty) {
@@ -145,7 +232,8 @@ class _MemoryFormState extends State<MemoryForm> {
     }
 
     final memory = Memory(
-      id: widget.existingMemory?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.existingMemory?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
       title: _titleController.text,
       description: _descriptionController.text,
       date: _dateController.text,
@@ -180,7 +268,13 @@ class _MemoryFormState extends State<MemoryForm> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(tituloDialogo, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: pinkDark,),
+              Text(
+                tituloDialogo,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: pinkDark,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
@@ -224,9 +318,9 @@ class _MemoryFormState extends State<MemoryForm> {
               ),
               const SizedBox(height: 20),
 
-              // Selección de Asset
+              //Seleccion de imagen (el menú nuevo)
               GestureDetector(
-                onTap: _selectAsset,
+                onTap: _pickImageOptions, //Ahora llama al menú de opciones
                 child: Container(
                   height: 150,
                   decoration: BoxDecoration(
@@ -236,27 +330,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: _selectedAsset != null && _selectedAsset!.isNotEmpty
-                        ? Image.asset(
-                      _selectedAsset!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Center(
-                        child: Icon(Icons.error, color: Colors.pinkAccent, size: 40),
-                      ),
-                    )
-                        : const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.photo_library, color: pinkPrimary, size: 40),
-                          SizedBox(height: 5),
-                          Text(
-                            'Seleccionar imagen',
-                            style: TextStyle(color: pinkPrimary),
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: _showSelectedImage(), // USAMOS EL NUEVO WIDGET
                   ),
                 ),
               ),
@@ -264,10 +338,7 @@ class _MemoryFormState extends State<MemoryForm> {
               Text(
                 'Presiona para cambiar la imagen',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
               const SizedBox(height: 20),
 
@@ -285,7 +356,8 @@ class _MemoryFormState extends State<MemoryForm> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: const Text('Cancelar', style: TextStyle(color: Colors.black54)),
+                      child: const Text('Cancelar',
+                          style: TextStyle(color: Colors.black54)),
                     ),
                   ),
                   const SizedBox(width: 15),

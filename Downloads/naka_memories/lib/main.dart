@@ -84,7 +84,7 @@ class GestorAutenticacion extends StatelessWidget {
     }
 
     // Decide qué pantalla mostrar
-    return auth.isAuthenticated ? const HomeScreen() : const LoginScreen();
+    return auth.isAuthenticated ? const HomeScreen() : LoginScreen();
   }
 }
 

@@ -16,7 +16,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+
   User? get currentUser => _auth.currentUser;
 
   Future<void> _logout(BuildContext context) async {
@@ -25,7 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      MaterialPageRoute(builder: (context) => LoginScreen()),
       (route) => false,
     );
   }
@@ -33,7 +33,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    
+
     String textoEmail = 'Usuario';
     if (currentUser != null && currentUser!.email != null) {
       textoEmail = currentUser!.email!;
@@ -53,7 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              
+
               // Información del usuario
               Card(
                 color: themeProvider.isDarkMode ? cardDark : Colors.white,
@@ -77,7 +77,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: themeProvider.isDarkMode ? textLight : Colors.black87,
+                          color: themeProvider.isDarkMode
+                              ? textLight
+                              : Colors.black87,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -86,8 +88,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         'Usuario registrado',
                         style: TextStyle(
                           fontSize: 14,
-                          color: themeProvider.isDarkMode 
-                              ? Colors.grey[300] 
+                          color: themeProvider.isDarkMode
+                              ? Colors.grey[300]
                               : Colors.grey[600],
                         ),
                       ),
@@ -95,9 +97,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 30),
-              
+
               // Configuración
               Card(
                 color: themeProvider.isDarkMode ? cardDark : Colors.white,
@@ -114,32 +116,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: themeProvider.isDarkMode ? textLight : Colors.black87,
+                            color: themeProvider.isDarkMode
+                                ? textLight
+                                : Colors.black87,
                           ),
                         ),
                       ),
-                      
+
                       // Switch para tema claro/oscuro
                       ListTile(
                         leading: Icon(
-                          themeProvider.isDarkMode 
-                              ? Icons.dark_mode 
+                          themeProvider.isDarkMode
+                              ? Icons.dark_mode
                               : Icons.light_mode,
                           color: pinkPrimary,
                         ),
                         title: Text(
                           'Modo Oscuro',
                           style: TextStyle(
-                            color: themeProvider.isDarkMode ? textLight : Colors.black87,
+                            color: themeProvider.isDarkMode
+                                ? textLight
+                                : Colors.black87,
                           ),
                         ),
                         subtitle: Text(
-                          themeProvider.isDarkMode 
-                              ? 'Activado' 
-                              : 'Desactivado',
+                          themeProvider.isDarkMode ? 'Activado' : 'Desactivado',
                           style: TextStyle(
-                            color: themeProvider.isDarkMode 
-                                ? Colors.grey[300] 
+                            color: themeProvider.isDarkMode
+                                ? Colors.grey[300]
                                 : Colors.grey[600],
                           ),
                         ),
@@ -147,16 +151,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           value: themeProvider.isDarkMode,
                           onChanged: (value) {
                             themeProvider.setThemeMode(
-                              value ? ThemeMode.dark : ThemeMode.light
-                            );
+                                value ? ThemeMode.dark : ThemeMode.light);
                           },
                           activeColor: pinkPrimary,
                           inactiveTrackColor: Colors.grey,
                         ),
                       ),
-                      
+
                       const Divider(),
-                      
+
                       // Botón para cambiar contraseña
                       ListTile(
                         leading: const Icon(
@@ -166,7 +169,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: Text(
                           'Cambiar contraseña',
                           style: TextStyle(
-                            color: themeProvider.isDarkMode ? textLight : Colors.black87,
+                            color: themeProvider.isDarkMode
+                                ? textLight
+                                : Colors.black87,
                           ),
                         ),
                         trailing: const Icon(
@@ -178,7 +183,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const ChangePasswordScreen(),
+                              builder: (context) => ChangePasswordScreen(),
                             ),
                           );
                         },
@@ -187,9 +192,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 30),
-              
+
               // Botón de cerrar sesión
               SizedBox(
                 width: double.infinity,
@@ -209,7 +214,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 20),
             ],
           ),

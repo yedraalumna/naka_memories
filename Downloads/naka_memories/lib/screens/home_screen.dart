@@ -1,5 +1,3 @@
-[file name]: home_screen.dart
-[file content begin]
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/MemoryService.dart';
@@ -53,7 +51,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
 
   void _showMemoryDetails(BuildContext context, Memory memory) {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -68,7 +66,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             context,
             MaterialPageRoute(
               builder: (ctx) => CoordinateInputScreen(
-                existingMemory: memory, // ← PASAMOS la memoria para editar ubicación
+                existingMemory:
+                    memory, // ← PASAMOS la memoria para editar ubicación
               ),
             ),
           );
@@ -148,7 +147,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -158,7 +157,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
+        backgroundColor:
+            themeProvider.isDarkMode ? backgroundDark : Colors.white,
         elevation: 0,
         iconTheme: IconThemeData(
           color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
@@ -168,105 +168,114 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: pinkPrimary))
           : _memories.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.photo_library,
-                      size: 80,
-                      color: Colors.grey,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'No hay recuerdos aún',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Agrega tu primer recuerdo desde el mapa',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : GridView.builder(
-              padding: const EdgeInsets.all(12),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.85,
-              ),
-              itemCount: _memories.length,
-              itemBuilder: (context, index) {
-                final memory = _memories[index];
-                return GestureDetector(
-                  onTap: () {
-                    _showMemoryDetails(context, memory);
-                  },
-                  child: Card(
-                    elevation: 3,
-                    color: themeProvider.isDarkMode ? cardDark : Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Imagen
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(12),
-                            ),
-                            child: _buildMemoryImage(memory),
+                        Icon(
+                          Icons.photo_library,
+                          size: 80,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'No hay recuerdos aún',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: themeProvider.isDarkMode
+                                ? Colors.grey[400]
+                                : Colors.grey,
                           ),
                         ),
-                        // Título
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                memory.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                memory.date,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                ),
-                              ),
-                            ],
+                        const SizedBox(height: 10),
+                        Text(
+                          'Agrega tu primer recuerdo desde el mapa',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: themeProvider.isDarkMode
+                                ? Colors.grey[400]
+                                : Colors.grey[600],
                           ),
+                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),
                   ),
-                );
-              },
-            ),
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.85,
+                  ),
+                  itemCount: _memories.length,
+                  itemBuilder: (context, index) {
+                    final memory = _memories[index];
+                    return GestureDetector(
+                      onTap: () {
+                        _showMemoryDetails(context, memory);
+                      },
+                      child: Card(
+                        elevation: 3,
+                        color:
+                            themeProvider.isDarkMode ? cardDark : Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Imagen
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(12),
+                                ),
+                                child: _buildMemoryImage(memory),
+                              ),
+                            ),
+                            // Título
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    memory.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: themeProvider.isDarkMode
+                                          ? textDarkMode
+                                          : Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    memory.date,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: themeProvider.isDarkMode
+                                          ? Colors.grey[400]
+                                          : Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }
@@ -286,7 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _widgetOptions = <Widget>[
     const MemoryGalleryScreen(),
-    const MapScreen(isLibrary: true),
+    MapScreen(isLibrary: true),
     const ProfileScreen(),
   ];
 
@@ -299,7 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    
+
     return Scaffold(
       body: _widgetOptions.elementAt(_selectedIndex),
       bottomNavigationBar: BottomNavigationBar(
@@ -319,8 +328,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: pinkPrimary,
-        unselectedItemColor: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
-        backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
+        unselectedItemColor:
+            themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+        backgroundColor:
+            themeProvider.isDarkMode ? backgroundDark : Colors.white,
         type: BottomNavigationBarType.fixed,
         elevation: 5,
         onTap: _onItemTapped,

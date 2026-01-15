@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
 import 'MemoryForm.dart';
+import 'dart:io'; //Obligatorio para leer archivos locales (la camara y la galeria)
 
 class MemoryDetailScreen extends StatelessWidget {
   final Memory memory;
@@ -121,27 +122,38 @@ class MemoryDetailScreen extends StatelessWidget {
     );
   }
 
-  // Construimps la sección de imagen del recuerdo
+  // MÉTODO ACTUALIZADO: Construimos la sección de imagen soportando archivos locales
   Widget _buildImage() {
     if (memory.imageAsset != null && memory.imageAsset!.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Image.asset(
+      Widget imageWidget;
+
+      // Lógica para decidir qué tipo de imagen mostrar
+      if (memory.imageAsset!.startsWith('assets/')) {
+        imageWidget = Image.asset(
           memory.imageAsset!,
           height: 250,
           width: double.infinity,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
-            height: 250,
-            color: pinkLighter,
-            alignment: Alignment.center,
-            child: Icon(Icons.error, color: pinkDark, size: 50),
-          ),
-        ),
+          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(),
+        );
+      } else {
+        // Carga la foto tomada con la cámara o elegida de la galería
+        imageWidget = Image.file(
+          File(memory.imageAsset!),
+          height: 250,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(),
+        );
+      }
+
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: imageWidget,
       );
     }
 
-    // Placeholder por defecto
+    // Placeholder por defecto si no hay imagen
     return Container(
       height: 150,
       decoration: BoxDecoration(
@@ -162,6 +174,16 @@ class MemoryDetailScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // Widget auxiliar para control de errores de carga de imagen
+  Widget _buildErrorContainer() {
+    return Container(
+      height: 250,
+      color: pinkLighter,
+      alignment: Alignment.center,
+      child: Icon(Icons.error, color: pinkDark, size: 50),
     );
   }
 
@@ -390,7 +412,8 @@ class MemoryDetailScreen extends StatelessWidget {
               ListTile(
                 leading: Icon(Icons.edit_note, color: pinkPrimary),
                 title: const Text('Editar todos los datos'),
-                subtitle: const Text('Título, descripción, fecha, imagen y ubicación'),
+                subtitle: const Text(
+                    'Título, descripción, fecha, imagen y ubicación'),
                 onTap: () {
                   Navigator.pop(context); // Cierra el menú de opciones
                   _navigateToFullEditForm(context);

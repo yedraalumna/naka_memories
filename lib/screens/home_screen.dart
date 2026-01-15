@@ -8,6 +8,7 @@ import 'map_screen.dart';
 import 'profile_screen.dart';
 import '../constants/colors.dart';
 import '../providers/theme_provider.dart';
+import 'dart:io'; //Importante para poder leer archivos del dispositivo
 
 // 1. Pantalla de Galería
 class MemoryGalleryScreen extends StatefulWidget {
@@ -110,15 +111,25 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  // Método para obtener imagen según el asset
+  // METODO ACTUALIZADO: Ahora soporta Assets y Fotos de ls camara o la galeria
   Widget _buildMemoryImage(Memory memory) {
-    // Si tiene asset, usarlo
     if (memory.imageAsset != null && memory.imageAsset!.isNotEmpty) {
-      return Image.asset(
-        memory.imageAsset!,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
-      );
+      // Si la ruta empieza con 'assets/', cargamos la imagen interna
+      if (memory.imageAsset!.startsWith('assets/')) {
+        return Image.asset(
+          memory.imageAsset!,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
+        );
+      }
+      // Si es una ruta de archivo (camara o galeria), usamos Image.file
+      else {
+        return Image.file(
+          File(memory.imageAsset!),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
+        );
+      }
     }
 
     // Placeholder por defecto
