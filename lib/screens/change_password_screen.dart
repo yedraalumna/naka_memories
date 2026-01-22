@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_auth_provider.dart';
 import '../constants/colors.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
+  const ChangePasswordScreen({super.key});
+
   @override
-  State<ChangePasswordScreen> createState() {
-    return _ChangePasswordScreenState();
-  }
+  State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
 
@@ -19,9 +19,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
-  //getter
-  User? get currentUser => _auth.currentUser;
-
   @override
   void dispose() {
     _newPasswordController.dispose();
@@ -29,8 +26,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     super.dispose();
   }
 
-  //con esto cambiamos la contraseña
+  // Con esto cambiamos la contraseña usando AppAuthProvider
   Future<void> _changePassword() async {
+    if (_newPasswordController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Por favor, ingresa una nueva contraseña';
+      });
+      return;
+    }
+
     if (_newPasswordController.text.length < 6) {
       setState(() {
         _errorMessage = 'La contraseña debe tener al menos 6 caracteres';
@@ -51,25 +55,29 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     });
 
     try {
-      await currentUser!.updatePassword(_newPasswordController.text);
+      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+      final success = await authProvider.changePassword(_newPasswordController.text);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Contraseña cambiada correctamente'),
-          backgroundColor: Colors.pink,
-        ),
-      );
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Contraseña cambiada correctamente'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
 
-      // Volvemos a la pantalla atrás después de cambiar la contraseña
-      Navigator.pop(context);
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = 'Error: ${e.message}';
-        _isLoading = false;
-      });
+        // Volvemos a la pantalla atrás después de cambiar la contraseña
+        Navigator.pop(context);
+      } else {
+        setState(() {
+          _errorMessage = authProvider.errorMessage ?? 'Error al cambiar la contraseña';
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error desconocido';
+        _errorMessage = 'Error desconocido: $e';
         _isLoading = false;
       });
     }
@@ -77,86 +85,25 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Determinamos el icono para nueva contraseña
-    IconData iconoNuevaPassword = Icons.visibility;
-    if (_showNewPassword) {
-      iconoNuevaPassword = Icons.visibility_off;
-    }
-
-    // Determinamos el icono para confirmar contraseña
-    IconData iconoConfirmarPassword = Icons.visibility;
-    if (_showConfirmPassword) {
-      iconoConfirmarPassword = Icons.visibility_off;
-    }
-
-    // construimos el widget de mensaje de error
-    Widget widgetError = Container();
-    if (_errorMessage != null) {
-      widgetError = Padding(
-        padding: EdgeInsets.only(top: 15),
-        child: Text(
-          _errorMessage!,
-          style: TextStyle(color: Colors.pink),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-
-    // Determinar contenido del boton de guardar
-    Widget contenidoBotonGuardar = Text('Guardar');
-    if (_isLoading) {
-      contenidoBotonGuardar = CircularProgressIndicator(color: Colors.white);
-    }
-
-    // Función para boto cancelar
-    VoidCallback? funcionBotonCancelar = () {
-      Navigator.pop(context);
-    };
-    if (_isLoading) {
-      funcionBotonCancelar = null;
-    }
-
-    // Función para el boton de guardar
-    VoidCallback? funcionBotonGuardar = _changePassword;
-    if (_isLoading) {
-      funcionBotonGuardar = null;
-    }
-
-    bool nuevoValorNuevaPassword;
-    if (_showNewPassword) {
-      nuevoValorNuevaPassword = false;
-    } else {
-      nuevoValorNuevaPassword = true;
-    }
-
-    bool nuevoValorConfirmarPassword;
-    if (_showConfirmPassword) {
-      nuevoValorConfirmarPassword = false;
-    } else {
-      nuevoValorConfirmarPassword = true;
-    }
-
     return Scaffold(
-      backgroundColor: textLight,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text('Cambiar Contraseña'),
+        title: const Text('Cambiar Contraseña'),
         backgroundColor: pinkPrimary,
         foregroundColor: Colors.white,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
         ),
       ),
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
+                const Text(
                   'Cambiar contraseña',
                   style: TextStyle(
                     fontSize: 24,
@@ -165,70 +112,146 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   ),
                 ),
 
-                SizedBox(height: 30),
+                const SizedBox(height: 30),
 
+                // Información importante
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: pinkLighter,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: pinkPrimary, width: 1),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info, color: pinkPrimary),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'La nueva contraseña debe tener al menos 6 caracteres',
+                          style: TextStyle(color: pinkDark),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Campo para nueva contraseña
                 TextField(
                   controller: _newPasswordController,
-                  obscureText: _showNewPassword == false,
+                  obscureText: !_showNewPassword,
+                  enabled: !_isLoading,
                   decoration: InputDecoration(
                     labelText: 'Nueva contraseña',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock, color: pinkPrimary),
                     suffixIcon: IconButton(
-                      icon: Icon(iconoNuevaPassword),
+                      icon: Icon(
+                        _showNewPassword ? Icons.visibility : Icons.visibility_off,
+                        color: pinkPrimary,
+                      ),
                       onPressed: () {
                         setState(() {
-                          _showNewPassword = nuevoValorNuevaPassword;
+                          _showNewPassword = !_showNewPassword;
                         });
                       },
                     ),
                   ),
                 ),
 
-                SizedBox(height: 15),
+                const SizedBox(height: 15),
 
+                // Campo para confirmar contraseña
                 TextField(
                   controller: _confirmPasswordController,
-                  obscureText: _showConfirmPassword == false,
+                  obscureText: !_showConfirmPassword,
+                  enabled: !_isLoading,
                   decoration: InputDecoration(
                     labelText: 'Confirmar contraseña',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_reset, color: pinkPrimary),
                     suffixIcon: IconButton(
-                      icon: Icon(iconoConfirmarPassword),
+                      icon: Icon(
+                        _showConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                        color: pinkPrimary,
+                      ),
                       onPressed: () {
                         setState(() {
-                          _showConfirmPassword = nuevoValorConfirmarPassword;
+                          _showConfirmPassword = !_showConfirmPassword;
                         });
                       },
                     ),
                   ),
                 ),
 
-                // Widget de error
-                widgetError,
+                // Mensaje de error
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 15),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error, color: Colors.red),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
-                SizedBox(height: 30),
+                const SizedBox(height: 30),
 
+                // Botones
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: funcionBotonCancelar,
+                        onPressed: _isLoading ? null : () => Navigator.pop(context),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey,
-                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.grey[300],
+                          foregroundColor: Colors.black87,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                        child: Text('Cancelar'),
+                        child: const Text('Cancelar'),
                       ),
                     ),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: funcionBotonGuardar,
+                        onPressed: _isLoading ? null : _changePassword,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: pinkPrimary,
                           foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                        child: contenidoBotonGuardar,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Guardar'),
                       ),
                     ),
                   ],

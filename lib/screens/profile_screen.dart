@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_auth_provider.dart';
 import '../providers/theme_provider.dart';
@@ -15,10 +14,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  User? get currentUser => _auth.currentUser;
-
   Future<void> _logout(BuildContext context) async {
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
     await authProvider.logout();
@@ -33,11 +28,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final authProvider = Provider.of<AppAuthProvider>(context);
 
-    String textoEmail = 'Usuario';
-    if (currentUser != null && currentUser!.email != null) {
-      textoEmail = currentUser!.email!;
-    }
+    // Obtener email del usuario desde AppAuthProvider
+    String textoEmail = authProvider.userEmail ?? 'Usuario';
+    String userId = authProvider.userId ?? 'ID no disponible';
 
     return Scaffold(
       backgroundColor: themeProvider.isDarkMode ? backgroundDark : textLight,
@@ -93,6 +88,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : Colors.grey[600],
                         ),
                       ),
+                      const SizedBox(height: 5),
+                      if (userId != 'ID no disponible')
+                        Text(
+                          'ID: ${userId.substring(0, 8)}...',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: themeProvider.isDarkMode
+                                ? Colors.grey[400]
+                                : Colors.grey[500],
+                            fontFamily: 'Monospace',
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -183,7 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => ChangePasswordScreen(),
+                              builder: (context) => const ChangePasswordScreen(),
                             ),
                           );
                         },

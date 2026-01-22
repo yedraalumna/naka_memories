@@ -1,7 +1,6 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'firebase_options.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'providers/app_auth_provider.dart';
@@ -10,9 +9,13 @@ import 'constants/colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  
+  // Inicializar Supabase
+  await Supabase.initialize(
+    url: 'https://bbpqvckqycllhklqxjis.supabase.co', // REEMPLAZA CON TU URL
+    anonKey: 'sb_publishable_B2UiEGYTG1-OfhVcuTMBzg_5SPe__-a', // REEMPLAZA CON TU API KEY
   );
+  
   runApp(const MiApp());
 }
 
