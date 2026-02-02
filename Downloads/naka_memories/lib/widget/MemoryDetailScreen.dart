@@ -56,13 +56,13 @@ class MemoryDetailScreen extends StatelessWidget {
   Widget _buildHeader(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(25),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [pinkPrimary, pinkAccent],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -135,7 +135,7 @@ class MemoryDetailScreen extends StatelessWidget {
             height: 250,
             color: pinkLighter,
             alignment: Alignment.center,
-            child: Icon(Icons.error, color: pinkDark, size: 50),
+            child: const Icon(Icons.error, color: pinkDark, size: 50),
           ),
         ),
       );
@@ -149,12 +149,12 @@ class MemoryDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: pinkLight, style: BorderStyle.solid),
       ),
-      child: Center(
+      child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.photo_library, size: 50, color: pinkPrimary),
-            const SizedBox(height: 10),
+            SizedBox(height: 10),
             Text(
               'Sin imagen',
               style: TextStyle(color: pinkDark),
@@ -169,7 +169,7 @@ class MemoryDetailScreen extends StatelessWidget {
   Widget _buildTitle() {
     return Text(
       memory.title,
-      style: TextStyle(
+      style: const TextStyle(
         color: pinkDark,
         fontSize: 28,
         fontWeight: FontWeight.bold,
@@ -182,7 +182,7 @@ class MemoryDetailScreen extends StatelessWidget {
   Widget _buildDate() {
     return Row(
       children: [
-        Icon(Icons.calendar_today, color: pinkPrimary, size: 18),
+        const Icon(Icons.calendar_today, color: pinkPrimary, size: 18),
         const SizedBox(width: 8),
         Text(
           memory.date,
@@ -200,7 +200,7 @@ class MemoryDetailScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Descripción',
           style: TextStyle(
             color: pinkDark,
@@ -211,7 +211,7 @@ class MemoryDetailScreen extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           memory.description,
-          style: TextStyle(
+          style: const TextStyle(
             color: backgroundDark,
             fontSize: 16,
             height: 1.6,
@@ -226,7 +226,7 @@ class MemoryDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [pinkLighter, Colors.white],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -237,10 +237,10 @@ class MemoryDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
               Icon(Icons.location_on, color: pinkPrimary, size: 24),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Text(
                 'Ubicación Exacta',
                 style: TextStyle(
@@ -254,12 +254,12 @@ class MemoryDetailScreen extends StatelessWidget {
           const SizedBox(height: 15),
           Row(
             children: [
-              Icon(Icons.north, color: pinkPrimary, size: 16),
+              const Icon(Icons.north, color: pinkPrimary, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Latitud: ${memory.latitude.toStringAsFixed(6)}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: pinkDark,
                     fontSize: 16,
                   ),
@@ -270,12 +270,12 @@ class MemoryDetailScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.east, color: pinkPrimary, size: 16),
+              const Icon(Icons.east, color: pinkPrimary, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Longitud: ${memory.longitude.toStringAsFixed(6)}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: pinkDark,
                     fontSize: 16,
                   ),
@@ -330,11 +330,11 @@ class MemoryDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
-                side: BorderSide(color: pinkPrimary, width: 2),
+                side: const BorderSide(color: pinkPrimary, width: 2),
               ),
             ),
-            icon: Icon(Icons.delete, color: pinkPrimary),
-            label: Text(
+            icon: const Icon(Icons.delete, color: pinkPrimary),
+            label: const Text(
               'Eliminar',
               style: TextStyle(
                 color: pinkPrimary,
@@ -375,7 +375,7 @@ class MemoryDetailScreen extends StatelessWidget {
 
               // Opción 1: Editar solo la ubicación (coordenadas)
               ListTile(
-                leading: Icon(Icons.edit_location, color: pinkPrimary),
+                leading: const Icon(Icons.edit_location, color: pinkPrimary),
                 title: const Text('Editar solo ubicación'),
                 subtitle: const Text('Cambia las coordenadas del recuerdo'),
                 onTap: () {
@@ -388,7 +388,7 @@ class MemoryDetailScreen extends StatelessWidget {
 
               // Opción 2: Editar todos los datos (título, descripción, fecha, imagen)
               ListTile(
-                leading: Icon(Icons.edit_note, color: pinkPrimary),
+                leading: const Icon(Icons.edit_note, color: pinkPrimary),
                 title: const Text('Editar todos los datos'),
                 subtitle: const Text('Título, descripción, fecha, imagen y ubicación'),
                 onTap: () {
@@ -401,7 +401,7 @@ class MemoryDetailScreen extends StatelessWidget {
 
               // Eliminar recuerdo
               ListTile(
-                leading: Icon(Icons.delete, color: Colors.pinkAccent),
+                leading: const Icon(Icons.delete, color: Colors.pinkAccent),
                 title: const Text('Eliminar recuerdo'),
                 subtitle: const Text('Elimina permanentemente este recuerdo'),
                 onTap: () {
@@ -438,10 +438,10 @@ class MemoryDetailScreen extends StatelessWidget {
 
             // Muestra el mensaje de confirmación
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Recuerdo actualizado correctamente'),
+              const SnackBar(
+                content: Text('Recuerdo actualizado correctamente'),
                 backgroundColor: pinkPrimary,
-                duration: const Duration(seconds: 2),
+                duration: Duration(seconds: 2),
               ),
             );
           },

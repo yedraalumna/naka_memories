@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../constants/colors.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
+  const ChangePasswordScreen({super.key});
+
   @override
   State<ChangePasswordScreen> createState() {
     return _ChangePasswordScreenState();
@@ -54,7 +56,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       await currentUser!.updatePassword(_newPasswordController.text);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Contraseña cambiada correctamente'),
           backgroundColor: Colors.pink,
         ),
@@ -93,19 +95,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     Widget widgetError = Container();
     if (_errorMessage != null) {
       widgetError = Padding(
-        padding: EdgeInsets.only(top: 15),
+        padding: const EdgeInsets.only(top: 15),
         child: Text(
           _errorMessage!,
-          style: TextStyle(color: Colors.pink),
+          style: const TextStyle(color: Colors.pink),
           textAlign: TextAlign.center,
         ),
       );
     }
 
     // Determinar contenido del boton de guardar
-    Widget contenidoBotonGuardar = Text('Guardar');
+    Widget contenidoBotonGuardar = const Text('Guardar');
     if (_isLoading) {
-      contenidoBotonGuardar = CircularProgressIndicator(color: Colors.white);
+      contenidoBotonGuardar = const CircularProgressIndicator(color: Colors.white);
     }
 
     // Función para boto cancelar
@@ -139,11 +141,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return Scaffold(
       backgroundColor: textLight,
       appBar: AppBar(
-        title: Text('Cambiar Contraseña'),
+        title: const Text('Cambiar Contraseña'),
         backgroundColor: pinkPrimary,
         foregroundColor: Colors.white,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () {
             Navigator.pop(context);
           },
@@ -152,11 +154,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
+                const Text(
                   'Cambiar contraseña',
                   style: TextStyle(
                     fontSize: 24,
@@ -165,14 +167,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   ),
                 ),
 
-                SizedBox(height: 30),
+                const SizedBox(height: 30),
 
                 TextField(
                   controller: _newPasswordController,
                   obscureText: _showNewPassword == false,
                   decoration: InputDecoration(
                     labelText: 'Nueva contraseña',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(iconoNuevaPassword),
                       onPressed: () {
@@ -184,14 +186,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   ),
                 ),
 
-                SizedBox(height: 15),
+                const SizedBox(height: 15),
 
                 TextField(
                   controller: _confirmPasswordController,
                   obscureText: _showConfirmPassword == false,
                   decoration: InputDecoration(
                     labelText: 'Confirmar contraseña',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(iconoConfirmarPassword),
                       onPressed: () {
@@ -206,7 +208,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 // Widget de error
                 widgetError,
 
-                SizedBox(height: 30),
+                const SizedBox(height: 30),
 
                 Row(
                   children: [
@@ -217,10 +219,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           backgroundColor: Colors.grey,
                           foregroundColor: Colors.white,
                         ),
-                        child: Text('Cancelar'),
+                        child: const Text('Cancelar'),
                       ),
                     ),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: funcionBotonGuardar,

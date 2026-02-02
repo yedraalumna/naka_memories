@@ -20,7 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => LoginScreen()),
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
       (route) => false,
     );
   }
@@ -57,7 +57,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
                     children: [
-                      CircleAvatar(
+                      const CircleAvatar(
                         radius: 40,
                         backgroundColor: pinkLighter,
                         child: Icon(
@@ -160,7 +160,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             themeProvider.setThemeMode(
                                 value ? ThemeMode.dark : ThemeMode.light);
                           },
-                          activeColor: pinkPrimary,
+                          activeThumbColor: pinkPrimary,
                           inactiveTrackColor: Colors.grey,
                         ),
                       ),

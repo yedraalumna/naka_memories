@@ -7,6 +7,8 @@ import 'register_screen.dart';
 import '../constants/colors.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() {
     return _LoginScreenState();
@@ -33,7 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: backgroundColor,
       body: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Center(
           child: SingleChildScrollView(
             child: Column(
@@ -41,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Padding(
-                  padding: EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(16.0),
                   child: Image.asset(
                     'assets/images/logo.png',
                     height: 250,
@@ -52,27 +54,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 Offstage(
                   offstage: error == '',
                   child: Padding(
-                    padding: EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(8.0),
                     child: Text(
                       error,
-                      style: TextStyle(color: Colors.red, fontSize: 16),
+                      style: const TextStyle(color: Colors.red, fontSize: 16),
                     ),
                   ),
                 ),
 
                 Padding(
-                  padding: EdgeInsets.all(8.0),
+                  padding: const EdgeInsets.all(8.0),
                   child: formulario(),
                 ),
 
                 butonLogin(),
 
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('¿No tienes cuenta?'),
+                    const Text('¿No tienes cuenta?'),
                     TextButton(
                       onPressed: _isLoading ? null : () {
                         Navigator.push(
@@ -82,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         );
                       },
-                      child: Text(
+                      child: const Text(
                         'Regístrate aquí',
                         style: TextStyle(color: pinkAccent),
                       ),
@@ -103,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Column(
         children: [
           buildEmail(),
-          Padding(padding: EdgeInsets.only(top: 12)),
+          const Padding(padding: EdgeInsets.only(top: 12)),
           buildPassword(),
         ],
       ),
@@ -114,14 +116,14 @@ class _LoginScreenState extends State<LoginScreen> {
     return TextFormField(
       decoration: InputDecoration(
         labelText: "Email",
-        labelStyle: TextStyle(color: pinkPrimary),
+        labelStyle: const TextStyle(color: pinkPrimary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: pinkLight),
+          borderSide: const BorderSide(color: pinkLight),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: pinkPrimary),
+          borderSide: const BorderSide(color: pinkPrimary),
         ),
       ),
       keyboardType: TextInputType.emailAddress,
@@ -141,14 +143,14 @@ class _LoginScreenState extends State<LoginScreen> {
     return TextFormField(
       decoration: InputDecoration(
         labelText: "Password",
-        labelStyle: TextStyle(color: pinkPrimary),
+        labelStyle: const TextStyle(color: pinkPrimary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: pinkLight),
+          borderSide: const BorderSide(color: pinkLight),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: pinkPrimary),
+          borderSide: const BorderSide(color: pinkPrimary),
         ),
       ),
       obscureText: true,
@@ -186,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (context) => HomeScreen()),
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
               (Route<dynamic> route) => false,
             );
 
@@ -219,9 +221,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     Widget contenidoBoton;
     if (_isLoading) {
-      contenidoBoton = CircularProgressIndicator(color: Colors.white);
+      contenidoBoton = const CircularProgressIndicator(color: Colors.white);
     } else {
-      contenidoBoton = Text("Login");
+      contenidoBoton = const Text("Login");
     }
 
     return FractionallySizedBox(

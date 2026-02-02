@@ -98,16 +98,16 @@ class AppAuthProvider with ChangeNotifier {
   void _handleSupabaseError(AuthException e) {
     switch (e.statusCode) {
       case 400:
-        if (e.message?.contains('Invalid login credentials') == true) {
+        if (e.message.contains('Invalid login credentials') == true) {
           _errorMessage = 'Credenciales inválidas';
-        } else if (e.message?.contains('Email not confirmed') == true) {
+        } else if (e.message.contains('Email not confirmed') == true) {
           _errorMessage = 'Email no confirmado';
         } else {
           _errorMessage = 'Error en la solicitud: ${e.message}';
         }
         break;
       case 422:
-        if (e.message?.contains('already registered') == true) {
+        if (e.message.contains('already registered') == true) {
           _errorMessage = 'Este correo ya está registrado';
         } else {
           _errorMessage = 'Datos inválidos: ${e.message}';

@@ -4,6 +4,7 @@ import '../models/Memory.dart';
 import '../constants/colors.dart';
 import 'dart:io'; // Necesario para cargar archivos de la cámara/galería
 import '../services/ImagePickerService.dart'; // Importamos el servicio
+import 'package:flutter/foundation.dart';
 
 class MemoryForm extends StatefulWidget {
   final LatLng location;
@@ -69,7 +70,7 @@ class _MemoryFormState extends State<MemoryForm> {
     }
   }
 
-  // NUEVO: Método para elegir entre Cámara, Galería o los Assets existentes
+  //Método para elegir entre Cámara, Galería o los Assets existentes
   void _pickImageOptions() {
     showModalBottomSheet(
       context: context,
@@ -213,8 +214,20 @@ class _MemoryFormState extends State<MemoryForm> {
     //Si la ruta empieza por 'assets/', es una imagen interna
     if (_selectedAsset!.startsWith('assets/')) {
       return Image.asset(_selectedAsset!, fit: BoxFit.cover);
-    } else {
-      //Si no, es un archivo del tlfno (camara o galeria)
+    } 
+    //WEB: Si estamos en navegador, usamos NetworkImage
+    else if (kIsWeb) {
+      return Image.network(
+        _selectedAsset!, 
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+            color: pinkLighter,
+            child: const Icon(Icons.error),
+        ),
+      );
+    } 
+    //MÓVIL: Usamos File normal
+    else {
       return Image.file(File(_selectedAsset!), fit: BoxFit.cover);
     }
   }

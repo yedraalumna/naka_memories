@@ -21,7 +21,7 @@ class MapScreen extends StatefulWidget {
   final Function(LatLng)? onCameraMoveCallback;
   final Function(LatLng, GoogleMapController)? onLongPressCallback;
 
-  MapScreen({
+  const MapScreen({super.key, 
     this.isLibrary = true,
     this.initialMarkers,
     this.onMapCreatedCallback,
@@ -37,7 +37,7 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
-  LatLng _currentCameraPosition = LatLng(40.4168, -3.7038);
+  LatLng _currentCameraPosition = const LatLng(40.4168, -3.7038);
   Set<Marker> _markers = {};
   final List<Memory> _memories = [];
   final MemoryService _memoryService = MemoryService();
@@ -101,7 +101,7 @@ class _MapScreenState extends State<MapScreen> {
   void _goToCoordinates() {
     if (_memories.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('No hay recuerdos guardados para mostrar.'),
           backgroundColor: pinkPrimary,
         ),
@@ -126,7 +126,7 @@ class _MapScreenState extends State<MapScreen> {
     final LatLng? selectedLocation = await Navigator.of(context).push<LatLng>(
       MaterialPageRoute(
         builder: (context) {
-          return CoordinateInputScreen();
+          return const CoordinateInputScreen();
         },
       ),
     );
@@ -206,7 +206,7 @@ class _MapScreenState extends State<MapScreen> {
       _loadMemories(); // Recargar los datos
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Ubicación actualizada correctamente'),
           backgroundColor: pinkPrimary,
           duration: Duration(seconds: 2),
@@ -264,7 +264,7 @@ class _MapScreenState extends State<MapScreen> {
             _loadMemories(); // Recargar los datos
 
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Text('Recuerdo actualizado correctamente'),
                 backgroundColor: pinkPrimary,
                 duration: Duration(seconds: 2),
@@ -283,20 +283,20 @@ class _MapScreenState extends State<MapScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Confirmar Eliminación'),
-          content: Text('¿Estás seguro de eliminar todos los recuerdos? Esta acción no se puede deshacer.'),
+          title: const Text('Confirmar Eliminación'),
+          content: const Text('¿Estás seguro de eliminar todos los recuerdos? Esta acción no se puede deshacer.'),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context, false);
               },
-              child: Text('Cancelar'),
+              child: const Text('Cancelar'),
             ),
             TextButton(
               onPressed: () {
                 Navigator.pop(context, true);
               },
-              child: Text('Eliminar', style: TextStyle(color: Colors.red)),
+              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -307,7 +307,7 @@ class _MapScreenState extends State<MapScreen> {
       await _memoryService.clearAllMemories();
       await _loadMemories();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Row(
             children: [
               Icon(Icons.delete_sweep, color: Colors.white),
@@ -327,14 +327,14 @@ class _MapScreenState extends State<MapScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Error'),
+          title: const Text('Error'),
           content: Text(message),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: Text('OK'),
+              child: const Text('OK'),
             ),
           ],
         );
@@ -345,7 +345,7 @@ class _MapScreenState extends State<MapScreen> {
   // MÉTODO PARA EL MAPA WEB - VERSIÓN SIMPLIFICADA
   Widget _buildWebMap({bool forLibrary = true}) {
     return fmap.FlutterMap(
-      options: fmap.MapOptions(
+      options: const fmap.MapOptions(
         initialCenter: latlong2.LatLng(40.4168, -3.7038),
         initialZoom: 15.0,
       ),
@@ -396,7 +396,7 @@ class _MapScreenState extends State<MapScreen> {
           iconTheme: IconThemeData(color: appBarTextColor),
           actions: [
             IconButton(
-              icon: Icon(Icons.menu, color: pinkPrimary),
+              icon: const Icon(Icons.menu, color: pinkPrimary),
               onPressed: _showMenuDialog,
             ),
           ],
@@ -409,7 +409,7 @@ class _MapScreenState extends State<MapScreen> {
     // SI ES MÓVIL, USAR GOOGLE MAPS ORIGINAL
     if (!widget.isLibrary) {
       return GoogleMap(
-        initialCameraPosition: CameraPosition(
+        initialCameraPosition: const CameraPosition(
           target: LatLng(40.4168, -3.7038),
           zoom: 15,
         ),
@@ -444,14 +444,14 @@ class _MapScreenState extends State<MapScreen> {
         iconTheme: IconThemeData(color: appBarTextColor),
         actions: [
           IconButton(
-            icon: Icon(Icons.menu, color: pinkPrimary),
+            icon: const Icon(Icons.menu, color: pinkPrimary),
             onPressed: _showMenuDialog,
           ),
         ],
       ),
       backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
       body: GoogleMap(
-        initialCameraPosition: CameraPosition(
+        initialCameraPosition: const CameraPosition(
           target: LatLng(40.4168, -3.7038),
           zoom: 15,
         ),

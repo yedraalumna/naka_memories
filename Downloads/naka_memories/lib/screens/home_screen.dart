@@ -99,10 +99,10 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           _loadMemories(); // Recargar la lista
 
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Recuerdo actualizado correctamente'),
+            const SnackBar(
+              content: Text('Recuerdo actualizado correctamente'),
               backgroundColor: pinkPrimary,
-              duration: const Duration(seconds: 2),
+              duration: Duration(seconds: 2),
             ),
           );
         },
@@ -166,7 +166,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       ),
       backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: pinkPrimary))
+          ? const Center(child: CircularProgressIndicator(color: pinkPrimary))
           : _memories.isEmpty
               ? Center(
                   child: Padding(
@@ -174,7 +174,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.photo_library,
                           size: 80,
                           color: Colors.grey,

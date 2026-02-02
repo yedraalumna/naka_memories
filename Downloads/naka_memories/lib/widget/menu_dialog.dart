@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
-import '../services/MemoryService.dart';
 
 class MenuDialog extends StatelessWidget {
   final List<Memory> memories;

@@ -87,7 +87,7 @@ class GestorAutenticacion extends StatelessWidget {
     }
 
     // Decide qué pantalla mostrar
-    return auth.isAuthenticated ? const HomeScreen() : LoginScreen();
+    return auth.isAuthenticated ? const HomeScreen() : const LoginScreen();
   }
 }
 
@@ -96,7 +96,7 @@ class PantallaCarga extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       backgroundColor: Colors.white,
       body: Center(
         child: Column(
@@ -105,7 +105,7 @@ class PantallaCarga extends StatelessWidget {
             CircularProgressIndicator(
               color: pinkPrimary,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             Text(
               'Cargando...',
               style: TextStyle(

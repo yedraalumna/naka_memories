@@ -9,6 +9,7 @@ import 'profile_screen.dart';
 import '../constants/colors.dart';
 import '../providers/theme_provider.dart';
 import 'dart:io'; //Importante para poder leer archivos del dispositivo
+import 'package:flutter/foundation.dart';
 
 // 1. Pantalla de Galería
 class MemoryGalleryScreen extends StatefulWidget {
@@ -100,10 +101,10 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           _loadMemories(); // Recargar la lista
 
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Recuerdo actualizado correctamente'),
+            const SnackBar(
+              content: Text('Recuerdo actualizado correctamente'),
               backgroundColor: pinkPrimary,
-              duration: const Duration(seconds: 2),
+              duration: Duration(seconds: 2),
             ),
           );
         },
@@ -111,10 +112,10 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  // METODO ACTUALIZADO: Ahora soporta Assets y Fotos de ls camara o la galeria
+  // Método que soporta Assets y Fotos de la camara o la galeria
   Widget _buildMemoryImage(Memory memory) {
     if (memory.imageAsset != null && memory.imageAsset!.isNotEmpty) {
-      // Si la ruta empieza con 'assets/', cargamos la imagen interna
+      // Asset
       if (memory.imageAsset!.startsWith('assets/')) {
         return Image.asset(
           memory.imageAsset!,
@@ -122,7 +123,15 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
         );
       }
-      // Si es una ruta de archivo (camara o galeria), usamos Image.file
+      // WEB
+      else if (kIsWeb) {
+        return Image.network(
+          memory.imageAsset!,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
+        );
+      }
+      // Móvil
       else {
         return Image.file(
           File(memory.imageAsset!),
@@ -131,8 +140,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
         );
       }
     }
-
-    // Placeholder por defecto
     return _buildPlaceholder();
   }
 
@@ -177,7 +184,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       ),
       backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: pinkPrimary))
+          ? const Center(child: CircularProgressIndicator(color: pinkPrimary))
           : _memories.isEmpty
               ? Center(
                   child: Padding(
@@ -185,7 +192,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.photo_library,
                           size: 80,
                           color: Colors.grey,
@@ -307,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _widgetOptions = <Widget>[
     const MemoryGalleryScreen(),
     MapScreen(isLibrary: true),
-    ProfileScreen(),
+    const ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
