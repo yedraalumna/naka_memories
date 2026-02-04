@@ -1,12 +1,16 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
 import '../providers/theme_provider.dart';
-import 'dart:io'; 
-import '../services/ImagePickerService.dart'; 
+import '../services/ImagePickerService.dart';
+import '../services/MemoryService.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 class MemoryForm extends StatefulWidget {
   final LatLng location;
@@ -31,9 +35,12 @@ class _MemoryFormState extends State<MemoryForm> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final ImagePickerService _pickerService = ImagePickerService();
+  final MemoryService _memoryService = MemoryService();
 
   String? _selectedAsset;
   bool _isLoadingImage = false;
+  bool _isSaving = false;
+  Uint8List? _selectedImageBytes;
 
   final List<String> _availableAssets = [
     'assets/images/gato.jpg',
@@ -190,7 +197,11 @@ class _MemoryFormState extends State<MemoryForm> {
     try {
       final path = await _pickerService.pickImageFromCamera();
       if (path != null) {
-        setState(() => _selectedAsset = path);
+        final bytes = await File(path).readAsBytes();
+        setState(() {
+          _selectedAsset = path;
+          _selectedImageBytes = bytes;
+        });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -209,7 +220,11 @@ class _MemoryFormState extends State<MemoryForm> {
     try {
       final path = await _pickerService.pickImageFromGallery();
       if (path != null) {
-        setState(() => _selectedAsset = path);
+        final bytes = await File(path).readAsBytes();
+        setState(() {
+          _selectedAsset = path;
+          _selectedImageBytes = bytes;
+        });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -226,9 +241,12 @@ class _MemoryFormState extends State<MemoryForm> {
   Future<void> _pickImageForWeb() async {
     setState(() => _isLoadingImage = true);
     try {
-      final path = await _pickerService.pickImageForWeb();
-      if (path != null) {
-        setState(() => _selectedAsset = path);
+      final bytes = await _pickerService.pickImageBytesForWeb();
+      if (bytes != null && bytes.isNotEmpty) {
+        setState(() {
+          _selectedAsset = 'data:image/jpeg;base64,${base64.encode(bytes)}';
+          _selectedImageBytes = bytes;
+        });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -282,6 +300,7 @@ class _MemoryFormState extends State<MemoryForm> {
                       onTap: () {
                         setState(() {
                           _selectedAsset = asset;
+                          _selectedImageBytes = null; // Es un asset, no bytes
                         });
                         Navigator.pop(context);
                       },
@@ -370,46 +389,26 @@ class _MemoryFormState extends State<MemoryForm> {
       );
     }
     
-    // Para Web
-    if (kIsWeb) {
-      // Si es un path que comienza con 'blob:' o 'http'
-      if (_selectedAsset!.startsWith('blob:') || 
-          _selectedAsset!.startsWith('http://') || 
-          _selectedAsset!.startsWith('https://')) {
-        return Image.network(
-          _selectedAsset!, 
+    // Para Web (data URL)
+    if (_selectedAsset!.startsWith('data:image')) {
+      try {
+        final bytes = base64.decode(_selectedAsset!.split(',')[1]);
+        return Image.memory(
+          bytes,
           fit: BoxFit.cover,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded / 
-                      loadingProgress.expectedTotalBytes!
-                    : null,
-                color: pinkPrimary,
-              ),
-            );
-          },
-          errorBuilder: (context, error, stackTrace) => Container(
-            color: pinkLighter,
-            child: Center(
-              child: Icon(Icons.error, color: pinkDark, size: 40),
-            ),
+        );
+      } catch (e) {
+        return Container(
+          color: pinkLighter,
+          child: Center(
+            child: Icon(Icons.error, color: pinkDark, size: 40),
           ),
         );
       }
-      // Si es un string base64 (para web)
-      if (_selectedAsset!.startsWith('data:image')) {
-        return Image.memory(
-          Uri.parse(_selectedAsset!).data!.contentAsBytes(),
-          fit: BoxFit.cover,
-        );
-      }
-      // Para otros casos en web
-      return Image.network(_selectedAsset!, fit: BoxFit.cover);
-    } else {
-      // Para móvil
+    }
+    
+    // Para imágenes locales (path de archivo)
+    if (_selectedAsset!.startsWith('/') || _selectedAsset!.contains('file:')) {
       return Image.file(
         File(_selectedAsset!), 
         fit: BoxFit.cover,
@@ -421,9 +420,49 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     }
+    
+    // Para URLs web
+    if (_selectedAsset!.startsWith('http')) {
+      return Image.network(
+        _selectedAsset!, 
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded / 
+                    loadingProgress.expectedTotalBytes!
+                  : null,
+              color: pinkPrimary,
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: pinkLighter,
+          child: Center(
+            child: Icon(Icons.error, color: pinkDark, size: 40),
+          ),
+        ),
+      );
+    }
+    
+    // Por defecto
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.image_not_supported, color: pinkPrimary, size: 40),
+          const SizedBox(height: 5),
+          Text('Imagen no compatible', style: TextStyle(color: pinkPrimary)),
+        ],
+      ),
+    );
   }
 
-  void _saveMemory() {
+  Future<void> _saveMemory() async {
+    if (_isSaving) return;
+    
     final title = _titleController.text.trim();
     final description = _descriptionController.text.trim();
     final date = _dateController.text.trim();
@@ -448,20 +487,76 @@ class _MemoryFormState extends State<MemoryForm> {
       return;
     }
 
-    final memory = Memory(
-      id: widget.existingMemory?.id ?? 
-          '${DateTime.now().millisecondsSinceEpoch}',
-      title: title,
-      description: description,
-      date: date,
-      location: {
-        'latitude': widget.location.latitude,
-        'longitude': widget.location.longitude,
-      },
-      imageAsset: _selectedAsset ?? _availableAssets[0],
-    );
+    setState(() => _isSaving = true);
 
-    widget.onSave(memory);
+    try {
+      // Crear memoria básica
+      final memory = Memory(
+        id: widget.existingMemory?.id ?? '',
+        title: title,
+        description: description,
+        date: date,
+        location: {
+          'latitude': widget.location.latitude,
+          'longitude': widget.location.longitude,
+        },
+        imageAsset: null, // Se asignará después de subir
+      );
+
+      // Si hay imagen seleccionada y es local (no asset), subirla
+      if (_selectedImageBytes != null && 
+          _selectedImageBytes!.isNotEmpty &&
+          !(_selectedAsset?.startsWith('assets/') ?? true)) {
+        
+        print('📤 Subiendo imagen a Supabase...');
+        
+        // Usar saveMemoryWithImage que sube la imagen primero
+        await _memoryService.saveMemoryWithImage(
+          memory: memory,
+          imageBytes: _selectedImageBytes!,
+        );
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Recuerdo guardado con imagen'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        // Si es un asset predeterminado o no hay imagen
+        final memoryWithAsset = Memory(
+          id: memory.id,
+          title: memory.title,
+          description: memory.description,
+          date: memory.date,
+          location: memory.location,
+          imageAsset: _selectedAsset, // Puede ser asset o null
+        );
+        
+        await _memoryService.saveMemory(memoryWithAsset);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Recuerdo guardado'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      
+      // Notificar al padre que se guardó
+      widget.onSave(memory);
+      
+    } catch (e) {
+      print('❌ Error guardando recuerdo: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al guardar: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -691,7 +786,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: widget.onCancel,
+                        onPressed: _isSaving ? null : widget.onCancel,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -712,9 +807,9 @@ class _MemoryFormState extends State<MemoryForm> {
                     const SizedBox(width: 15),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: _saveMemory,
+                        onPressed: _isSaving ? null : _saveMemory,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: pinkPrimary,
+                          backgroundColor: _isSaving ? Colors.grey : pinkPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -722,13 +817,22 @@ class _MemoryFormState extends State<MemoryForm> {
                           elevation: 3,
                           shadowColor: pinkPrimary.withOpacity(0.4),
                         ),
-                        child: const Text(
-                          'Guardar',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Guardar',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                   ],

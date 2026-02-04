@@ -250,9 +250,12 @@ class _LoginScreenState extends State<LoginScreen> {
             });
 
             final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-            authProvider.clearError(); // Limpiar errores previos
+            authProvider.clearError();
 
             final success = await authProvider.login(email, password);
+
+            // COMPROBACIÓN CRUCIAL AQUÍ
+            if (!mounted) return; 
 
             setState(() {
               _isLoading = false;
@@ -265,7 +268,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 (Route<dynamic> route) => false,
               );
             }
-            // El error ya se mostrará automáticamente a través del provider
           }
         },
         child: _isLoading

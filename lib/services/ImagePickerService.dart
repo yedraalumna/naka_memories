@@ -12,13 +12,12 @@ class ImagePickerService {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 80, // Se reduce un poco la calidad para ahorrar espacio
+        imageQuality: 80,
         maxWidth: 1200,
         maxHeight: 1200,
       );
       
       if (kIsWeb && image != null) {
-        // Para web, el path puede venir como blob URL o base64
         return image.path;
       }
       
@@ -35,7 +34,6 @@ class ImagePickerService {
   Future<String?> pickImageFromCamera() async {
     try {
       if (kIsWeb) {
-        // En web, la cámara puede no estar disponible, así que usamos galería
         return pickImageFromGallery();
       }
       
@@ -54,12 +52,11 @@ class ImagePickerService {
     }
   }
 
-  // Método específico para web (necesario para MemoryForm)
+  // Método específico para web
   Future<String?> pickImageForWeb() async {
     try {
-      // En web, tanto cámara como galería usan el mismo método
       final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery, // Usamos gallery para web
+        source: ImageSource.gallery,
         imageQuality: 80,
         maxWidth: 1200,
         maxHeight: 1200,
@@ -68,6 +65,74 @@ class ImagePickerService {
     } catch (e) {
       if (kDebugMode) {
         print('Error en pickImageForWeb: $e');
+      }
+      return null;
+    }
+  }
+
+  // NUEVO MÉTODO: Para obtener bytes de imagen en web
+  Future<Uint8List?> pickImageBytesForWeb() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 1200,
+        maxHeight: 1200,
+      );
+      
+      if (image != null) {
+        // Leer como bytes
+        final bytes = await image.readAsBytes();
+        return bytes;
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error en pickImageBytesForWeb: $e');
+      }
+      return null;
+    }
+  }
+
+  // Método universal que devuelve bytes para cualquier plataforma
+  Future<Uint8List?> pickImageAsBytes() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: kIsWeb ? ImageSource.gallery : ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 1200,
+        maxHeight: 1200,
+      );
+      
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        return bytes;
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error en pickImageAsBytes: $e');
+      }
+      return null;
+    }
+  }
+
+  // Método para convertir path a bytes (para mobile/desktop)
+  Future<Uint8List?> getBytesFromPath(String path) async {
+    try {
+      if (kIsWeb) {
+        // En web, no podemos leer archivos del sistema
+        return null;
+      }
+      
+      final file = File(path);
+      if (await file.exists()) {
+        return await file.readAsBytes();
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error en getBytesFromPath: $e');
       }
       return null;
     }
