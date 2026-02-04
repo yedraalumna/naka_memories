@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_auth_provider.dart';
+import '../providers/theme_provider.dart';
 import 'home_screen.dart';
 import '../constants/colors.dart';
 
@@ -74,9 +75,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     // Obtiene el estado actual del proveedor de autenticación
     final auth = Provider.of<AppAuthProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
+    Color backgroundColor = themeProvider.isDarkMode ? backgroundDark : textLight;
+    Color textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    Color iconColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    Color borderColor = themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
+    Color focusedBorderColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
 
     return Scaffold(
-      backgroundColor: textLight,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
         title: const Text('Crear Cuenta'),
         backgroundColor: pinkPrimary,
@@ -96,32 +104,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 30),
 
               // Icono decorativo que representa el registro
-              const Icon(
+              Icon(
                 Icons.person_add,
                 size: 80,
-                color: pinkPrimary,
+                color: iconColor,
               ),
 
               const SizedBox(height: 20),
 
               // Título principal de la pantalla de registro
-              const Text(
+              Text(
                 'Crear Nueva Cuenta',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: pinkDark,
+                  color: iconColor,
                 ),
               ),
 
               const SizedBox(height: 10),
 
               // Texto descriptivo que guía al usuario
-              const Text(
+              Text(
                 'Completa el formulario para registrarte',
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey,
+                  color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey,
                 ),
               ),
 
@@ -133,17 +141,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 15),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: themeProvider.isDarkMode 
+                        ? Colors.red[900]?.withOpacity(0.3) 
+                        : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade200),
+                    border: Border.all(
+                      color: themeProvider.isDarkMode 
+                          ? Colors.red[700]! 
+                          : Colors.red.shade200,
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.warning, color: Colors.red),
+                      Icon(
+                        Icons.warning, 
+                        color: themeProvider.isDarkMode 
+                            ? Colors.red[300] 
+                            : Colors.red
+                      ),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(auth.errorMessage!)),
+                      Expanded(
+                        child: Text(
+                          auth.errorMessage!,
+                          style: TextStyle(
+                            color: themeProvider.isDarkMode 
+                                ? Colors.red[300] 
+                                : Colors.black,
+                          ),
+                        ),
+                      ),
                       IconButton(
-                        icon: const Icon(Icons.close, size: 18),
+                        icon: Icon(
+                          Icons.close, 
+                          size: 18,
+                          color: themeProvider.isDarkMode 
+                              ? Colors.red[300] 
+                              : Colors.black,
+                        ),
                         onPressed: auth.clearError,
                       ),
                     ],
@@ -158,17 +192,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     // Campo para ingresar el correo electrónico
                     TextFormField(
                       controller: emailController,
-                      style: const TextStyle(color: Colors.black),
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: textColor),
+                      decoration: InputDecoration(
                         labelText: 'Correo Electrónico',
-                        labelStyle: TextStyle(color: pinkPrimary),
-                        prefixIcon: Icon(Icons.email, color: pinkPrimary),
+                        labelStyle: TextStyle(color: iconColor),
+                        prefixIcon: Icon(Icons.email, color: iconColor),
                         border: OutlineInputBorder(
-                          borderSide: BorderSide(color: pinkLight),
+                          borderSide: BorderSide(color: borderColor),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: borderColor),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: pinkPrimary),
+                          borderSide: BorderSide(color: focusedBorderColor),
                         ),
+                        filled: themeProvider.isDarkMode,
+                        fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
                       ),
                       keyboardType: TextInputType.emailAddress,
                       // Validador para el campo de correo
@@ -188,17 +227,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     // Campo para ingresar la contraseña
                     TextFormField(
                       controller: passwordController,
+                      style: TextStyle(color: textColor),
                       decoration: InputDecoration(
                         labelText: 'Contraseña',
-                        labelStyle: const TextStyle(color: pinkPrimary),
-                        prefixIcon: const Icon(Icons.lock, color: pinkPrimary),
+                        labelStyle: TextStyle(color: iconColor),
+                        prefixIcon: Icon(Icons.lock, color: iconColor),
                         // Botón para alternar la visibilidad de la contraseña
                         suffixIcon: IconButton(
                           icon: Icon(
                             ocultarPassword
                                 ? Icons.visibility_off
                                 : Icons.visibility,
-                            color: pinkPrimary,
+                            color: iconColor,
                           ),
                           onPressed: () {
                             setState(() {
@@ -206,12 +246,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             });
                           },
                         ),
-                        border: const OutlineInputBorder(
-                          borderSide: BorderSide(color: pinkLight),
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(color: borderColor),
                         ),
-                        focusedBorder: const OutlineInputBorder(
-                          borderSide: BorderSide(color: pinkPrimary),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: borderColor),
                         ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: focusedBorderColor),
+                        ),
+                        filled: themeProvider.isDarkMode,
+                        fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
                       ),
                       obscureText: ocultarPassword,
                       // Validador para el campo de contraseña
@@ -231,17 +276,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     // Campo para confirmar la contraseña
                     TextFormField(
                       controller: confirmarController,
+                      style: TextStyle(color: textColor),
                       decoration: InputDecoration(
                         labelText: 'Confirmar Contraseña',
-                        labelStyle: const TextStyle(color: pinkPrimary),
-                        prefixIcon: const Icon(Icons.lock_outline, color: pinkPrimary),
+                        labelStyle: TextStyle(color: iconColor),
+                        prefixIcon: Icon(Icons.lock_outline, color: iconColor),
                         // Botón para alternar la visibilidad de la confirmación
                         suffixIcon: IconButton(
                           icon: Icon(
                             ocultarConfirmar
                                 ? Icons.visibility_off
                                 : Icons.visibility,
-                            color: pinkPrimary,
+                            color: iconColor,
                           ),
                           onPressed: () {
                             setState(() {
@@ -249,12 +295,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             });
                           },
                         ),
-                        border: const OutlineInputBorder(
-                          borderSide: BorderSide(color: pinkLight),
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(color: borderColor),
                         ),
-                        focusedBorder: const OutlineInputBorder(
-                          borderSide: BorderSide(color: pinkPrimary),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: borderColor),
                         ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: focusedBorderColor),
+                        ),
+                        filled: themeProvider.isDarkMode,
+                        fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
                       ),
                       obscureText: ocultarConfirmar,
                       // Validador para confirmar que las contraseñas coincidan

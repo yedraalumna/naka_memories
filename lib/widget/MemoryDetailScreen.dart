@@ -3,8 +3,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
 import 'MemoryForm.dart';
-import 'dart:io'; //Obligatorio para leer archivos locales (la camara y la galeria)
+import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 
 class MemoryDetailScreen extends StatelessWidget {
   final Memory memory;
@@ -22,6 +24,9 @@ class MemoryDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDarkMode = themeProvider.isDarkMode;
+    
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.9,
@@ -30,11 +35,11 @@ class MemoryDetailScreen extends StatelessWidget {
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDarkMode ? backgroundDark : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
             boxShadow: [
               BoxShadow(
-                color: pinkPrimary.withOpacity(0.2),
+                color: pinkPrimary.withOpacity(isDarkMode ? 0.1 : 0.2),
                 blurRadius: 30,
                 spreadRadius: 5,
               ),
@@ -44,8 +49,8 @@ class MemoryDetailScreen extends StatelessWidget {
             controller: scrollController,
             child: Column(
               children: [
-                _buildHeader(context),
-                _buildContent(context),
+                _buildHeader(context, isDarkMode),
+                _buildContent(context, isDarkMode),
               ],
             ),
           ),
@@ -54,17 +59,13 @@ class MemoryDetailScreen extends StatelessWidget {
     );
   }
 
-  //Construimos el encabezado superior con fondo degradado
-  Widget _buildHeader(BuildContext context) {
+  //Construimos el encabezado superior
+  Widget _buildHeader(BuildContext context, bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(25),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [pinkPrimary, pinkAccent],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      decoration: BoxDecoration(
+        color: isDarkMode ? pinkDark : pinkPrimary,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -100,23 +101,23 @@ class MemoryDetailScreen extends StatelessWidget {
   }
 
   // Contenedor principal con todos los elementos de la memoria
-  Widget _buildContent(BuildContext context) {
+  Widget _buildContent(BuildContext context, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.all(25),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildImage(),
+          _buildImage(isDarkMode),
           const SizedBox(height: 25),
-          _buildTitle(),
+          _buildTitle(isDarkMode),
           const SizedBox(height: 15),
-          _buildDate(),
+          _buildDate(isDarkMode),
           const SizedBox(height: 20),
-          _buildDescription(),
+          _buildDescription(isDarkMode),
           const SizedBox(height: 25),
-          _buildLocationInfo(),
+          _buildLocationInfo(isDarkMode),
           const SizedBox(height: 30),
-          _buildActionButtons(context),
+          _buildActionButtons(context, isDarkMode),
           const SizedBox(height: 30),
         ],
       ),
@@ -124,7 +125,7 @@ class MemoryDetailScreen extends StatelessWidget {
   }
 
   // Construimos la sección de imagen soportando archivos locales
-  Widget _buildImage() {
+  Widget _buildImage(bool isDarkMode) {
     if (memory.imageAsset != null && memory.imageAsset!.isNotEmpty) {
       Widget imageWidget;
 
@@ -134,7 +135,7 @@ class MemoryDetailScreen extends StatelessWidget {
           height: 250,
           width: double.infinity,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(),
+          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(isDarkMode),
         );
       }
       // WEB
@@ -144,7 +145,7 @@ class MemoryDetailScreen extends StatelessWidget {
           height: 250,
           width: double.infinity,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(),
+          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(isDarkMode),
         );
       }
       // MÓVIL
@@ -154,7 +155,7 @@ class MemoryDetailScreen extends StatelessWidget {
           height: 250,
           width: double.infinity,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(),
+          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(isDarkMode),
         );
       }
 
@@ -168,19 +169,22 @@ class MemoryDetailScreen extends StatelessWidget {
     return Container(
       height: 150,
       decoration: BoxDecoration(
-        color: pinkLighter,
+        color: isDarkMode ? cardDark : pinkLighter,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: pinkLight, style: BorderStyle.solid),
+        border: Border.all(
+          color: isDarkMode ? Colors.grey[700]! : pinkLight, 
+          style: BorderStyle.solid
+        ),
       ),
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.photo_library, size: 50, color: pinkPrimary),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Text(
               'Sin imagen',
-              style: TextStyle(color: pinkDark),
+              style: TextStyle(color: pinkPrimary),
             ),
           ],
         ),
@@ -189,21 +193,21 @@ class MemoryDetailScreen extends StatelessWidget {
   }
 
   // Widget auxiliar para control de errores de carga de imagen
-  Widget _buildErrorContainer() {
+  Widget _buildErrorContainer(bool isDarkMode) {
     return Container(
       height: 250,
-      color: pinkLighter,
+      color: isDarkMode ? cardDark : pinkLighter,
       alignment: Alignment.center,
-      child: const Icon(Icons.error, color: pinkDark, size: 50),
+      child: Icon(Icons.error, color: pinkPrimary, size: 50),
     );
   }
 
   //Muestra el título principal de la memoria
-  Widget _buildTitle() {
+  Widget _buildTitle(bool isDarkMode) {
     return Text(
       memory.title,
-      style: const TextStyle(
-        color: pinkDark,
+      style: TextStyle(
+        color: isDarkMode ? textDarkMode : pinkDark,
         fontSize: 28,
         fontWeight: FontWeight.bold,
         height: 1.2,
@@ -212,15 +216,15 @@ class MemoryDetailScreen extends StatelessWidget {
   }
 
   // mostramos la fecha del recuerdo con icono de calendario
-  Widget _buildDate() {
+  Widget _buildDate(bool isDarkMode) {
     return Row(
       children: [
-        const Icon(Icons.calendar_today, color: pinkPrimary, size: 18),
+        Icon(Icons.calendar_today, color: pinkPrimary, size: 18),
         const SizedBox(width: 8),
         Text(
           memory.date,
           style: TextStyle(
-            color: pinkDark.withOpacity(0.8),
+            color: isDarkMode ? Colors.grey[400] : pinkDark.withOpacity(0.8),
             fontSize: 16,
           ),
         ),
@@ -229,14 +233,14 @@ class MemoryDetailScreen extends StatelessWidget {
   }
 
   // mostramos la descripción detallada del recuerdo
-  Widget _buildDescription() {
+  Widget _buildDescription(bool isDarkMode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Descripción',
           style: TextStyle(
-            color: pinkDark,
+            color: isDarkMode ? textDarkMode : pinkDark,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -244,8 +248,8 @@ class MemoryDetailScreen extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           memory.description,
-          style: const TextStyle(
-            color: backgroundDark,
+          style: TextStyle(
+            color: isDarkMode ? Colors.grey[300] : backgroundDark,
             fontSize: 16,
             height: 1.6,
           ),
@@ -255,29 +259,27 @@ class MemoryDetailScreen extends StatelessWidget {
   }
 
   // mostramos la información de ubicación, es decir las coordenadas
-  Widget _buildLocationInfo() {
+  Widget _buildLocationInfo(bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [pinkLighter, Colors.white],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: isDarkMode ? cardDark : pinkLighter,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: pinkLight.withOpacity(0.3)),
+        border: Border.all(
+          color: isDarkMode ? Colors.grey[700]! : pinkLight.withOpacity(0.3)
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(Icons.location_on, color: pinkPrimary, size: 24),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Text(
                 'Ubicación Exacta',
                 style: TextStyle(
-                  color: pinkDark,
+                  color: isDarkMode ? textDarkMode : pinkDark,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -287,13 +289,13 @@ class MemoryDetailScreen extends StatelessWidget {
           const SizedBox(height: 15),
           Row(
             children: [
-              const Icon(Icons.north, color: pinkPrimary, size: 16),
+              Icon(Icons.north, color: pinkPrimary, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Latitud: ${memory.latitude.toStringAsFixed(6)}',
-                  style: const TextStyle(
-                    color: pinkDark,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey[300] : pinkDark,
                     fontSize: 16,
                   ),
                 ),
@@ -303,13 +305,13 @@ class MemoryDetailScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.east, color: pinkPrimary, size: 16),
+              Icon(Icons.east, color: pinkPrimary, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Longitud: ${memory.longitude.toStringAsFixed(6)}',
-                  style: const TextStyle(
-                    color: pinkDark,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey[300] : pinkDark,
                     fontSize: 16,
                   ),
                 ),
@@ -322,14 +324,14 @@ class MemoryDetailScreen extends StatelessWidget {
   }
 
   // construimos los botones de acción, es decir editar y eliminar
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons(BuildContext context, bool isDarkMode) {
     return Column(
       children: [
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: () {
-              _showEditOptions(context);
+              _showEditOptions(context, isDarkMode);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: pinkPrimary,
@@ -359,15 +361,15 @@ class MemoryDetailScreen extends StatelessWidget {
           child: ElevatedButton.icon(
             onPressed: onDelete,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
+              backgroundColor: isDarkMode ? cardDark : Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
                 side: const BorderSide(color: pinkPrimary, width: 2),
               ),
             ),
-            icon: const Icon(Icons.delete, color: pinkPrimary),
-            label: const Text(
+            icon: Icon(Icons.delete, color: pinkPrimary),
+            label: Text(
               'Eliminar',
               style: TextStyle(
                 color: pinkPrimary,
@@ -382,7 +384,7 @@ class MemoryDetailScreen extends StatelessWidget {
   }
 
   // Mostrar un menú con opciones de edición
-  void _showEditOptions(BuildContext context) {
+  void _showEditOptions(BuildContext context, bool isDarkMode) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -391,16 +393,20 @@ class MemoryDetailScreen extends StatelessWidget {
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDarkMode ? backgroundDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Título del menú de opciones
-              const Text(
+              Text(
                 '¿Qué deseas editar?',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: pinkDark,
+                  color: isDarkMode ? textDarkMode : pinkDark,
                 ),
               ),
 
@@ -408,39 +414,70 @@ class MemoryDetailScreen extends StatelessWidget {
 
               // Opción 1: Editar solo la ubicación (coordenadas)
               ListTile(
-                leading: const Icon(Icons.edit_location, color: pinkPrimary),
-                title: const Text('Editar solo ubicación'),
-                subtitle: const Text('Cambia las coordenadas del recuerdo'),
+                leading: Icon(Icons.edit_location, color: pinkPrimary),
+                title: Text(
+                  'Editar solo ubicación',
+                  style: TextStyle(
+                    color: isDarkMode ? textDarkMode : Colors.black87,
+                  ),
+                ),
+                subtitle: Text(
+                  'Cambia las coordenadas del recuerdo',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
+                tileColor: isDarkMode ? cardDark.withOpacity(0.5) : null,
                 onTap: () {
-                  Navigator.pop(context); // Cierra el menú de opciones
-                  onEdit(); // Ejecuta la función de edición
+                  Navigator.pop(context);
+                  onEdit();
                 },
               ),
 
-              const Divider(),
+              Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[300]),
 
-              // Opción 2: Editar todos los datos (título, descripción, fecha, imagen)
+              // Opción 2: Editar todos los datos
               ListTile(
-                leading: const Icon(Icons.edit_note, color: pinkPrimary),
-                title: const Text('Editar todos los datos'),
-                subtitle: const Text(
-                    'Título, descripción, fecha, imagen y ubicación'),
+                leading: Icon(Icons.edit_note, color: pinkPrimary),
+                title: Text(
+                  'Editar todos los datos',
+                  style: TextStyle(
+                    color: isDarkMode ? textDarkMode : Colors.black87,
+                  ),
+                ),
+                subtitle: Text(
+                  'Título, descripción, fecha, imagen y ubicación',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
+                tileColor: isDarkMode ? cardDark.withOpacity(0.5) : null,
                 onTap: () {
-                  Navigator.pop(context); // Cierra el menú de opciones
+                  Navigator.pop(context);
                   _navigateToFullEditForm(context);
                 },
               ),
 
-              const Divider(),
+              Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[300]),
 
               // Eliminar recuerdo
               ListTile(
-                leading: const Icon(Icons.delete, color: Colors.pinkAccent),
-                title: const Text('Eliminar recuerdo'),
-                subtitle: const Text('Elimina permanentemente este recuerdo'),
+                leading: Icon(Icons.delete, color: Colors.pinkAccent),
+                title: Text(
+                  'Eliminar recuerdo',
+                  style: TextStyle(
+                    color: isDarkMode ? textDarkMode : Colors.black87,
+                  ),
+                ),
+                subtitle: Text(
+                  'Elimina permanentemente este recuerdo',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
+                tileColor: isDarkMode ? cardDark.withOpacity(0.5) : null,
                 onTap: () {
-                  Navigator.pop(context); // Cierra el menú de opciones
-                  // Llama directamente a la función onDelete
+                  Navigator.pop(context);
                   onDelete();
                 },
               ),
@@ -460,27 +497,23 @@ class MemoryDetailScreen extends StatelessWidget {
           location: LatLng(memory.latitude, memory.longitude),
           existingMemory: memory,
           onSave: (updatedMemory) {
-            // Cierra el diálogo del formulario
             Navigator.pop(context);
-
-            // Cierra también el modal de detalles si está abierto
             Navigator.pop(context);
 
             if (onUpdate != null) {
               onUpdate!(updatedMemory);
             }
 
-            // Muestra el mensaje de confirmación
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Text('Recuerdo actualizado correctamente'),
                 backgroundColor: pinkPrimary,
-                duration: Duration(seconds: 2),
+                duration: const Duration(seconds: 2),
               ),
             );
           },
           onCancel: () {
-            Navigator.pop(context); // Cerrar el diálogo
+            Navigator.pop(context);
           },
         );
       },

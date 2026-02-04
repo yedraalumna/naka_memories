@@ -54,22 +54,35 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.red[50],
+                        color: themeProvider.isDarkMode ? Colors.red[900]?.withOpacity(0.3) : Colors.red[50],
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red),
+                        border: Border.all(
+                          color: themeProvider.isDarkMode ? Colors.red[700]! : Colors.red,
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error, color: Colors.red, size: 20),
+                          Icon(
+                            Icons.error, 
+                            color: themeProvider.isDarkMode ? Colors.red[300] : Colors.red, 
+                            size: 20
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               error,
-                              style: const TextStyle(color: Colors.red, fontSize: 14),
+                              style: TextStyle(
+                                color: themeProvider.isDarkMode ? Colors.red[300] : Colors.red, 
+                                fontSize: 14
+                              ),
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close, size: 18, color: Colors.red),
+                            icon: Icon(
+                              Icons.close, 
+                              size: 18, 
+                              color: themeProvider.isDarkMode ? Colors.red[300] : Colors.red
+                            ),
                             onPressed: () => authProvider.clearError(),
                           ),
                         ],
@@ -79,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: formulario(),
+                  child: formulario(themeProvider),
                 ),
                 botonLogin(),
                 const SizedBox(height: 20),
@@ -117,33 +130,45 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget formulario() {
+  Widget formulario(ThemeProvider themeProvider) {
     return Form(
       key: _formKey,
       child: Column(
         children: [
-          buildEmail(),
+          buildEmail(themeProvider),
           const Padding(padding: EdgeInsets.only(top: 12)),
-          buildPassword(),
+          buildPassword(themeProvider),
         ],
       ),
     );
   }
 
-  Widget buildEmail() {
+  Widget buildEmail(ThemeProvider themeProvider) {
+    Color textColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    Color borderColor = themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
+    Color focusedBorderColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    Color iconColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    
     return TextFormField(
+      style: TextStyle(color: textColor),
       decoration: InputDecoration(
         labelText: "Email",
-        labelStyle: const TextStyle(color: pinkPrimary),
+        labelStyle: TextStyle(color: textColor),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: pinkLight),
+          borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: pinkPrimary),
+          borderSide: BorderSide(color: focusedBorderColor),
         ),
-        prefixIcon: const Icon(Icons.email, color: pinkPrimary),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        prefixIcon: Icon(Icons.email, color: iconColor),
+        filled: themeProvider.isDarkMode,
+        fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
       ),
       keyboardType: TextInputType.emailAddress,
       onSaved: (String? value) {
@@ -161,20 +186,32 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget buildPassword() {
+  Widget buildPassword(ThemeProvider themeProvider) {
+    Color textColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    Color borderColor = themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
+    Color focusedBorderColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    Color iconColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    
     return TextFormField(
+      style: TextStyle(color: textColor),
       decoration: InputDecoration(
         labelText: "Contraseña",
-        labelStyle: const TextStyle(color: pinkPrimary),
+        labelStyle: TextStyle(color: textColor),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: pinkLight),
+          borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: pinkPrimary),
+          borderSide: BorderSide(color: focusedBorderColor),
         ),
-        prefixIcon: const Icon(Icons.lock, color: pinkPrimary),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        prefixIcon: Icon(Icons.lock, color: iconColor),
+        filled: themeProvider.isDarkMode,
+        fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
       ),
       obscureText: true,
       validator: (value) {

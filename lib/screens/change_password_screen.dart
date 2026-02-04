@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_auth_provider.dart';
+import '../providers/theme_provider.dart';
 import '../constants/colors.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -60,10 +61,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Contraseña cambiada correctamente'),
+          SnackBar(
+            content: const Text('Contraseña cambiada correctamente'),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
 
@@ -85,8 +86,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDarkMode = themeProvider.isDarkMode;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDarkMode ? backgroundDark : Colors.white,
       appBar: AppBar(
         title: const Text('Cambiar Contraseña'),
         backgroundColor: pinkPrimary,
@@ -103,12 +107,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
+                Text(
                   'Cambiar contraseña',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: pinkDark,
+                    color: isDarkMode ? textDarkMode : pinkDark,
                   ),
                 ),
 
@@ -118,18 +122,20 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: pinkLighter,
+                    color: isDarkMode ? cardDark : pinkLighter,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: pinkPrimary, width: 1),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       Icon(Icons.info, color: pinkPrimary),
-                      SizedBox(width: 10),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'La nueva contraseña debe tener al menos 6 caracteres',
-                          style: TextStyle(color: pinkDark),
+                          style: TextStyle(
+                            color: isDarkMode ? textDarkMode : pinkDark,
+                          ),
                         ),
                       ),
                     ],
@@ -143,10 +149,20 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   controller: _newPasswordController,
                   obscureText: !_showNewPassword,
                   enabled: !_isLoading,
+                  style: TextStyle(
+                    color: isDarkMode ? textDarkMode : Colors.black87,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Nueva contraseña',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock, color: pinkPrimary),
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? textDarkMode.withOpacity(0.7) : Colors.grey[700],
+                    ),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!,
+                      ),
+                    ),
+                    prefixIcon: Icon(Icons.lock, color: pinkPrimary),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _showNewPassword ? Icons.visibility : Icons.visibility_off,
@@ -158,6 +174,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         });
                       },
                     ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: pinkPrimary, width: 2),
+                    ),
+                    fillColor: isDarkMode ? cardDark : Colors.white,
+                    filled: true,
                   ),
                 ),
 
@@ -168,10 +194,20 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   controller: _confirmPasswordController,
                   obscureText: !_showConfirmPassword,
                   enabled: !_isLoading,
+                  style: TextStyle(
+                    color: isDarkMode ? textDarkMode : Colors.black87,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Confirmar contraseña',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock_reset, color: pinkPrimary),
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? textDarkMode.withOpacity(0.7) : Colors.grey[700],
+                    ),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!,
+                      ),
+                    ),
+                    prefixIcon: Icon(Icons.lock_reset, color: pinkPrimary),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _showConfirmPassword ? Icons.visibility : Icons.visibility_off,
@@ -183,6 +219,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         });
                       },
                     ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: pinkPrimary, width: 2),
+                    ),
+                    fillColor: isDarkMode ? cardDark : Colors.white,
+                    filled: true,
                   ),
                 ),
 
@@ -220,8 +266,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : () => Navigator.pop(context),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[300],
-                          foregroundColor: Colors.black87,
+                          backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                          foregroundColor: isDarkMode ? Colors.white : Colors.black87,
                           padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),

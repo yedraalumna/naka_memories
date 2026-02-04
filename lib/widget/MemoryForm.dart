@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:provider/provider.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
+import '../providers/theme_provider.dart';
 import 'dart:io'; 
 import '../services/ImagePickerService.dart'; 
 import 'package:flutter/foundation.dart';
-
 
 class MemoryForm extends StatefulWidget {
   final LatLng location;
@@ -56,11 +57,34 @@ class _MemoryFormState extends State<MemoryForm> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDarkMode = themeProvider.isDarkMode;
+    
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(1900),
       lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: isDarkMode
+              ? ThemeData.dark().copyWith(
+                  colorScheme: const ColorScheme.dark(
+                    primary: pinkPrimary,
+                    onPrimary: Colors.white,
+                    surface: backgroundDark,
+                    onSurface: Colors.white,
+                  ),
+                )
+              : ThemeData.light().copyWith(
+                  colorScheme: const ColorScheme.light(
+                    primary: pinkPrimary,
+                    onPrimary: Colors.white,
+                  ),
+                ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -76,17 +100,24 @@ class _MemoryFormState extends State<MemoryForm> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
+        final themeProvider = Provider.of<ThemeProvider>(context);
+        final isDarkMode = themeProvider.isDarkMode;
+        
         return Container(
           padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDarkMode ? cardDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Seleccionar origen de imagen',
                 style: TextStyle(
-                    fontSize: 18, 
-                    fontWeight: FontWeight.bold, 
-                    color: pinkDark
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold, 
+                  color: isDarkMode ? textDarkMode : pinkDark,
                 ),
               ),
               const SizedBox(height: 20),
@@ -94,8 +125,11 @@ class _MemoryFormState extends State<MemoryForm> {
               // Opción de cámara (solo mostrar si no es web)
               if (!kIsWeb) ...[
                 ListTile(
-                  leading: const Icon(Icons.camera_alt, color: pinkPrimary),
-                  title: const Text('Sacar una foto'),
+                  leading: Icon(Icons.camera_alt, color: pinkPrimary),
+                  title: Text('Sacar una foto', style: TextStyle(
+                    color: isDarkMode ? textDarkMode : Colors.black87,
+                  )),
+                  tileColor: isDarkMode ? backgroundDark.withOpacity(0.3) : null,
                   onTap: () async {
                     Navigator.pop(context);
                     await _pickImageFromCamera();
@@ -106,8 +140,11 @@ class _MemoryFormState extends State<MemoryForm> {
               // Opción de galería (solo mostrar si no es web)
               if (!kIsWeb) ...[
                 ListTile(
-                  leading: const Icon(Icons.photo_library, color: pinkPrimary),
-                  title: const Text('Elegir desde galería'),
+                  leading: Icon(Icons.photo_library, color: pinkPrimary),
+                  title: Text('Elegir desde galería', style: TextStyle(
+                    color: isDarkMode ? textDarkMode : Colors.black87,
+                  )),
+                  tileColor: isDarkMode ? backgroundDark.withOpacity(0.3) : null,
                   onTap: () async {
                     Navigator.pop(context);
                     await _pickImageFromGallery();
@@ -118,8 +155,11 @@ class _MemoryFormState extends State<MemoryForm> {
               // Opción para web (si no hay soporte de cámara/galería)
               if (kIsWeb) ...[
                 ListTile(
-                  leading: const Icon(Icons.photo_library, color: pinkPrimary),
-                  title: const Text('Subir imagen'),
+                  leading: Icon(Icons.photo_library, color: pinkPrimary),
+                  title: Text('Subir imagen', style: TextStyle(
+                    color: isDarkMode ? textDarkMode : Colors.black87,
+                  )),
+                  tileColor: isDarkMode ? backgroundDark.withOpacity(0.3) : null,
                   onTap: () async {
                     Navigator.pop(context);
                     await _pickImageForWeb();
@@ -128,8 +168,11 @@ class _MemoryFormState extends State<MemoryForm> {
               ],
               
               ListTile(
-                leading: const Icon(Icons.image_search, color: pinkPrimary),
-                title: const Text('Imágenes predeterminadas'),
+                leading: Icon(Icons.image_search, color: pinkPrimary),
+                title: Text('Imágenes predeterminadas', style: TextStyle(
+                  color: isDarkMode ? textDarkMode : Colors.black87,
+                )),
+                tileColor: isDarkMode ? backgroundDark.withOpacity(0.3) : null,
                 onTap: () {
                   Navigator.pop(context);
                   _selectAsset();
@@ -203,17 +246,25 @@ class _MemoryFormState extends State<MemoryForm> {
     showModalBottomSheet(
       context: context,
       builder: (context) {
+        final themeProvider = Provider.of<ThemeProvider>(context);
+        final isDarkMode = themeProvider.isDarkMode;
+        
         return Container(
           padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDarkMode ? cardDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          height: MediaQuery.of(context).size.height * 0.7,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Seleccionar imagen',
                 style: TextStyle(
                   fontSize: 18, 
                   fontWeight: FontWeight.bold, 
-                  color: pinkDark
+                  color: isDarkMode ? textDarkMode : pinkDark,
                 ),
               ),
               const SizedBox(height: 10),
@@ -243,7 +294,7 @@ class _MemoryFormState extends State<MemoryForm> {
                           borderRadius: BorderRadius.circular(10),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.grey.withOpacity(0.3),
+                              color: Colors.grey.withOpacity(isDarkMode ? 0.1 : 0.3),
                               blurRadius: 5,
                               offset: const Offset(0, 3),
                             ),
@@ -255,8 +306,8 @@ class _MemoryFormState extends State<MemoryForm> {
                             asset, 
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) => Container(
-                              color: pinkLighter,
-                              child: const Icon(Icons.error, color: pinkDark),
+                              color: isDarkMode ? cardLight : pinkLighter,
+                              child: Icon(Icons.error, color: pinkDark),
                             ),
                           ),
                         ),
@@ -294,12 +345,12 @@ class _MemoryFormState extends State<MemoryForm> {
     }
 
     if (_selectedAsset == null || _selectedAsset!.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.photo_library, color: pinkPrimary, size: 40),
-            SizedBox(height: 5),
+            const SizedBox(height: 5),
             Text('Seleccionar imagen', style: TextStyle(color: pinkPrimary)),
           ],
         ),
@@ -312,7 +363,7 @@ class _MemoryFormState extends State<MemoryForm> {
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => Container(
           color: pinkLighter,
-          child: const Center(
+          child: Center(
             child: Icon(Icons.error, color: pinkDark, size: 40),
           ),
         ),
@@ -342,7 +393,7 @@ class _MemoryFormState extends State<MemoryForm> {
           },
           errorBuilder: (context, error, stackTrace) => Container(
             color: pinkLighter,
-            child: const Center(
+            child: Center(
               child: Icon(Icons.error, color: pinkDark, size: 40),
             ),
           ),
@@ -364,7 +415,7 @@ class _MemoryFormState extends State<MemoryForm> {
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => Container(
           color: pinkLighter,
-          child: const Center(
+          child: Center(
             child: Icon(Icons.error, color: pinkDark, size: 40),
           ),
         ),
@@ -415,8 +466,11 @@ class _MemoryFormState extends State<MemoryForm> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDarkMode = themeProvider.isDarkMode;
+
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: isDarkMode ? backgroundDark : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
@@ -433,10 +487,10 @@ class _MemoryFormState extends State<MemoryForm> {
                   widget.existingMemory == null 
                       ? 'Crear Nuevo Recuerdo' 
                       : 'Editar Recuerdo',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: pinkDark,
+                    color: isDarkMode ? textDarkMode : pinkDark,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -445,16 +499,33 @@ class _MemoryFormState extends State<MemoryForm> {
                 // Campo de título
                 TextField(
                   controller: _titleController,
-                  decoration: const InputDecoration(
+                  style: TextStyle(
+                    color: isDarkMode ? textDarkMode : Colors.black87,
+                  ),
+                  decoration: InputDecoration(
                     labelText: 'Título *',
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                    ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: isDarkMode ? Colors.grey[700]! : pinkLight,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: isDarkMode ? Colors.grey[700]! : pinkLight,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: pinkPrimary, width: 2),
                     ),
                     prefixIcon: Icon(Icons.title, color: pinkPrimary),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: pinkPrimary, width: 2),
-                      borderRadius: BorderRadius.all(Radius.circular(10)),
-                    ),
+                    fillColor: isDarkMode ? cardDark : Colors.white,
+                    filled: true,
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -462,16 +533,33 @@ class _MemoryFormState extends State<MemoryForm> {
                 // Campo de descripción
                 TextField(
                   controller: _descriptionController,
-                  decoration: const InputDecoration(
+                  style: TextStyle(
+                    color: isDarkMode ? textDarkMode : Colors.black87,
+                  ),
+                  decoration: InputDecoration(
                     labelText: 'Descripción',
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                    ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: isDarkMode ? Colors.grey[700]! : pinkLight,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: isDarkMode ? Colors.grey[700]! : pinkLight,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: pinkPrimary, width: 2),
                     ),
                     prefixIcon: Icon(Icons.description, color: pinkPrimary),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: pinkPrimary, width: 2),
-                      borderRadius: BorderRadius.all(Radius.circular(10)),
-                    ),
+                    fillColor: isDarkMode ? cardDark : Colors.white,
+                    filled: true,
                   ),
                   maxLines: 3,
                 ),
@@ -483,16 +571,33 @@ class _MemoryFormState extends State<MemoryForm> {
                   child: AbsorbPointer(
                     child: TextField(
                       controller: _dateController,
-                      decoration: const InputDecoration(
+                      style: TextStyle(
+                        color: isDarkMode ? textDarkMode : Colors.black87,
+                      ),
+                      decoration: InputDecoration(
                         labelText: 'Fecha *',
+                        labelStyle: TextStyle(
+                          color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                        ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                            color: isDarkMode ? Colors.grey[700]! : pinkLight,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                            color: isDarkMode ? Colors.grey[700]! : pinkLight,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: pinkPrimary, width: 2),
                         ),
                         prefixIcon: Icon(Icons.calendar_today, color: pinkPrimary),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: pinkPrimary, width: 2),
-                          borderRadius: BorderRadius.all(Radius.circular(10)),
-                        ),
+                        fillColor: isDarkMode ? cardDark : Colors.white,
+                        filled: true,
                       ),
                     ),
                   ),
@@ -503,11 +608,11 @@ class _MemoryFormState extends State<MemoryForm> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Imagen',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: pinkDark,
+                        color: isDarkMode ? textDarkMode : pinkDark,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -516,7 +621,9 @@ class _MemoryFormState extends State<MemoryForm> {
                       child: Container(
                         height: 200,
                         decoration: BoxDecoration(
-                          color: pinkLighter.withOpacity(0.3),
+                          color: isDarkMode 
+                              ? cardDark.withOpacity(0.5) 
+                              : pinkLighter.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: pinkPrimary,
@@ -525,7 +632,7 @@ class _MemoryFormState extends State<MemoryForm> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
+                              color: Colors.grey.withOpacity(isDarkMode ? 0.1 : 0.2),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -542,12 +649,40 @@ class _MemoryFormState extends State<MemoryForm> {
                       'Presiona para cambiar la imagen',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[600],
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                         fontStyle: FontStyle.italic,
                       ),
                       textAlign: TextAlign.center,
                     ),
                   ],
+                ),
+                const SizedBox(height: 25),
+                
+                // Coordenadas
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? cardDark : pinkLighter.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isDarkMode ? Colors.grey[700]! : pinkLight,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.location_on, color: pinkPrimary, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Ubicación: ${widget.location.latitude.toStringAsFixed(6)}, ${widget.location.longitude.toStringAsFixed(6)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 25),
                 
@@ -558,18 +693,17 @@ class _MemoryFormState extends State<MemoryForm> {
                       child: ElevatedButton(
                         onPressed: widget.onCancel,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[200],
+                          backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.grey[400]!),
                           ),
                           elevation: 2,
                         ),
-                        child: const Text(
+                        child: Text(
                           'Cancelar',
                           style: TextStyle(
-                            color: Colors.black87,
+                            color: isDarkMode ? Colors.white : Colors.black87,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

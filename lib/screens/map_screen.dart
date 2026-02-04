@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:math' as math;
+import 'package:provider/provider.dart';
 
 import '../widget/MemoryForm.dart';
 import '../widget/MemoryDetailScreen.dart';
@@ -18,6 +19,7 @@ import '../models/Memory.dart';
 import '../constants/colors.dart';
 import '../constants/map_style.dart';
 import '../screens/coordinate_input_screen.dart';
+import '../providers/theme_provider.dart';
 
 class MapScreen extends StatefulWidget {
   final bool isLibrary;
@@ -590,7 +592,7 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(9), // Un poco menos que el borde
+              borderRadius: BorderRadius.circular(9),
               child: Container(
                 width: 60,
                 height: 60,
@@ -649,24 +651,34 @@ class _MapScreenState extends State<MapScreen> {
   // --- WIDGET PRINCIPAL ---
   @override
   Widget build(BuildContext context) {
+    // 1. OBTENER EL TEMA ACTUAL
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final bool isDarkMode = themeProvider.isDarkMode;
+
+    // 2. CONFIGURAR COLORES SEGÚN EL MODO
+    final Color appBarBg = isDarkMode ? backgroundDark : backgroundLight;
+    final Color titleColor = isDarkMode ? textDarkMode : textDark;
+    final Color iconColor = pinkPrimary;
+    final Color progressColor = pinkPrimary; // Color para el loading indicator
+
     // Si es web y estamos en modo biblioteca
     if (_isWeb && widget.isLibrary) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text(
+          title: Text(
             'Memory Places',
-            style: TextStyle(color: pinkDark, fontWeight: FontWeight.bold),
+            style: TextStyle(color: titleColor, fontWeight: FontWeight.bold),
           ),
-          backgroundColor: Colors.white,
+          backgroundColor: appBarBg,
           elevation: 1,
           actions: [
             if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.all(12.0),
-                child: CircularProgressIndicator(color: pinkPrimary),
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: CircularProgressIndicator(color: progressColor),
               ),
             IconButton(
-              icon: const Icon(Icons.menu, color: pinkPrimary),
+              icon: Icon(Icons.menu, color: iconColor),
               onPressed: _showMenuDialog,
             ),
           ],
@@ -684,20 +696,20 @@ class _MapScreenState extends State<MapScreen> {
     if (widget.isLibrary) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text(
+          title: Text(
             'Memory Places',
-            style: TextStyle(color: pinkDark, fontWeight: FontWeight.bold),
+            style: TextStyle(color: titleColor, fontWeight: FontWeight.bold),
           ),
-          backgroundColor: Colors.white,
+          backgroundColor: appBarBg,
           elevation: 1,
           actions: [
             if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.all(12.0),
+              Padding(
+                padding: const EdgeInsets.all(12.0),
                 child: CircularProgressIndicator(color: pinkPrimary),
               ),
             IconButton(
-              icon: const Icon(Icons.menu, color: pinkPrimary),
+              icon: Icon(Icons.menu, color: iconColor),
               onPressed: _showMenuDialog,
             ),
           ],
@@ -719,6 +731,7 @@ class _MapScreenState extends State<MapScreen> {
               },
               onCameraMove: (position) {
                 _currentCameraPosition = position.target;
+                // ESTO HACE QUE LAS COORDENADAS CAMBIEN EN TIEMPO REAL
                 if (widget.onCameraMoveCallback != null) {
                   widget.onCameraMoveCallback!(position.target);
                 }
@@ -749,10 +762,12 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
-    // Para móvil - Modo NO biblioteca (selección)
+    // Para móvil - Modo NO biblioteca (selección de coordenadas)
     return GoogleMap(
-      initialCameraPosition: const CameraPosition(
-        target: LatLng(40.4168, -3.7038),
+      initialCameraPosition: CameraPosition(
+        target: widget.initialMarkers?.isNotEmpty == true 
+            ? widget.initialMarkers!.first.position 
+            : const LatLng(40.4168, -3.7038),
         zoom: 15,
       ),
       onMapCreated: (controller) {
@@ -763,6 +778,7 @@ class _MapScreenState extends State<MapScreen> {
         }
       },
       onCameraMove: (position) {
+        // MUY IMPORTANTE: Actualizar el callback aquí también
         if (widget.onCameraMoveCallback != null) {
           widget.onCameraMoveCallback!(position.target);
         }

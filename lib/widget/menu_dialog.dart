@@ -22,7 +22,7 @@ class MenuDialog extends StatelessWidget {
     required this.onShowMemoryDetails,
   });
 
-  void _showMemoryListModal(BuildContext context, List<Memory> list, String title) {
+  void _showMemoryListModal(BuildContext context, List<Memory> list, String title, ThemeData theme) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -33,10 +33,14 @@ class MenuDialog extends StatelessWidget {
           maxChildSize: 0.95,
           minChildSize: 0.5,
           builder: (context, scrollController) {
+            Color backgroundColor = theme.brightness == Brightness.dark ? backgroundDark : Colors.white;
+            Color textColor = theme.brightness == Brightness.dark ? Colors.white : Colors.black;
+            Color primaryColor = theme.brightness == Brightness.dark ? pinkLight : pinkPrimary;
+            
             return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
                 children: [
@@ -45,32 +49,42 @@ class MenuDialog extends StatelessWidget {
                     alignment: Alignment.center,
                     child: Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: pinkPrimary,
+                        color: primaryColor,
                       ),
                     ),
                   ),
                   Expanded(
                     child: list.isEmpty
-                        ? const Center(child: Text('No se encontraron recuerdos.'))
+                        ? Center(
+                            child: Text(
+                              'No se encontraron recuerdos.',
+                              style: TextStyle(color: textColor),
+                            ),
+                          )
                         : ListView.builder(
                       controller: scrollController,
                       itemCount: list.length,
                       itemBuilder: (context, index) {
                         final memory = list[index];
                         return ListTile(
-                          leading: const Icon(Icons.location_pin, color: pinkPrimary),
-                          title: Text(memory.title),
+                          leading: Icon(Icons.location_pin, color: primaryColor),
+                          title: Text(
+                            memory.title,
+                            style: TextStyle(color: textColor),
+                          ),
                           subtitle: Text(
                             '${memory.date} | ${memory.location['latitude']?.toStringAsFixed(4)}, ${memory.location['longitude']?.toStringAsFixed(4)}',
+                            style: TextStyle(color: theme.brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[700]),
                           ),
                           onTap: () {
                             // Cierra el modal de la lista y llama al callback de MapScreen
                             Navigator.pop(context);
                             onShowMemoryDetails(memory);
                           },
+                          tileColor: theme.brightness == Brightness.dark ? cardDark.withOpacity(0.5) : null,
                         );
                       },
                     ),
@@ -85,20 +99,27 @@ class MenuDialog extends StatelessWidget {
   }
 
   // ordenamos por fecha de la mas reciente a la mas antigua
-  void _showSortedByDate(BuildContext context) {
+  void _showSortedByDate(BuildContext context, ThemeData theme) {
     Navigator.pop(context);
     final sortedMemories = List<Memory>.from(memories)
       ..sort((a, b) => b.date.compareTo(a.date)); // Del más reciente al más antiguo
-    _showMemoryListModal(context, sortedMemories, 'Recuerdos por Fecha (Recientes)');
+    _showMemoryListModal(context, sortedMemories, 'Recuerdos por Fecha (Recientes)', theme);
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    bool isDarkMode = theme.brightness == Brightness.dark;
+    
+    Color backgroundColor = isDarkMode ? backgroundDark : Colors.white;
+    Color textColor = isDarkMode ? Colors.white : Colors.black87;
+    Color dividerColor = isDarkMode ? Colors.grey[700]! : pinkLighter;
+    
     return Container(
       padding: const EdgeInsets.all(25),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -119,9 +140,10 @@ class MenuDialog extends StatelessWidget {
             title: 'Guardar nuevo recuerdo (Elegir coordenadas)',
             color: pinkAccent,
             onTap: onSaveCurrentCoordinates,
+            isDarkMode: isDarkMode,
           ),
 
-          const Divider(color: pinkLighter),
+          Divider(color: dividerColor),
 
           // centramos el mapa en todos los recuerdos
           _buildMenuItem(
@@ -129,6 +151,7 @@ class MenuDialog extends StatelessWidget {
             title: 'Centrar en todos los recuerdos',
             color: pinkPrimary,
             onTap: onShowAllMemories,
+            isDarkMode: isDarkMode,
           ),
 
           _buildMenuItem(
@@ -137,18 +160,20 @@ class MenuDialog extends StatelessWidget {
             color: pinkPrimary,
             onTap: () {
               Navigator.pop(context);
-              _showMemoryListModal(context, memories, 'Todos los Recuerdos');
+              _showMemoryListModal(context, memories, 'Todos los Recuerdos', theme);
             },
+            isDarkMode: isDarkMode,
           ),
 
           _buildMenuItem(
             icon: Icons.date_range,
             title: 'Listar por fecha (Recientes)',
             color: pinkPrimary,
-            onTap: () => _showSortedByDate(context),
+            onTap: () => _showSortedByDate(context, theme),
+            isDarkMode: isDarkMode,
           ),
 
-          const Divider(color: pinkLighter),
+          Divider(color: dividerColor),
 
           // eliminamos todos los recuerdos
           _buildMenuItem(
@@ -156,6 +181,7 @@ class MenuDialog extends StatelessWidget {
             title: 'Eliminar todos los recuerdos',
             color: Colors.pink,
             onTap: onClearAllMemories,
+            isDarkMode: isDarkMode,
           ),
         ],
       ),
@@ -167,20 +193,21 @@ class MenuDialog extends StatelessWidget {
     required String title,
     required VoidCallback onTap,
     required Color color,
+    required bool isDarkMode,
   }) {
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withOpacity(isDarkMode ? 0.2 : 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: color),
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          color: Colors.black87,
+        style: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black87,
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
@@ -188,6 +215,7 @@ class MenuDialog extends StatelessWidget {
       trailing: Icon(Icons.chevron_right, color: color),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+      tileColor: isDarkMode ? cardDark.withOpacity(0.3) : null,
     );
   }
 }
