@@ -3,6 +3,12 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_map/flutter_map.dart' as fmap;
 import 'package:latlong2/latlong.dart' as latlong2;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
+import 'dart:ui' as ui;
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'dart:math' as math;
 
 import '../widget/MemoryForm.dart';
 import '../widget/MemoryDetailScreen.dart';
@@ -20,36 +26,33 @@ class MapScreen extends StatefulWidget {
   final Function(LatLng)? onCameraMoveCallback;
   final Function(LatLng, GoogleMapController)? onLongPressCallback;
 
-  const MapScreen({super.key, 
+  const MapScreen({
+    Key? key,
     this.isLibrary = true,
     this.initialMarkers,
     this.onMapCreatedCallback,
     this.onCameraMoveCallback,
     this.onLongPressCallback,
-  });
+  }) : super(key: key);
 
   @override
-  State<MapScreen> createState() {
-    return _MapScreenState();
-  }
+  State<MapScreen> createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
   LatLng _currentCameraPosition = const LatLng(40.4168, -3.7038);
   Set<Marker> _markers = {};
-  final List<Memory> _memories = [];
+  List<Memory> _memories = [];
   final MemoryService _memoryService = MemoryService();
+  bool _isLoading = false;
 
-  // Método para detectar si es web
-  bool get _isWeb {
-    return identical(0, 0.0);
-  }
+  // Detectar si es web
+  bool get _isWeb => kIsWeb;
 
   @override
   void initState() {
     super.initState();
-
     if (widget.isLibrary) {
       _loadMemories();
     } else if (widget.initialMarkers != null) {
@@ -57,83 +60,299 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  // --- MOTOR DE IMÁGENES: CREA MARCADOR CUADRADO CON BORDES REDONDEADOS ---
+  Future<BitmapDescriptor> _getMarkerIconSquare(String? path) async {
+    const int targetWidth = 80;
+    const double borderRadius = 12.0;
+    const double borderWidth = 3.0;
+    
+    try {
+      Uint8List bytes;
+
+      if (path == null || path.isEmpty) {
+        return await _createDefaultMarkerIconSquare();
+      }
+
+      // 1. Obtención de bytes según plataforma y origen
+      if (path.startsWith('assets/')) {
+        ByteData data = await rootBundle.load(path);
+        bytes = data.buffer.asUint8List();
+      } else if (_isWeb || path.startsWith('http')) {
+        final response = await http.get(Uri.parse(path));
+        if (response.statusCode != 200) {
+          throw Exception('Failed to load image: ${response.statusCode}');
+        }
+        bytes = response.bodyBytes;
+      } else {
+        final file = File(path);
+        if (await file.exists()) {
+          bytes = await file.readAsBytes();
+        } else {
+          return await _createDefaultMarkerIconSquare();
+        }
+      }
+
+      // 2. Redimensionar la imagen
+      ui.Codec codec = await ui.instantiateImageCodec(
+        bytes, 
+        targetWidth: targetWidth
+      );
+      ui.FrameInfo fi = await codec.getNextFrame();
+      
+      // 3. Crear imagen cuadrada con bordes redondeados
+      final pictureRecorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(pictureRecorder);
+      final paint = ui.Paint();
+      
+      final rect = ui.Rect.fromLTWH(0, 0, targetWidth.toDouble(), targetWidth.toDouble());
+      final innerRect = ui.Rect.fromLTWH(
+        borderWidth, 
+        borderWidth, 
+        targetWidth - (borderWidth * 2), 
+        targetWidth - (borderWidth * 2)
+      );
+      
+      // Dibujar fondo con borde rosado
+      paint.color = pinkPrimary;
+      canvas.drawRRect(
+        ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(borderRadius)),
+        paint,
+      );
+      
+      // Dibujar fondo interior blanco
+      paint.color = Colors.white;
+      canvas.drawRRect(
+        ui.RRect.fromRectAndRadius(innerRect, ui.Radius.circular(borderRadius - borderWidth)),
+        paint,
+      );
+      
+      // Recortar con bordes redondeados
+      final clipPath = ui.Path()
+        ..addRRect(ui.RRect.fromRectAndRadius(
+          innerRect, 
+          ui.Radius.circular(borderRadius - borderWidth)
+        ));
+      
+      canvas.clipPath(clipPath);
+      
+      // Dibujar la imagen
+      canvas.drawImageRect(
+        fi.image,
+        ui.Rect.fromLTWH(0, 0, fi.image.width.toDouble(), fi.image.height.toDouble()),
+        innerRect,
+        ui.Paint()..filterQuality = ui.FilterQuality.high,
+      );
+      
+      // Convertir a bitmap
+      final picture = pictureRecorder.endRecording();
+      final image = await picture.toImage(targetWidth, targetWidth);
+      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      
+      if (byteData == null) {
+        throw Exception('Failed to convert image to byte data');
+      }
+      
+      return BitmapDescriptor.fromBytes(byteData.buffer.asUint8List());
+      
+    } catch (e) {
+      debugPrint("Error creando marcador cuadrado: $e");
+      return await _createDefaultMarkerIconSquare();
+    }
+  }
+
+  Future<BitmapDescriptor> _createDefaultMarkerIconSquare() async {
+    const double size = 80.0;
+    const double borderRadius = 12.0;
+    const double borderWidth = 3.0;
+    
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(pictureRecorder);
+    final paint = ui.Paint();
+    
+    final rect = ui.Rect.fromLTWH(0, 0, size, size);
+    final innerRect = ui.Rect.fromLTWH(
+      borderWidth, 
+      borderWidth, 
+      size - (borderWidth * 2), 
+      size - (borderWidth * 2)
+    );
+    
+    // Fondo con borde rosado
+    paint.color = pinkPrimary;
+    canvas.drawRRect(
+      ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(borderRadius)),
+      paint,
+    );
+    
+    // Fondo interior blanco
+    paint.color = Colors.white;
+    canvas.drawRRect(
+      ui.RRect.fromRectAndRadius(innerRect, ui.Radius.circular(borderRadius - borderWidth)),
+      paint,
+    );
+    
+    // Icono de foto
+    final textStyle = ui.TextStyle(
+      fontSize: size * 0.4,
+      fontFamily: Icons.photo.fontFamily,
+      color: pinkPrimary,
+    );
+    
+    final paragraphBuilder = ui.ParagraphBuilder(ui.ParagraphStyle())
+      ..pushStyle(textStyle)
+      ..addText(String.fromCharCode(Icons.photo.codePoint));
+    
+    final paragraph = paragraphBuilder.build();
+    paragraph.layout(ui.ParagraphConstraints(width: size));
+    
+    canvas.drawParagraph(
+      paragraph,
+      ui.Offset(
+        size / 2 - paragraph.width / 2,
+        size / 2 - paragraph.height / 2,
+      ),
+    );
+    
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    
+    if (byteData == null) {
+      return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+    }
+    
+    return BitmapDescriptor.fromBytes(byteData.buffer.asUint8List());
+  }
+
+  // --- CARGA DE RECUERDOS CON MARCADORES PERSONALIZADOS ---
   Future<void> _loadMemories() async {
+    if (_isLoading) return;
+    
+    setState(() => _isLoading = true);
+    
     try {
       final memories = await _memoryService.getMemories();
+      Set<Marker> newMarkers = {};
+
+      // Crear marcadores para cada memoria
+      for (var memory in memories) {
+        try {
+          final icon = await _getMarkerIconSquare(memory.imageAsset);
+          
+          newMarkers.add(
+            Marker(
+              markerId: MarkerId(memory.id),
+              position: memory.toLatLng,
+              icon: icon,
+              anchor: const Offset(0.5, 0.5), // Centrar el marcador
+              infoWindow: InfoWindow(
+                title: memory.title,
+                snippet: memory.description,
+                onTap: () => _showMemoryDetails(memory),
+              ),
+              onTap: () => _showMemoryDetails(memory),
+            ),
+          );
+        } catch (e) {
+          debugPrint("Error creando marcador para ${memory.title}: $e");
+          // Usar marcador por defecto si hay error
+          newMarkers.add(
+            Marker(
+              markerId: MarkerId(memory.id),
+              position: memory.toLatLng,
+              infoWindow: InfoWindow(
+                title: memory.title,
+                snippet: memory.description,
+                onTap: () => _showMemoryDetails(memory),
+              ),
+              onTap: () => _showMemoryDetails(memory),
+            ),
+          );
+        }
+      }
+
       setState(() {
-        _memories.clear();
-        _memories.addAll(memories);
-        _addMarkers(memories);
+        _memories = memories;
+        _markers = newMarkers;
+        _isLoading = false;
       });
     } catch (e) {
+      setState(() => _isLoading = false);
       _showErrorDialog('Error al cargar recuerdos: $e');
     }
   }
 
-  void _addMarkers(List<Memory> memories) {
-    setState(() {
-      _markers = memories.map((memory) {
-        return Marker(
-          markerId: MarkerId(memory.id),
-          position: memory.toLatLng,
-          infoWindow: InfoWindow(
-            title: memory.title,
-            snippet: memory.description,
-            onTap: () {
-              _showMemoryDetails(memory);
-            },
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
-          onTap: () {
-            _showMemoryDetails(memory);
-          },
-        );
-      }).toSet();
-    });
-  }
-
+  // --- MANEJO DE MENÚ Y NAVEGACIÓN ---
   void _handleSaveCoordinatesFromMenu() {
-    Navigator.pop(context);
+    if (Navigator.canPop(context)) Navigator.pop(context);
     _navigateToCoordinateInput();
   }
 
-  void _goToCoordinates() {
-    if (_memories.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No hay recuerdos guardados para mostrar.'),
-          backgroundColor: pinkPrimary,
-        ),
-      );
-      return;
-    }
-
-    final firstPosition = _memories.first.toLatLng;
-    if (_isWeb) {
-      Navigator.pop(context);
+  void _goToFirstMemory() {
+    if (_memories.isNotEmpty) {
+      final firstMemory = _memories.first;
+      if (_isWeb) {
+        _showSnackbar('Centrado en: ${firstMemory.title}');
+        Navigator.pop(context);
+      } else {
+        mapController.animateCamera(
+          CameraUpdate.newLatLngZoom(firstMemory.toLatLng, 15),
+        );
+        Navigator.pop(context);
+        _showSnackbar('Centrado en: ${firstMemory.title}');
+      }
     } else {
-      mapController.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: firstPosition, zoom: 15),
-        ),
-      );
-      Navigator.pop(context);
+      _showSnackbar('No hay recuerdos guardados', isError: true);
     }
   }
 
-  void _navigateToCoordinateInput() async {
+  void _goToAllMemories() {
+    if (_memories.length > 1) {
+      if (!_isWeb) {
+        // Calcular bounds para incluir todos los marcadores
+        LatLngBounds bounds = _calculateBounds();
+        mapController.animateCamera(
+          CameraUpdate.newLatLngBounds(bounds, 100),
+        );
+        Navigator.pop(context);
+        _showSnackbar('Mostrando todos los recuerdos (${_memories.length})');
+      } else {
+        Navigator.pop(context);
+        _showSnackbar('Mostrando todos los recuerdos (${_memories.length})');
+      }
+    } else {
+      _goToFirstMemory();
+    }
+  }
+
+  LatLngBounds _calculateBounds() {
+    double minLat = _memories[0].toLatLng.latitude;
+    double maxLat = _memories[0].toLatLng.latitude;
+    double minLng = _memories[0].toLatLng.longitude;
+    double maxLng = _memories[0].toLatLng.longitude;
+
+    for (var memory in _memories) {
+      minLat = math.min(minLat, memory.toLatLng.latitude);
+      maxLat = math.max(maxLat, memory.toLatLng.latitude);
+      minLng = math.min(minLng, memory.toLatLng.longitude);
+      maxLng = math.max(maxLng, memory.toLatLng.longitude);
+    }
+
+    return LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
+  }
+
+  Future<void> _navigateToCoordinateInput() async {
     final LatLng? selectedLocation = await Navigator.of(context).push<LatLng>(
       MaterialPageRoute(
-        builder: (context) {
-          return const CoordinateInputScreen();
-        },
+        builder: (context) => const CoordinateInputScreen(),
       ),
     );
 
     if (selectedLocation != null) {
       _showMemoryForm(selectedLocation);
-    } else {
-      _loadMemories();
     }
   }
 
@@ -146,7 +365,7 @@ class _MapScreenState extends State<MapScreen> {
         return MenuDialog(
           memories: _memories,
           currentPosition: _currentCameraPosition,
-          onShowAllMemories: _goToCoordinates,
+          onShowAllMemories: _goToAllMemories,
           onSaveCurrentCoordinates: _handleSaveCoordinatesFromMenu,
           onClearAllMemories: _confirmClearAllMemories,
           onShowMemoryDetails: _showMemoryDetails,
@@ -165,61 +384,51 @@ class _MapScreenState extends State<MapScreen> {
   void _showMemoryForm(LatLng location, {Memory? existingMemory}) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
         return MemoryForm(
           location: location,
           existingMemory: existingMemory,
           onSave: (memory) async {
-            await _memoryService.saveMemory(memory);
-            Navigator.of(context).pop();
-            _loadMemories();
+            try {
+              await _memoryService.saveMemory(memory);
+              Navigator.of(context).pop();
+              _loadMemories();
+              _showSnackbar(
+                existingMemory == null 
+                  ? 'Recuerdo creado' 
+                  : 'Recuerdo actualizado'
+              );
+            } catch (e) {
+              _showSnackbar('Error al guardar: $e', isError: true);
+            }
           },
-          onCancel: () {
-            Navigator.of(context).pop();
-          },
+          onCancel: () => Navigator.of(context).pop(),
         );
       },
     );
   }
 
-  // NUEVO MÉTODO: Editar solo la ubicación (similar a MemoryGalleryScreen)
+  // --- EDICIÓN Y DETALLES ---
   Future<void> _editOnlyLocation(Memory memory) async {
-    // Cerrar el modal de detalles primero
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
+    if (Navigator.canPop(context)) Navigator.pop(context);
 
-    // Navegar a CoordinateInputScreen con la memoria existente
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CoordinateInputScreen(
-          existingMemory: memory,
-        ),
+        builder: (context) => CoordinateInputScreen(existingMemory: memory),
       ),
     );
 
-    // Procesar el resultado
     if (result != null && result is Memory) {
       await _memoryService.saveMemory(result);
-      _loadMemories(); // Recargar los datos
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ubicación actualizada correctamente'),
-          backgroundColor: pinkPrimary,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      _loadMemories();
+      _showSnackbar('Ubicación actualizada');
     }
   }
 
-  // MÉTODO ACTUALIZADO: Ahora separa editar todo de editar solo ubicación
   void _showMemoryDetails(Memory memory) {
-    // Cerrar el menú dialog si está abierto
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
+    if (Navigator.canPop(context)) Navigator.pop(context);
 
     showModalBottomSheet(
       context: context,
@@ -228,228 +437,344 @@ class _MapScreenState extends State<MapScreen> {
       builder: (context) {
         return MemoryDetailScreen(
           memory: memory,
-          onEdit: () {
-            // Ahora llama al método para editar solo ubicación
-            _editOnlyLocation(memory);
-          },
+          onEdit: () => _editOnlyLocation(memory),
           onDelete: () async {
-            try {
-              // Cerrar el modal de detalles
-              Navigator.of(context).pop();
-              // Eliminar la memoria
-              await _memoryService.deleteMemory(memory.id);
-              // Recargar los datos
-              _loadMemories();
-              // Mostrar confirmación
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${memory.title} eliminado.'),
-                  backgroundColor: pinkPrimary,
-                ),
-              );
-            } catch (e) {
-              // Mostrar error si falla
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Error al eliminar: $e'),
-                  backgroundColor: Colors.pinkAccent,
-                ),
-              );
-            }
+            Navigator.of(context).pop();
+            await _confirmDeleteMemory(memory);
           },
-          // NUEVO: callback para actualizar la memoria cuando se edita todo
           onUpdate: (updatedMemory) async {
             await _memoryService.saveMemory(updatedMemory);
-            _loadMemories(); // Recargar los datos
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Recuerdo actualizado correctamente'),
-                backgroundColor: pinkPrimary,
-                duration: Duration(seconds: 2),
-              ),
-            );
+            _loadMemories();
+            _showSnackbar('Recuerdo actualizado');
           },
         );
       },
     );
   }
 
-  Future<void> _confirmClearAllMemories() async {
-    Navigator.pop(context);
-
+  Future<void> _confirmDeleteMemory(Memory memory) async {
     final bool? result = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Confirmar Eliminación'),
-          content: const Text('¿Estás seguro de eliminar todos los recuerdos? Esta acción no se puede deshacer.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context, false);
-              },
-              child: const Text('Cancelar'),
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar Recuerdo'),
+        content: Text('¿Estás seguro de eliminar "${memory.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: Colors.red),
             ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context, true);
-              },
-              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
 
     if (result == true) {
-      await _memoryService.clearAllMemories();
-      await _loadMemories();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
+      try {
+        await _memoryService.deleteMemory(memory.id);
+        _loadMemories();
+        _showSnackbar('${memory.title} eliminado');
+      } catch (e) {
+        _showSnackbar('Error al eliminar: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _confirmClearAllMemories() async {
+    if (Navigator.canPop(context)) Navigator.pop(context);
+    
+    if (_memories.isEmpty) {
+      _showSnackbar('No hay recuerdos para eliminar', isError: true);
+      return;
+    }
+
+    final bool? result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar Todos los Recuerdos'),
+        content: const Text('¿Estás seguro? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Eliminar Todo',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      try {
+        await _memoryService.clearAllMemories();
+        _loadMemories();
+        _showSnackbar('Todos los recuerdos eliminados');
+      } catch (e) {
+        _showSnackbar('Error al eliminar: $e', isError: true);
+      }
+    }
+  }
+
+  // --- MAPA WEB CON FLUTTER MAP ---
+  Widget _buildWebMap() {
+    return Scaffold(
+      body: Stack(
+        children: [
+          fmap.FlutterMap(
+            options: fmap.MapOptions(
+              initialCenter: latlong2.LatLng(40.4168, -3.7038),
+              initialZoom: 15.0,
+            ),
             children: [
-              Icon(Icons.delete_sweep, color: Colors.white),
-              SizedBox(width: 10),
-              Text('Todos los recuerdos eliminados'),
+              fmap.TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.memory_places',
+              ),
+              fmap.RichAttributionWidget(
+                attributions: [
+                  fmap.TextSourceAttribution(
+                    'OpenStreetMap contributors',
+                    onTap: () => launchUrl(
+                      Uri.parse('https://openstreetmap.org/copyright'),
+                    ),
+                  ),
+                ],
+              ),
+              // Agregar marcadores para web usando MarkerLayer
+              if (_memories.isNotEmpty)
+                fmap.MarkerLayer(
+                  markers: _buildWebMarkers(),
+                ),
             ],
           ),
-          backgroundColor: pinkPrimary,
-          duration: Duration(seconds: 2),
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(color: pinkPrimary),
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<fmap.Marker> _buildWebMarkers() {
+    return _memories.map((memory) {
+      return fmap.Marker(
+        point: latlong2.LatLng(
+          memory.toLatLng.latitude,
+          memory.toLatLng.longitude,
+        ),
+        width: 60,
+        height: 60,
+        child: GestureDetector(
+          onTap: () => _showMemoryDetails(memory),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: pinkPrimary, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 5,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(9), // Un poco menos que el borde
+              child: Container(
+                width: 60,
+                height: 60,
+                color: Colors.white,
+                child: memory.imageAsset != null && memory.imageAsset!.isNotEmpty
+                    ? Image.network(
+                        memory.imageAsset!,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: pinkLighter,
+                          child: Icon(Icons.photo, color: pinkPrimary, size: 30),
+                        ),
+                      )
+                    : Container(
+                        color: pinkLighter,
+                        child: Icon(Icons.photo, color: pinkPrimary, size: 30),
+                      ),
+              ),
+            ),
+          ),
         ),
       );
-    }
+    }).toList();
+  }
+
+  // --- MÉTODOS AUXILIARES ---
+  void _showSnackbar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : pinkPrimary,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Error'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // MÉTODO PARA EL MAPA WEB - VERSIÓN SIMPLIFICADA
-  Widget _buildWebMap({bool forLibrary = true}) {
-    return fmap.FlutterMap(
-      options: const fmap.MapOptions(
-        initialCenter: latlong2.LatLng(40.4168, -3.7038), // CORREGIDO: initialCenter en lugar de center
-        initialZoom: 15.0,
+      builder: (context) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
       ),
-      children: [
-        fmap.TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.mi_prueba',
-        ),
-        fmap.RichAttributionWidget(
-          attributions: [
-            fmap.TextSourceAttribution(
-              'OpenStreetMap contributors',
-              onTap: () => launchUrl(
-                  Uri.parse('https://openstreetmap.org/copyright')),
-            ),
-          ],
-        ),
-      ],
     );
   }
 
+  // --- WIDGET PRINCIPAL ---
   @override
   Widget build(BuildContext context) {
-    // SI ES WEB, USAR FLUTTER MAP
-    if (_isWeb) {
-      if (!widget.isLibrary) {
-        return _buildWebMap(forLibrary: false);
-      }
-
+    // Si es web y estamos en modo biblioteca
+    if (_isWeb && widget.isLibrary) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Memory Places', style: TextStyle(color: pinkDark, fontWeight: FontWeight.bold)),
+          title: const Text(
+            'Memory Places',
+            style: TextStyle(color: pinkDark, fontWeight: FontWeight.bold),
+          ),
           backgroundColor: Colors.white,
           elevation: 1,
           actions: [
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.all(12.0),
+                child: CircularProgressIndicator(color: pinkPrimary),
+              ),
             IconButton(
               icon: const Icon(Icons.menu, color: pinkPrimary),
               onPressed: _showMenuDialog,
             ),
           ],
         ),
-        body: _buildWebMap(forLibrary: true),
+        body: _buildWebMap(),
       );
     }
 
-    // SI ES MÓVIL, USAR GOOGLE MAPS ORIGINAL
-    if (!widget.isLibrary) {
-      return GoogleMap(
-        initialCameraPosition: const CameraPosition(
-          target: LatLng(40.4168, -3.7038),
-          zoom: 15,
-        ),
-        onMapCreated: (controller) {
-          mapController = controller;
-          mapController.setMapStyle(mapStyle);
-          if (widget.onMapCreatedCallback != null) {
-            widget.onMapCreatedCallback!(controller);
-          }
-        },
-        onCameraMove: (position) {
-          if (widget.onCameraMoveCallback != null) {
-            widget.onCameraMoveCallback!(position.target);
-          }
-        },
-        markers: widget.initialMarkers ?? {},
-        onLongPress: (position) {
-          if (widget.onLongPressCallback != null) {
-            widget.onLongPressCallback!(position, mapController);
-          }
-        },
-        zoomControlsEnabled: false,
-        myLocationButtonEnabled: false,
-      );
+    // Si es web pero NO es biblioteca (modo selección)
+    if (_isWeb && !widget.isLibrary) {
+      return _buildWebMap();
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Memory Places', style: TextStyle(color: pinkDark, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.menu, color: pinkPrimary),
-            onPressed: _showMenuDialog,
+    // Para móvil - Modo biblioteca
+    if (widget.isLibrary) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Memory Places',
+            style: TextStyle(color: pinkDark, fontWeight: FontWeight.bold),
           ),
-        ],
-      ),
-      body: GoogleMap(
-        initialCameraPosition: const CameraPosition(
-          target: LatLng(40.4168, -3.7038),
-          zoom: 15,
+          backgroundColor: Colors.white,
+          elevation: 1,
+          actions: [
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.all(12.0),
+                child: CircularProgressIndicator(color: pinkPrimary),
+              ),
+            IconButton(
+              icon: const Icon(Icons.menu, color: pinkPrimary),
+              onPressed: _showMenuDialog,
+            ),
+          ],
         ),
-        onMapCreated: (controller) {
-          mapController = controller;
-          mapController.setMapStyle(mapStyle);
-          _loadMemories();
-        },
-        onCameraMove: (position) {
-          _currentCameraPosition = position.target;
-        },
-        markers: _markers,
-        onLongPress: _onMapLongPress,
-        zoomControlsEnabled: true,
-        myLocationButtonEnabled: true,
+        body: Stack(
+          children: [
+            GoogleMap(
+              initialCameraPosition: const CameraPosition(
+                target: LatLng(40.4168, -3.7038),
+                zoom: 15,
+              ),
+              onMapCreated: (controller) {
+                mapController = controller;
+                mapController.setMapStyle(mapStyle);
+                if (widget.onMapCreatedCallback != null) {
+                  widget.onMapCreatedCallback!(controller);
+                }
+                _loadMemories();
+              },
+              onCameraMove: (position) {
+                _currentCameraPosition = position.target;
+                if (widget.onCameraMoveCallback != null) {
+                  widget.onCameraMoveCallback!(position.target);
+                }
+              },
+              markers: _markers,
+              onLongPress: (position) {
+                if (widget.onLongPressCallback != null) {
+                  widget.onLongPressCallback!(position, mapController);
+                } else {
+                  _onMapLongPress(position);
+                }
+              },
+              zoomControlsEnabled: true,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+              compassEnabled: true,
+              rotateGesturesEnabled: true,
+              scrollGesturesEnabled: true,
+              zoomGesturesEnabled: true,
+              tiltGesturesEnabled: true,
+            ),
+            if (_isLoading)
+              const Center(
+                child: CircularProgressIndicator(color: pinkPrimary),
+              ),
+          ],
+        ),
+      );
+    }
+
+    // Para móvil - Modo NO biblioteca (selección)
+    return GoogleMap(
+      initialCameraPosition: const CameraPosition(
+        target: LatLng(40.4168, -3.7038),
+        zoom: 15,
       ),
+      onMapCreated: (controller) {
+        mapController = controller;
+        mapController.setMapStyle(mapStyle);
+        if (widget.onMapCreatedCallback != null) {
+          widget.onMapCreatedCallback!(controller);
+        }
+      },
+      onCameraMove: (position) {
+        if (widget.onCameraMoveCallback != null) {
+          widget.onCameraMoveCallback!(position.target);
+        }
+      },
+      markers: widget.initialMarkers ?? {},
+      onLongPress: (position) {
+        if (widget.onLongPressCallback != null) {
+          widget.onLongPressCallback!(position, mapController);
+        }
+      },
+      zoomControlsEnabled: false,
+      myLocationButtonEnabled: false,
     );
   }
 }
