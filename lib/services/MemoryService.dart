@@ -31,6 +31,54 @@ class MemoryService {
     return _uuid.v4();
   }
 
+  // ============= NUEVO MÉTODO: SUBIR AVATAR =============
+  Future<String?> uploadAvatar(Uint8List bytes, String userId) async {
+    try {
+      print('🖼️ Subiendo avatar para usuario: $userId');
+      
+      // Definimos el nombre del archivo basado en el ID del usuario
+      final String fileName = 'avatar_$userId.jpg';
+      final String path = 'avatars/$fileName';
+
+      // Subimos la imagen al bucket 'nayeka memories'
+      await _supabase.storage.from(_storageBucket).uploadBinary(
+        path,
+        bytes,
+        fileOptions: const FileOptions(
+          contentType: 'image/jpeg', 
+          upsert: true,
+        ),
+      );
+
+      print('✅ Avatar subido exitosamente: $path');
+
+      // Obtenemos la URL pública
+      final String publicUrl = _supabase.storage
+          .from(_storageBucket)
+          .getPublicUrl(path);
+      
+      print('🔗 URL pública del avatar: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      print('❌ Error subiendo avatar: $e');
+      
+      if (e is StorageException) {
+        print('📋 Storage error details:');
+        print('  - Status code: ${e.statusCode}');
+        print('  - Message: ${e.message}');
+        print('  - Error: ${e.error}');
+        
+        if (e.statusCode == 404) {
+          print('🔍 El bucket "$_storageBucket" no existe en Storage');
+          print('💡 Crea el bucket en Supabase Dashboard > Storage');
+        }
+      }
+      
+      return null;
+    }
+  }
+  // =====================================================
+
   // 1. OBTENER RECUERDOS
   Future<List<Memory>> getMemories() async {
     try {
@@ -184,10 +232,32 @@ class MemoryService {
         print('✅ URL pública obtenida: $publicUrl');
         return publicUrl;
       } catch (uploadError) {
-        print('⚠️ Error en uploadBinary: $uploadError');
-        // Si falla uploadBinary, es probable que sea un error de red o permisos,
-        // no tiene sentido intentar el método .upload() antiguo.
-        return null;
+        print('⚠️ Error en upload: $uploadError');
+        
+        try {
+          print('🔄 Intentando método alternativo...');
+          
+          final response = await _supabase.storage
+              .from(_storageBucket)
+              .uploadBinary(
+                fileName,
+                imageBytes,
+                fileOptions: FileOptions(
+                  contentType: 'image/jpeg',
+                  cacheControl: '3600',
+                ),
+              );
+          
+          final publicUrl = _supabase.storage
+              .from(_storageBucket)
+              .getPublicUrl(fileName);
+          
+          print('✅ Imagen subida (método alternativo): $publicUrl');
+          return publicUrl;
+        } catch (e) {
+          print('❌ Ambos métodos fallaron: $e');
+          return null;
+        }
       }
     } catch (e) {
       print('❌ Error general subiendo imagen: $e');
@@ -356,6 +426,17 @@ class MemoryService {
 
         print('✅ Bucket "$_storageBucket" accesible');
         print('📄 Archivos en bucket: ${files.length}');
+        
+        // Verificar si existe la carpeta 'avatars'
+        try {
+          final avatars = await _supabase.storage
+              .from(_storageBucket)
+              .list(path: 'avatars');
+          print('📁 Carpeta avatars encontrada: ${avatars.length} archivos');
+        } catch (e) {
+          print('📁 La carpeta "avatars" aún no existe (se creará automáticamente al subir)');
+        }
+        
       } catch (e) {
         if (e is StorageException && e.message.contains('not found')) {
           print('❌ El bucket "$_storageBucket" no existe');
@@ -375,9 +456,85 @@ class MemoryService {
 
   // 8. MÉTODO DE PRUEBA
   Future<void> testSupabaseConnection() async {
-    // ... tu código de test (sin cambios)
+    try {
+      print('🧪 PRUEBA COMPLETA DE SUPABASE 🧪');
+      print('=' * 50);
+      
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        print('❌ Usuario no autenticado');
+        return;
+      }
+      print('✅ Usuario autenticado: ${user.id}');
+      
+      // 1. Verificar tabla
+      print('\n1️⃣ VERIFICANDO TABLA "nayeka memories"...');
+      try {
+        final response = await _supabase
+            .from('nayeka memories')
+            .select('id')
+            .limit(1);
+        
+        if (response != null) {
+          print('✅ Tabla accesible - ${response.length} registros encontrados');
+        }
+      } catch (e) {
+        print('❌ Error accediendo a tabla: $e');
+      }
+      
+      // 2. Verificar Storage
+      print('\n2️⃣ VERIFICANDO STORAGE...');
+      await verifyStorageBucket();
+      
+      // 3. Prueba de escritura
+      print('\n3️⃣ PRUEBA DE ESCRITURA...');
+      final testId = _generateId();
+      final testData = {
+        'id': testId,
+        'user_id': user.id,
+        'title': 'Prueba de conexión',
+        'description': 'Este es un registro de prueba',
+        'date': DateTime.now().toIso8601String(),
+        'latitude': 0.0,
+        'longitude': 0.0,
+        'imageAsset': null,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      
+      try {
+        await _supabase
+            .from('nayeka memories')
+            .insert(testData);
+        print('✅ Escritura exitosa en tabla');
+        
+        final response = await _supabase
+            .from('nayeka memories')
+            .select()
+            .eq('id', testId);
+        
+        if (response != null && response.isNotEmpty) {
+          print('✅ Lectura exitosa de tabla');
+        }
+        
+        await _supabase
+            .from('nayeka memories')
+            .delete()
+            .eq('id', testId);
+        print('✅ Datos de prueba eliminados');
+        
+      } catch (e) {
+        print('❌ Error en prueba de escritura: $e');
+      }
+      
+      print('\n' + '=' * 50);
+      print('🧪 PRUEBA COMPLETADA 🧪');
+      
+    } catch (e) {
+      print('❌ Error en testSupabaseConnection: $e');
+    }
   }
 
+  // Resto de métodos (sin cambios)
   Future<void> deleteMemory(String id) async {
     try {
       print('🗑️ Eliminando recuerdo: $id');
@@ -417,6 +574,7 @@ class MemoryService {
     }
   }
 
+  // 10. LIMPIAR TODOS LOS RECUERDOS
   Future<void> clearAllMemories() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -445,6 +603,7 @@ class MemoryService {
     }
   }
 
+  // 11. VERIFICAR CONEXIÓN SUPABASE
   bool isSupabaseConnected() {
     return _isSupabaseAvailable;
   }
