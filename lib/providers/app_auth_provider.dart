@@ -38,12 +38,12 @@ class AppAuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // ============= NUEVOS MÉTODOS PARA AVATAR =============
+  // ============= MÉTODOS PARA AVATAR - VERSIÓN CORREGIDA =============
   
   // Getter para la URL del avatar guardada en metadatos
   String? get avatarUrl => _user?.userMetadata?['avatar_url'];
 
-  // Actualizar foto de perfil en metadatos del usuario
+  // ✅ ACTUALIZAR FOTO - CON UI INMEDIATA
   Future<bool> updateProfilePhoto(String url) async {
     try {
       _isLoading = true;
@@ -51,15 +51,19 @@ class AppAuthProvider with ChangeNotifier {
 
       print('🖼️ Actualizando avatar en metadatos: $url');
 
-      // Actualizamos los metadatos del usuario en la autenticación de Supabase
+      // 1. Actualizar en Supabase
       final response = await _supabase.auth.updateUser(
         UserAttributes(data: {'avatar_url': url}),
       );
 
-      // Refrescamos el usuario local
+      // 2. Actualizar usuario local con la respuesta
       _user = response.user;
       
+      // 3. FORZAR ACTUALIZACIÓN DE UI INMEDIATA
+      notifyListeners();
+      
       print('✅ Avatar actualizado en metadatos');
+      print('   Nuevo avatar URL: ${_user?.userMetadata?['avatar_url']}');
       
       _isLoading = false;
       notifyListeners();
@@ -79,38 +83,25 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // Método adicional: Obtener avatar URL directamente del usuario
-  Future<String?> fetchAvatarUrl() async {
-    try {
-      if (_user == null) return null;
-      
-      // Refrescamos el usuario obteniendo la sesión actual
-      final session = _supabase.auth.currentSession;
-      _user = session?.user;
-      notifyListeners();
-      
-      return avatarUrl;
-    } catch (e) {
-      print('❌ Error obteniendo avatar URL: $e');
-      return null;
-    }
-  }
-
-  // Método adicional: Eliminar avatar (establecer a null)
+  // ✅ ELIMINAR FOTO - CON UI INMEDIATA
   Future<bool> removeProfilePhoto() async {
     try {
       _isLoading = true;
       notifyListeners();
 
-      // Actualizamos los metadatos eliminando el avatar_url
+      // 1. Actualizar en Supabase (establecer avatar_url = null)
       final response = await _supabase.auth.updateUser(
         UserAttributes(data: {'avatar_url': null}),
       );
 
-      // Refrescamos el usuario local
+      // 2. Actualizar usuario local
       _user = response.user;
       
+      // 3. FORZAR ACTUALIZACIÓN DE UI INMEDIATA
+      notifyListeners();
+      
       print('✅ Avatar eliminado de metadatos');
+      print('   Avatar URL ahora: ${_user?.userMetadata?['avatar_url']}');
       
       _isLoading = false;
       notifyListeners();
@@ -123,7 +114,32 @@ class AppAuthProvider with ChangeNotifier {
       return false;
     }
   }
-  // =====================================================
+
+  // ✅ REFRESCAR METADATOS - Obtener la sesión más reciente
+  Future<void> refreshUserMetadata() async {
+    try {
+      print('🔄 Refrescando metadatos del usuario...');
+      
+      final session = _supabase.auth.currentSession;
+      
+      if (session != null) {
+        _user = session.user;
+        notifyListeners();
+        
+        print('✅ Usuario refrescado: ${_user?.email}');
+        print('   Avatar: ${_user?.userMetadata?['avatar_url']}');
+      }
+    } catch (e) {
+      print('❌ Error refrescando metadatos: $e');
+    }
+  }
+
+  // ✅ OBTENER AVATAR URL ACTUALIZADA
+  Future<String?> fetchAvatarUrl() async {
+    await refreshUserMetadata();
+    return avatarUrl;
+  }
+  // ================================================================
 
   // Funciones para autenticar y cerrar sesión o iniciar sesión
   Future<bool> login(String email, String password) async {
@@ -132,7 +148,6 @@ class AppAuthProvider with ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
 
-      // Login con Supabase
       final response = await _supabase.auth.signInWithPassword(
         email: email,
         password: password,
@@ -140,7 +155,6 @@ class AppAuthProvider with ChangeNotifier {
 
       _user = response.user;
       
-      // Log de avatar si existe
       if (_user?.userMetadata?['avatar_url'] != null) {
         print('👤 Usuario tiene avatar configurado');
       }
@@ -159,19 +173,17 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // Intentamos registrar un nuevo usuario con el correo y la contraseña
   Future<bool> register(String email, String password) async {
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
-      // Registro con Supabase - podemos incluir metadatos iniciales
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
         data: {
-          'avatar_url': null, // Inicializamos sin avatar
+          'avatar_url': null,
           'registered_at': DateTime.now().toIso8601String(),
         },
       );
@@ -191,7 +203,6 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // Manejamos los errores de autenticación de Supabase
   void _handleSupabaseError(AuthException e) {
     print('⚠️ Auth error: ${e.statusCode} - ${e.message}');
     
@@ -222,7 +233,6 @@ class AppAuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Cerramos la sesión del usuario actual
   Future<void> logout() async {
     print('🚪 Cerrando sesión...');
     await _supabase.auth.signOut();
@@ -231,19 +241,14 @@ class AppAuthProvider with ChangeNotifier {
     print('✅ Sesión cerrada');
   }
 
-  // Obtenemos el ID del usuario actual
   String? get userId => _user?.id;
-
-  // Obtenemos el email del usuario actual
   String? get userEmail => _user?.email;
 
-  // Limpiamos el mensaje de error
   void clearError() {
     _errorMessage = null;
     notifyListeners();
   }
 
-  // Método para cambiar contraseña
   Future<bool> changePassword(String newPassword) async {
     try {
       _isLoading = true;
@@ -268,7 +273,6 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // Método para actualizar perfil completo (email, nombre, etc)
   Future<bool> updateProfile({
     String? email,
     String? password,
@@ -287,7 +291,6 @@ class AppAuthProvider with ChangeNotifier {
 
       final response = await _supabase.auth.updateUser(attributes);
       
-      // Refrescamos el usuario
       _user = response.user;
       
       _isLoading = false;
@@ -304,18 +307,12 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // Escuchar cambios de autenticación en tiempo real
   void listenToAuthChanges() {
     _supabase.auth.onAuthStateChange.listen((AuthState data) {
       final session = data.session;
       if (session != null) {
         _user = session.user;
         print('🔄 Cambio en auth state: Usuario autenticado - ${_user?.email}');
-        
-        // Log de avatar si existe
-        if (_user?.userMetadata?['avatar_url'] != null) {
-          print('👤 Usuario tiene avatar configurado');
-        }
       } else {
         _user = null;
         print('🔄 Cambio en auth state: Usuario no autenticado');
@@ -324,24 +321,11 @@ class AppAuthProvider with ChangeNotifier {
     });
   }
 
-  // Método para recargar el usuario actual
   Future<void> refreshUser() async {
-    try {
-      final session = _supabase.auth.currentSession;
-      _user = session?.user;
-      notifyListeners();
-      print('🔄 Usuario refrescado: ${_user?.email}');
-    } catch (e) {
-      print('❌ Error refrescando usuario: $e');
-    }
+    await refreshUserMetadata();
   }
 
-  // Obtener todos los metadatos del usuario
   Map<String, dynamic>? get userMetadata => _user?.userMetadata;
-
-  // Verificar si el usuario tiene avatar
   bool get hasAvatar => avatarUrl != null && avatarUrl!.isNotEmpty;
-  
-  // Obtener fecha de registro
   String? get registeredAt => _user?.userMetadata?['registered_at'];
 }

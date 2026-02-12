@@ -21,75 +21,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final MemoryService _memoryService = MemoryService();
   bool _isUploading = false;
 
+  // ✅ MÉTODO CORREGIDO - Actualizar foto de perfil
   Future<void> _cambiarFoto(AppAuthProvider auth) async {
     try {
-      // 1. Seleccionamos la imagen usando nuestro servicio existente
+      // 1. Seleccionar imagen
       final Uint8List? imageBytes = await _pickerService.pickImageAsBytes();
       
-      if (imageBytes == null) {
-        // si el usuario canceló la selección
-        return;
-      }
+      if (imageBytes == null) return;
 
       if (auth.userId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error: Usuario no autenticado'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _mostrarSnackbar('Error: Usuario no autenticado', isError: true);
         return;
       }
 
-      setState(() {
-        _isUploading = true;
-      });
+      setState(() => _isUploading = true);
 
-      // 2. subimos a supabase storage la imagen con un nombre único
+      // 2. Subir imagen a Supabase Storage
       final String? url = await _memoryService.uploadAvatar(
         imageBytes, 
         auth.userId!,
       );
       
       if (url != null) {
-        // 3. Actualizamos los metadatos del usuario
+        // 3. Actualizar metadatos en Supabase
         final success = await auth.updateProfilePhoto(url);
         
         if (success && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Foto de perfil actualizada'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          // 4. FORZAR RECARGA DE LA UI
+          setState(() {});
+          
+          _mostrarSnackbar('✅ Foto de perfil actualizada');
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Error al subir la imagen'),
-              backgroundColor: Colors.red,
+        _mostrarSnackbar('❌ Error al subir la imagen', isError: true);
+      }
+    } catch (e) {
+      print('❌ Error en _cambiarFoto: $e');
+      _mostrarSnackbar('Error: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
+  }
+
+  // ✅ MÉTODO CORREGIDO - Eliminar foto de perfil
+  Future<void> _eliminarFoto(AppAuthProvider auth) async {
+    try {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Eliminar foto'),
+          content: const Text('¿Estás seguro de eliminar tu foto de perfil?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
             ),
-          );
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        final success = await auth.removeProfilePhoto();
+        
+        if (success && mounted) {
+          // FORZAR RECARGA DE LA UI
+          setState(() {});
+          
+          _mostrarSnackbar('✅ Foto de perfil eliminada');
         }
       }
     } catch (e) {
-      print('Error en _cambiarFoto: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
-      }
+      print('❌ Error eliminando foto: $e');
     }
+  }
+
+  // ✅ MÉTODO AUXILIAR - Mostrar snackbar
+  void _mostrarSnackbar(String mensaje, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _logout(BuildContext context) async {
@@ -105,12 +127,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  String _formatDate(String dateString) {
+    if (dateString.isEmpty) return 'Desconocido';
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return 'Desconocido';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final authProvider = Provider.of<AppAuthProvider>(context);
 
-    // Obtenemos los datos del usuario desde AppAuthProvider
+    // Obtener datos del usuario
     String userEmail = authProvider.userEmail ?? 'Usuario';
     String userId = authProvider.userId ?? '';
     String avatarUrl = authProvider.avatarUrl ?? '';
@@ -132,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               const SizedBox(height: 20),
 
-              // Tarjeta de perfil con avatar
+              // 🟢 TARJETA DE PERFIL CON AVATAR
               Card(
                 color: themeProvider.isDarkMode ? cardDark : Colors.white,
                 elevation: 3,
@@ -145,12 +177,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Stack(
                         children: [
+                          // ✅ CIRCLEAVATAR CON KEY PARA FORZAR RECARGA
                           CircleAvatar(
                             radius: 50,
                             backgroundColor: pinkLighter,
-                            backgroundImage: hasAvatar ? NetworkImage(avatarUrl) as ImageProvider: null,
-                            child: !hasAvatar ? const Icon( Icons.person, size: 50, color: pinkPrimary,) : null,
+                            key: ValueKey(avatarUrl), // 👈 CLAVE IMPORTANTÍSIMA
+                            backgroundImage: hasAvatar 
+                                ? NetworkImage(avatarUrl) as ImageProvider
+                                : null,
+                            child: !hasAvatar 
+                                ? const Icon(Icons.person, size: 50, color: pinkPrimary)
+                                : null,
                           ),
+                          
+                          // ✅ INDICADOR DE CARGA
                           if (_isUploading)
                             Positioned.fill(
                               child: Container(
@@ -165,6 +205,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                             ),
+                          
+                          // ✅ BOTÓN DE CÁMARA
                           Positioned(
                             bottom: 0,
                             right: 0,
@@ -199,6 +241,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       
                       const SizedBox(height: 20),
                       
+                      // ✅ EMAIL DEL USUARIO
                       Text(
                         userEmail,
                         style: TextStyle(
@@ -213,6 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       
                       const SizedBox(height: 8),
                       
+                      // ✅ FECHA DE REGISTRO
                       Text(
                         'Miembro desde: ${_formatDate(registeredAt)}',
                         style: TextStyle(
@@ -225,6 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       
                       const SizedBox(height: 8),
                       
+                      // ✅ ID DEL USUARIO (TRUNCADO)
                       if (userId.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -256,7 +301,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 30),
 
-              // Configuración
+              // ⚙️ CONFIGURACIÓN
               Card(
                 color: themeProvider.isDarkMode ? cardDark : Colors.white,
                 elevation: 3,
@@ -282,7 +327,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
 
-                      // Switch para tema claro/oscuro
+                      // 🌗 SWITCH MODO OSCURO
                       ListTile(
                         leading: Icon(
                           themeProvider.isDarkMode
@@ -322,12 +367,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       const Divider(),
 
-                      // Botón para cambiar contraseña
+                      // 🔐 BOTÓN CAMBIAR CONTRASEÑA
                       ListTile(
-                        leading: const Icon(
-                          Icons.lock,
-                          color: pinkPrimary,
-                        ),
+                        leading: const Icon(Icons.lock, color: pinkPrimary),
                         title: Text(
                           'Cambiar contraseña',
                           style: TextStyle(
@@ -351,15 +393,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         },
                       ),
 
-                      const Divider(),
-
-                      // Botón para eliminar foto (solo si tiene avatar)
+                      // 🗑️ BOTÓN ELIMINAR FOTO (SOLO SI TIENE AVATAR)
                       if (hasAvatar) ...[
+                        const Divider(),
                         ListTile(
-                          leading: const Icon(
-                            Icons.delete,
-                            color: Colors.red,
-                          ),
+                          leading: const Icon(Icons.delete, color: Colors.red),
                           title: Text(
                             'Eliminar foto de perfil',
                             style: TextStyle(
@@ -370,7 +408,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           onTap: () => _eliminarFoto(authProvider),
                         ),
-                        const Divider(),
                       ],
                     ],
                   ),
@@ -379,7 +416,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 30),
 
-              // Botón de cerrar sesión
+              // 🚪 BOTÓN CERRAR SESIÓN
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -403,7 +440,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 20),
               
-              // Versión de la app
+              // ℹ️ VERSIÓN DE LA APP
               Text(
                 'Versión 1.0.0',
                 style: TextStyle(
@@ -418,58 +455,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
-  }
-
-  // Método para eliminar la foto de perfil
-  Future<void> _eliminarFoto(AppAuthProvider auth) async {
-    try {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Eliminar foto'),
-          content: const Text('¿Estás seguro de que quieres eliminar tu foto de perfil?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
-              child: const Text('Eliminar'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirm == true) {
-        final success = await auth.removeProfilePhoto();
-        
-        if (success && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Foto de perfil eliminada'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          setState(() {}); // Forzar rebuild
-        }
-      }
-    } catch (e) {
-      print(' Error eliminando foto: $e');
-    }
-  }
-
-  // Helper para formatear fecha de registro
-  String _formatDate(String dateString) {
-    if (dateString.isEmpty) return 'Desconocido';
-    try {
-      final date = DateTime.parse(dateString);
-      return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
-      return 'Desconocido';
-    }
   }
 }
