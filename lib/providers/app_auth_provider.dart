@@ -37,13 +37,11 @@ class AppAuthProvider with ChangeNotifier {
     _isLoading = false;
     notifyListeners();
   }
-
-  // ============= MÉTODOS PARA AVATAR - VERSIÓN CORREGIDA =============
   
   // Getter para la URL del avatar guardada en metadatos
   String? get avatarUrl => _user?.userMetadata?['avatar_url'];
 
-  // ✅ ACTUALIZAR FOTO - CON UI INMEDIATA
+  // actualizamos la URL del avatar en los metadatos del usuario en Supabase y forzamos la actualización de la UI
   Future<bool> updateProfilePhoto(String url) async {
     try {
       _isLoading = true;
@@ -51,31 +49,31 @@ class AppAuthProvider with ChangeNotifier {
 
       print('🖼️ Actualizando avatar en metadatos: $url');
 
-      // 1. Actualizar en Supabase
+      // 1. se actualiza en Supabase
       final response = await _supabase.auth.updateUser(
         UserAttributes(data: {'avatar_url': url}),
       );
 
-      // 2. Actualizar usuario local con la respuesta
+      // 2. se actualiza el usuario local con la respuesta
       _user = response.user;
       
-      // 3. FORZAR ACTUALIZACIÓN DE UI INMEDIATA
+      // 3. forzamos que se una actualizacion inmediata
       notifyListeners();
       
-      print('✅ Avatar actualizado en metadatos');
-      print('   Nuevo avatar URL: ${_user?.userMetadata?['avatar_url']}');
+      print('Avatar actualizado en metadatos');
+      print('Nuevo avatar URL: ${_user?.userMetadata?['avatar_url']}');
       
       _isLoading = false;
       notifyListeners();
       return true;
     } on AuthException catch (e) {
-      print('❌ Error actualizando avatar: ${e.message}');
+      print('Error actualizando avatar: ${e.message}');
       _handleSupabaseError(e);
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
-      print('❌ Error desconocido actualizando avatar: $e');
+      print('Error desconocido actualizando avatar: $e');
       _errorMessage = 'Error al actualizar foto de perfil: $e';
       _isLoading = false;
       notifyListeners();
@@ -83,25 +81,22 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // ✅ ELIMINAR FOTO - CON UI INMEDIATA
+  // eliminamos la URL del avatar de los metadatos del usuario en Supabase y forzamos la actualización de la UI
   Future<bool> removeProfilePhoto() async {
     try {
       _isLoading = true;
       notifyListeners();
 
-      // 1. Actualizar en Supabase (establecer avatar_url = null)
+      // 1. que se actualice en Supabase
       final response = await _supabase.auth.updateUser(
         UserAttributes(data: {'avatar_url': null}),
       );
 
-      // 2. Actualizar usuario local
+      // 2. Actualizamos el usuario local
       _user = response.user;
       
-      // 3. FORZAR ACTUALIZACIÓN DE UI INMEDIATA
+      // 3. forzamos la actualización de la UI inmediata
       notifyListeners();
-      
-      print('✅ Avatar eliminado de metadatos');
-      print('   Avatar URL ahora: ${_user?.userMetadata?['avatar_url']}');
       
       _isLoading = false;
       notifyListeners();
@@ -115,31 +110,28 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // ✅ REFRESCAR METADATOS - Obtener la sesión más reciente
+  // refrescamos los metadatos del usuario desde Supabase para asegurarnos de tener la información más actualizada, especialmente después de cambios en el perfil como la actualización del avatar
   Future<void> refreshUserMetadata() async {
     try {
-      print('🔄 Refrescando metadatos del usuario...');
-      
       final session = _supabase.auth.currentSession;
       
       if (session != null) {
         _user = session.user;
         notifyListeners();
         
-        print('✅ Usuario refrescado: ${_user?.email}');
-        print('   Avatar: ${_user?.userMetadata?['avatar_url']}');
+        print('Usuario refrescado: ${_user?.email}');
+        print('Avatar: ${_user?.userMetadata?['avatar_url']}');
       }
     } catch (e) {
-      print('❌ Error refrescando metadatos: $e');
+      print('Error refrescando metadatos: $e');
     }
   }
 
-  // ✅ OBTENER AVATAR URL ACTUALIZADA
+  // obtenemos la URL del avatar actualizada, asegurándonos de refrescar los metadatos del usuario para obtener la información más reciente, especialmente después de cambios en el perfil
   Future<String?> fetchAvatarUrl() async {
     await refreshUserMetadata();
     return avatarUrl;
   }
-  // ================================================================
 
   // Funciones para autenticar y cerrar sesión o iniciar sesión
   Future<bool> login(String email, String password) async {
@@ -156,7 +148,7 @@ class AppAuthProvider with ChangeNotifier {
       _user = response.user;
       
       if (_user?.userMetadata?['avatar_url'] != null) {
-        print('👤 Usuario tiene avatar configurado');
+        print('Usuario tiene avatar configurado');
       }
       
       _isLoading = false;
@@ -204,7 +196,7 @@ class AppAuthProvider with ChangeNotifier {
   }
 
   void _handleSupabaseError(AuthException e) {
-    print('⚠️ Auth error: ${e.statusCode} - ${e.message}');
+    print('Auth error: ${e.statusCode} - ${e.message}');
     
     switch (e.statusCode) {
       case '400':
@@ -234,11 +226,11 @@ class AppAuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
-    print('🚪 Cerrando sesión...');
+    print('Cerrando sesión...');
     await _supabase.auth.signOut();
     _user = null;
     notifyListeners();
-    print('✅ Sesión cerrada');
+    print('Sesión cerrada');
   }
 
   String? get userId => _user?.id;
@@ -312,10 +304,10 @@ class AppAuthProvider with ChangeNotifier {
       final session = data.session;
       if (session != null) {
         _user = session.user;
-        print('🔄 Cambio en auth state: Usuario autenticado - ${_user?.email}');
+        print('Cambio en auth state: Usuario autenticado - ${_user?.email}');
       } else {
         _user = null;
-        print('🔄 Cambio en auth state: Usuario no autenticado');
+        print('Cambio en auth state: Usuario no autenticado');
       }
       notifyListeners();
     });

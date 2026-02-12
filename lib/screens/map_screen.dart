@@ -10,7 +10,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
-
 import '../widget/MemoryForm.dart';
 import '../widget/MemoryDetailScreen.dart';
 import '../widget/menu_dialog.dart';
@@ -62,7 +61,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // --- MOTOR DE IMÁGENES: CREA MARCADOR CUADRADO CON BORDES REDONDEADOS ---
+  // crea marcador cuadrado con bordes redondeados
   Future<BitmapDescriptor> _getMarkerIconSquare(String? path) async {
     const int targetWidth = 80;
     const double borderRadius = 12.0;
@@ -94,14 +93,14 @@ class _MapScreenState extends State<MapScreen> {
         }
       }
 
-      // 2. Redimensionar la imagen
+      // 2. Redimensionamos la imagen
       ui.Codec codec = await ui.instantiateImageCodec(
         bytes, 
         targetWidth: targetWidth
       );
       ui.FrameInfo fi = await codec.getNextFrame();
       
-      // 3. Crear imagen cuadrada con bordes redondeados
+      // 3. Crearmos la imagen cuadrada con bordes redondeados
       final pictureRecorder = ui.PictureRecorder();
       final canvas = ui.Canvas(pictureRecorder);
       final paint = ui.Paint();
@@ -114,21 +113,21 @@ class _MapScreenState extends State<MapScreen> {
         targetWidth - (borderWidth * 2)
       );
       
-      // Dibujar fondo con borde rosado
+      // Dibujamos fondo con borde rosado
       paint.color = pinkPrimary;
       canvas.drawRRect(
         ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(borderRadius)),
         paint,
       );
       
-      // Dibujar fondo interior blanco
+      // Dibujamos fondo interior blanco
       paint.color = Colors.white;
       canvas.drawRRect(
         ui.RRect.fromRectAndRadius(innerRect, ui.Radius.circular(borderRadius - borderWidth)),
         paint,
       );
       
-      // Recortar con bordes redondeados
+      // Recortamos con bordes redondeados
       final clipPath = ui.Path()
         ..addRRect(ui.RRect.fromRectAndRadius(
           innerRect, 
@@ -137,7 +136,7 @@ class _MapScreenState extends State<MapScreen> {
       
       canvas.clipPath(clipPath);
       
-      // Dibujar la imagen
+      // Dibujamos la imagen
       canvas.drawImageRect(
         fi.image,
         ui.Rect.fromLTWH(0, 0, fi.image.width.toDouble(), fi.image.height.toDouble()),
@@ -145,7 +144,7 @@ class _MapScreenState extends State<MapScreen> {
         ui.Paint()..filterQuality = ui.FilterQuality.high,
       );
       
-      // Convertir a bitmap
+      // Convertimos a bitmap
       final picture = pictureRecorder.endRecording();
       final image = await picture.toImage(targetWidth, targetWidth);
       final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -226,7 +225,7 @@ class _MapScreenState extends State<MapScreen> {
     return BitmapDescriptor.fromBytes(byteData.buffer.asUint8List());
   }
 
-  // --- CARGA DE RECUERDOS CON MARCADORES PERSONALIZADOS ---
+  // cargamos los recuerdos con marcadores personalizados
   Future<void> _loadMemories() async {
     if (_isLoading) return;
     
@@ -236,7 +235,7 @@ class _MapScreenState extends State<MapScreen> {
       final memories = await _memoryService.getMemories();
       Set<Marker> newMarkers = {};
 
-      // Crear marcadores para cada memoria
+      // Creamos marcadores para cada memoria
       for (var memory in memories) {
         try {
           final icon = await _getMarkerIconSquare(memory.imageAsset);
@@ -246,7 +245,7 @@ class _MapScreenState extends State<MapScreen> {
               markerId: MarkerId(memory.id),
               position: memory.toLatLng,
               icon: icon,
-              anchor: const Offset(0.5, 0.5), // Centrar el marcador
+              anchor: const Offset(0.5, 0.5), // Centramos el marcador
               infoWindow: InfoWindow(
                 title: memory.title,
                 snippet: memory.description,
@@ -257,7 +256,7 @@ class _MapScreenState extends State<MapScreen> {
           );
         } catch (e) {
           debugPrint("Error creando marcador para ${memory.title}: $e");
-          // Usar marcador por defecto si hay error
+          // Usamos el marcador por defecto si hay error
           newMarkers.add(
             Marker(
               markerId: MarkerId(memory.id),
@@ -284,7 +283,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // --- MANEJO DE MENÚ Y NAVEGACIÓN ---
+  // manejamos el menú y la navegación
   void _handleSaveCoordinatesFromMenu() {
     if (Navigator.canPop(context)) Navigator.pop(context);
     _navigateToCoordinateInput();
@@ -311,7 +310,7 @@ class _MapScreenState extends State<MapScreen> {
   void _goToAllMemories() {
     if (_memories.length > 1) {
       if (!_isWeb) {
-        // Calcular bounds para incluir todos los marcadores
+        // Calculamos bounds para incluir todos los marcadores
         LatLngBounds bounds = _calculateBounds();
         mapController.animateCamera(
           CameraUpdate.newLatLngBounds(bounds, 100),
@@ -411,7 +410,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // --- EDICIÓN Y DETALLES ---
+  // edicion de solo ubicación desde el detalle del recuerdo
   Future<void> _editOnlyLocation(Memory memory) async {
     if (Navigator.canPop(context)) Navigator.pop(context);
 
@@ -527,7 +526,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // --- MAPA WEB CON FLUTTER MAP ---
+  // mapa para web usando flutter_map
   Widget _buildWebMap() {
     return Scaffold(
       body: Stack(
@@ -552,7 +551,7 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ],
               ),
-              // Agregar marcadores para web usando MarkerLayer
+              // Agregamos marcadores para web usando MarkerLayer
               if (_memories.isNotEmpty)
                 fmap.MarkerLayer(
                   markers: _buildWebMarkers(),
@@ -620,7 +619,7 @@ class _MapScreenState extends State<MapScreen> {
     }).toList();
   }
 
-  // --- MÉTODOS AUXILIARES ---
+  // metodos para mostrar mensajes al usuario
   void _showSnackbar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -648,14 +647,14 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // --- WIDGET PRINCIPAL ---
+  // widget build con lógica para mostrar el mapa y la UI según plataforma y modo
   @override
   Widget build(BuildContext context) {
-    // 1. OBTENER EL TEMA ACTUAL
+    // 1. obtenemos el estado del tema para configurar colores
     final themeProvider = Provider.of<ThemeProvider>(context);
     final bool isDarkMode = themeProvider.isDarkMode;
 
-    // 2. CONFIGURAR COLORES SEGÚN EL MODO
+    // 2. configuramos colores dinámicos para la UI
     final Color appBarBg = isDarkMode ? backgroundDark : backgroundLight;
     final Color titleColor = isDarkMode ? textDarkMode : textDark;
     final Color iconColor = pinkPrimary;
@@ -687,7 +686,7 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
-    // Si es web pero NO es biblioteca (modo selección)
+    // Si es web pero no es biblioteca (modo selección)
     if (_isWeb && !widget.isLibrary) {
       return _buildWebMap();
     }
@@ -731,7 +730,7 @@ class _MapScreenState extends State<MapScreen> {
               },
               onCameraMove: (position) {
                 _currentCameraPosition = position.target;
-                // ESTO HACE QUE LAS COORDENADAS CAMBIEN EN TIEMPO REAL
+                // actualizamos las coordenadas en tiempo real
                 if (widget.onCameraMoveCallback != null) {
                   widget.onCameraMoveCallback!(position.target);
                 }
@@ -762,7 +761,7 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
-    // Para móvil - Modo NO biblioteca (selección de coordenadas)
+    // Para móvil - Modo no biblioteca (selección de coordenadas)
     return GoogleMap(
       initialCameraPosition: CameraPosition(
         target: widget.initialMarkers?.isNotEmpty == true 
@@ -778,7 +777,7 @@ class _MapScreenState extends State<MapScreen> {
         }
       },
       onCameraMove: (position) {
-        // MUY IMPORTANTE: Actualizar el callback aquí también
+        // actualizamos el callback aquí también
         if (widget.onCameraMoveCallback != null) {
           widget.onCameraMoveCallback!(position.target);
         }

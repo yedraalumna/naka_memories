@@ -21,7 +21,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final MemoryService _memoryService = MemoryService();
   bool _isUploading = false;
 
-  // ✅ MÉTODO CORREGIDO - Actualizar foto de perfil
+  // actualizamos foto de perfil
   Future<void> _cambiarFoto(AppAuthProvider auth) async {
     try {
       // 1. Seleccionar imagen
@@ -65,7 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // ✅ MÉTODO CORREGIDO - Eliminar foto de perfil
+  // eliminamos foto de perfil
   Future<void> _eliminarFoto(AppAuthProvider auth) async {
     try {
       final confirm = await showDialog<bool>(
@@ -91,18 +91,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final success = await auth.removeProfilePhoto();
         
         if (success && mounted) {
-          // FORZAR RECARGA DE LA UI
+          // forzamos la actualización de la UI para reflejar el cambio inmediatamente
           setState(() {});
           
-          _mostrarSnackbar('✅ Foto de perfil eliminada');
+          _mostrarSnackbar('Foto de perfil eliminada');
         }
       }
     } catch (e) {
-      print('❌ Error eliminando foto: $e');
+      print('Error eliminando foto: $e');
     }
   }
 
-  // ✅ MÉTODO AUXILIAR - Mostrar snackbar
+  // mostrar snackbar
   void _mostrarSnackbar(String mensaje, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -142,7 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final authProvider = Provider.of<AppAuthProvider>(context);
 
-    // Obtener datos del usuario
+    // Obtenemos los datos del usuario
     String userEmail = authProvider.userEmail ?? 'Usuario';
     String userId = authProvider.userId ?? '';
     String avatarUrl = authProvider.avatarUrl ?? '';
@@ -164,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               const SizedBox(height: 20),
 
-              // 🟢 TARJETA DE PERFIL CON AVATAR
+              // tarjeta de perfil con avatar
               Card(
                 color: themeProvider.isDarkMode ? cardDark : Colors.white,
                 elevation: 3,
@@ -177,11 +177,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Stack(
                         children: [
-                          // ✅ CIRCLEAVATAR CON KEY PARA FORZAR RECARGA
+                          // circle avatar con key para forzar recarga
                           CircleAvatar(
                             radius: 50,
                             backgroundColor: pinkLighter,
-                            key: ValueKey(avatarUrl), // 👈 CLAVE IMPORTANTÍSIMA
+                            key: ValueKey(avatarUrl),
                             backgroundImage: hasAvatar 
                                 ? NetworkImage(avatarUrl) as ImageProvider
                                 : null,
@@ -190,7 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 : null,
                           ),
                           
-                          // ✅ INDICADOR DE CARGA
+                          // indicador de carga
                           if (_isUploading)
                             Positioned.fill(
                               child: Container(
@@ -206,7 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           
-                          // ✅ BOTÓN DE CÁMARA
+                          // botón de cámara
                           Positioned(
                             bottom: 0,
                             right: 0,
@@ -241,7 +241,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       
                       const SizedBox(height: 20),
                       
-                      // ✅ EMAIL DEL USUARIO
+                      // email del usuario
                       Text(
                         userEmail,
                         style: TextStyle(
@@ -256,7 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       
                       const SizedBox(height: 8),
                       
-                      // ✅ FECHA DE REGISTRO
+                      // fecha de registro del usuario
                       Text(
                         'Miembro desde: ${_formatDate(registeredAt)}',
                         style: TextStyle(
@@ -269,7 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       
                       const SizedBox(height: 8),
                       
-                      // ✅ ID DEL USUARIO (TRUNCADO)
+                      // id del usuario (solo si existe)
                       if (userId.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -301,7 +301,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 30),
 
-              // ⚙️ CONFIGURACIÓN
+              // configuración
               Card(
                 color: themeProvider.isDarkMode ? cardDark : Colors.white,
                 elevation: 3,
@@ -327,7 +327,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
 
-                      // 🌗 SWITCH MODO OSCURO
+                      // cambiar a tema oscuro
                       ListTile(
                         leading: Icon(
                           themeProvider.isDarkMode
@@ -367,7 +367,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       const Divider(),
 
-                      // 🔐 BOTÓN CAMBIAR CONTRASEÑA
+                      // cambiar contraseña
                       ListTile(
                         leading: const Icon(Icons.lock, color: pinkPrimary),
                         title: Text(
@@ -393,7 +393,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         },
                       ),
 
-                      // 🗑️ BOTÓN ELIMINAR FOTO (SOLO SI TIENE AVATAR)
+                      // eliminar foto de perfil (solo si tiene avatar)
                       if (hasAvatar) ...[
                         const Divider(),
                         ListTile(
@@ -416,7 +416,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 30),
 
-              // 🚪 BOTÓN CERRAR SESIÓN
+              // cerrar sesión
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -440,7 +440,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 20),
               
-              // ℹ️ VERSIÓN DE LA APP
+              // versión de la app
               Text(
                 'Versión 1.0.0',
                 style: TextStyle(

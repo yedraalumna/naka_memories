@@ -70,7 +70,7 @@ class ImagePickerService {
     }
   }
 
-  // NUEVO MÉTODO: Para obtener bytes de imagen en web
+  // Para obtener bytes de imagen en web
   Future<Uint8List?> pickImageBytesForWeb() async {
     try {
       final XFile? image = await _picker.pickImage(

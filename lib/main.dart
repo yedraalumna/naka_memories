@@ -12,8 +12,8 @@ void main() async {
   
   // Inicializar Supabase
   await Supabase.initialize(
-    url: 'https://bbpqvckqycllhklqxjis.supabase.co', // REEMPLAZA CON TU URL
-    anonKey: 'sb_publishable_B2UiEGYTG1-OfhVcuTMBzg_5SPe__-a', // REEMPLAZA CON TU API KEY
+    url: 'https://bbpqvckqycllhklqxjis.supabase.co', 
+    anonKey: 'sb_publishable_B2UiEGYTG1-OfhVcuTMBzg_5SPe__-a',
   );
   
   runApp(const MiApp());
@@ -107,7 +107,7 @@ class PantallaCarga extends StatelessWidget {
             ),
             SizedBox(height: 20),
             Text(
-              'Cargando...',
+              'Cargando',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey,

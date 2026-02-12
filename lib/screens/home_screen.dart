@@ -69,7 +69,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             MaterialPageRoute(
               builder: (ctx) => CoordinateInputScreen(
                 existingMemory:
-                    memory, // ← PASAMOS la memoria para editar ubicación
+                    memory, // pasamos la memoria para editar ubicación
               ),
             ),
           );
@@ -95,7 +95,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             );
           }
         },
-        // NUEVO: callback para actualizar la memoria cuando se edita todo
+        // callback para actualizar la memoria cuando se edita todo
         onUpdate: (updatedMemory) async {
           await _memoryService.saveMemory(updatedMemory);
           _loadMemories(); // Recargar la lista
@@ -123,7 +123,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
         );
       }
-      // WEB
+      // web
       else if (kIsWeb) {
         return Image.network(
           memory.imageAsset!,

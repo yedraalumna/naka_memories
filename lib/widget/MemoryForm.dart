@@ -547,7 +547,7 @@ class _MemoryFormState extends State<MemoryForm> {
       widget.onSave(memory);
       
     } catch (e) {
-      print('❌ Error guardando recuerdo: $e');
+      print('Error guardando recuerdo: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al guardar: ${e.toString()}'),

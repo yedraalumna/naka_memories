@@ -138,7 +138,7 @@ class MemoryDetailScreen extends StatelessWidget {
           errorBuilder: (context, error, stackTrace) => _buildErrorContainer(isDarkMode),
         );
       }
-      // WEB
+      // web
       else if (kIsWeb) {
         imageWidget = Image.network(
           memory.imageAsset!,
@@ -148,7 +148,7 @@ class MemoryDetailScreen extends StatelessWidget {
           errorBuilder: (context, error, stackTrace) => _buildErrorContainer(isDarkMode),
         );
       }
-      // MÓVIL
+      // movil
       else {
         imageWidget = Image.file(
           File(memory.imageAsset!),
@@ -355,7 +355,7 @@ class MemoryDetailScreen extends StatelessWidget {
 
         const SizedBox(height: 15),
 
-        // Botón de Eliminar
+        // Botón de eliminar
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
