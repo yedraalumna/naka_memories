@@ -70,7 +70,72 @@ class ImagePickerService {
     }
   }
 
-  // Para obtener bytes de imagen en web
+// Seleccionar video desde la galeria
+  Future<String?> pickVideoFromGallery() async {
+    try {
+      final XFile? video = await _picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(seconds: 20), // Límite de 20 segundos
+      );
+      return video?.path;
+    } catch (e) {
+      if (kDebugMode) print('Error en pickVideoFromGallery: $e');
+      return null;
+    }
+  }
+
+  // Grabar video con la cámara
+  Future<String?> pickVideoFromCamera() async {
+    try {
+      final XFile? video = await _picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(seconds: 20), // Límite de 20 segundos
+        preferredCameraDevice: CameraDevice.rear,
+      );
+      return video?.path;
+    } catch (e) {
+      if (kDebugMode) print('Error en pickVideoFromCamera: $e');
+      return null;
+    }
+  }
+
+  // Método para obtener bytes tanto de imágenes como de videos
+  Future<Uint8List?> getFileBytes(String path) async {
+    try {
+      // Si es Web, el path suele ser un Blob URL o similar,pero para subir necesitamos leer el XFile original. 
+      // Como no guardamos el XFile en el estado global, en Web la subida de video requiere un truco extra en el formulario,
+      // pero para móvil esto funciona perfecto:
+      if (!kIsWeb) {
+        final file = File(path);
+        if (await file.exists()) {
+          return await file.readAsBytes();
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error obteniendo bytes: $e');
+      return null;
+    }
+  }
+
+  // Método necesario pq en web no existe File(path)
+  Future<Uint8List?> pickVideoBytesForWeb() async {
+    try {
+      final XFile? video = await _picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(seconds: 20),
+      );
+      
+      if (video != null) {
+        return await video.readAsBytes();
+      }
+      return null;
+    } catch (e) {
+      print('Error en pickVideoBytesForWeb: $e');
+      return null;
+    }
+  }
+
   Future<Uint8List?> pickImageBytesForWeb() async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -81,15 +146,11 @@ class ImagePickerService {
       );
       
       if (image != null) {
-        // Leer como bytes
-        final bytes = await image.readAsBytes();
-        return bytes;
+        return await image.readAsBytes();
       }
       return null;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en pickImageBytesForWeb: $e');
-      }
+      if (kDebugMode) print('Error en pickImageBytesForWeb: $e');
       return null;
     }
   }

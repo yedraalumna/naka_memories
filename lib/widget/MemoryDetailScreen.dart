@@ -7,8 +7,11 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 
-class MemoryDetailScreen extends StatelessWidget {
+class MemoryDetailScreen extends StatefulWidget {
+  // CAMBIO IMPORTANTE: Antes era StatelessWidget, se cambia pq es necesario pa video
   final Memory memory;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -23,10 +26,87 @@ class MemoryDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<MemoryDetailScreen> createState() => _MemoryDetailScreenState();
+}
+
+class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _isVideo = false;
+  bool _isInitVideoError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkMediaType(); // Comprobar si es video al iniciar
+  }
+
+  @override
+  void didUpdateWidget(MemoryDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Si la URL cambia (gracias al paso 1), esto se activará y refrescará la imagen
+    if (widget.memory.imageAsset != oldWidget.memory.imageAsset) {
+      _disposeControllers();
+      _checkMediaType();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposeControllers(); // Limpiar memoria al salir
+    super.dispose();
+  }
+
+  void _disposeControllers() {
+    _videoPlayerController?.dispose();
+    _chewieController?.dispose();
+    _videoPlayerController = null;
+    _chewieController = null;
+  }
+
+  // LÓGICA DE DETECCIÓN
+  void _checkMediaType() {
+    final path = widget.memory.imageAsset?.trim();
+    if (path == null || path.isEmpty) return;
+
+    // Detectar .mp4 permitiendo parámetros URL
+    if (!path.startsWith('assets/') && path.toLowerCase().contains('.mp4')) {
+      setState(() => _isVideo = true);
+      _initializePlayer(path);
+    } else {
+      setState(() => _isVideo = false);
+    }
+  }
+
+  Future<void> _initializePlayer(String path) async {
+    try {
+      if (kIsWeb || path.startsWith('http')) {
+        _videoPlayerController =
+            VideoPlayerController.networkUrl(Uri.parse(path));
+      } else {
+        _videoPlayerController = VideoPlayerController.file(File(path));
+      }
+      await _videoPlayerController!.initialize();
+      _chewieController = ChewieController(
+        videoPlayerController: _videoPlayerController!,
+        autoPlay: false,
+        looping: true,
+        aspectRatio: _videoPlayerController!.value.aspectRatio,
+        errorBuilder: (context, errorMessage) => const Center(
+            child: Text('Error video', style: TextStyle(color: Colors.white))),
+      );
+      if (mounted) setState(() {});
+    } catch (e) {
+      print("Error video: $e");
+      if (mounted) setState(() => _isInitVideoError = true);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
-    
+
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.9,
@@ -124,72 +204,87 @@ class MemoryDetailScreen extends StatelessWidget {
     );
   }
 
-  // Construimos la sección de imagen soportando archivos locales
+  // Construimos la sección de imagen y video soportando archivos locales
   Widget _buildImage(bool isDarkMode) {
-    if (memory.imageAsset != null && memory.imageAsset!.isNotEmpty) {
+    final path = widget.memory.imageAsset?.trim();
+
+    if (path != null && path.isNotEmpty) {
+      // 1. SECCIÓN DE VIDEO
+      if (_isVideo) {
+        if (_isInitVideoError) return _buildErrorContainer(isDarkMode);
+        if (_chewieController != null &&
+            _videoPlayerController!.value.isInitialized) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: AspectRatio(
+              aspectRatio: _videoPlayerController!.value.aspectRatio,
+              child: Chewie(controller: _chewieController!),
+            ),
+          );
+        } else {
+          return Container(
+            height: 250,
+            decoration: BoxDecoration(
+                color: Colors.black12, borderRadius: BorderRadius.circular(20)),
+            child: const Center(
+                child: CircularProgressIndicator(color: pinkPrimary)),
+          );
+        }
+      }
+
+      // 2. SECCIÓN DE FOTO (A TAMAÑO REAL)
       Widget imageWidget;
 
-      if (memory.imageAsset!.startsWith('assets/')) {
-        imageWidget = Image.asset(
-          memory.imageAsset!,
-          height: 250,
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(isDarkMode),
-        );
-      }
-      // web
-      else if (kIsWeb) {
+      // Configuramos la carga de la imagen
+      if (path.startsWith('assets/')) {
+        imageWidget = Image.asset(path, fit: BoxFit.contain);
+      } else if (kIsWeb || path.startsWith('http')) {
         imageWidget = Image.network(
-          memory.imageAsset!,
-          height: 250,
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(isDarkMode),
+          path,
+          key: ValueKey(path),
+          fit: BoxFit.contain, // CLAVE: Muestra la foto entera sin recortar
+          cacheWidth:
+              1200, // Subimos la calidad para que se vea nítida en el detalle
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return const SizedBox(
+                height: 250,
+                child: Center(
+                    child: CircularProgressIndicator(color: pinkPrimary)));
+          },
+          errorBuilder: (context, error, stackTrace) =>
+              _buildErrorContainer(isDarkMode),
         );
-      }
-      // movil
-      else {
+      } else {
         imageWidget = Image.file(
-          File(memory.imageAsset!),
-          height: 250,
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildErrorContainer(isDarkMode),
+          File(path),
+          fit: BoxFit.contain, // Muestra la foto entera sin recortar
+          cacheWidth: 1200,
+          errorBuilder: (context, error, stackTrace) =>
+              _buildErrorContainer(isDarkMode),
         );
       }
 
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: imageWidget,
+      return Container(
+        constraints: const BoxConstraints(
+            maxHeight:
+                500), // Limitamos la altura máxima para que no ocupe toda la pantalla
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: isDarkMode
+              ? Colors.black26
+              : Colors
+                  .grey[100], // Fondo sutil para las zonas que queden vacías
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: imageWidget,
+        ),
       );
     }
 
-    // Placeholder por defecto si no hay imagen
-    return Container(
-      height: 150,
-      decoration: BoxDecoration(
-        color: isDarkMode ? cardDark : pinkLighter,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDarkMode ? Colors.grey[700]! : pinkLight, 
-          style: BorderStyle.solid
-        ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.photo_library, size: 50, color: pinkPrimary),
-            const SizedBox(height: 10),
-            Text(
-              'Sin imagen',
-              style: TextStyle(color: pinkPrimary),
-            ),
-          ],
-        ),
-      ),
-    );
+    return _buildErrorContainer(isDarkMode); // Si no hay nada, error
   }
 
   // Widget auxiliar para control de errores de carga de imagen
@@ -202,10 +297,10 @@ class MemoryDetailScreen extends StatelessWidget {
     );
   }
 
-  //Muestra el título principal de la memoria
+  // Muestra el título principal de la memoria
   Widget _buildTitle(bool isDarkMode) {
     return Text(
-      memory.title,
+      widget.memory.title,
       style: TextStyle(
         color: isDarkMode ? textDarkMode : pinkDark,
         fontSize: 28,
@@ -222,7 +317,7 @@ class MemoryDetailScreen extends StatelessWidget {
         Icon(Icons.calendar_today, color: pinkPrimary, size: 18),
         const SizedBox(width: 8),
         Text(
-          memory.date,
+          widget.memory.date,
           style: TextStyle(
             color: isDarkMode ? Colors.grey[400] : pinkDark.withOpacity(0.8),
             fontSize: 16,
@@ -247,7 +342,7 @@ class MemoryDetailScreen extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          memory.description,
+          widget.memory.description,
           style: TextStyle(
             color: isDarkMode ? Colors.grey[300] : backgroundDark,
             fontSize: 16,
@@ -266,8 +361,7 @@ class MemoryDetailScreen extends StatelessWidget {
         color: isDarkMode ? cardDark : pinkLighter,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDarkMode ? Colors.grey[700]! : pinkLight.withOpacity(0.3)
-        ),
+            color: isDarkMode ? Colors.grey[700]! : pinkLight.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,7 +387,7 @@ class MemoryDetailScreen extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Latitud: ${memory.latitude.toStringAsFixed(6)}',
+                  'Latitud: ${widget.memory.latitude.toStringAsFixed(6)}',
                   style: TextStyle(
                     color: isDarkMode ? Colors.grey[300] : pinkDark,
                     fontSize: 16,
@@ -309,7 +403,7 @@ class MemoryDetailScreen extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Longitud: ${memory.longitude.toStringAsFixed(6)}',
+                  'Longitud: ${widget.memory.longitude.toStringAsFixed(6)}',
                   style: TextStyle(
                     color: isDarkMode ? Colors.grey[300] : pinkDark,
                     fontSize: 16,
@@ -359,7 +453,7 @@ class MemoryDetailScreen extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: onDelete,
+            onPressed: widget.onDelete,
             style: ElevatedButton.styleFrom(
               backgroundColor: isDarkMode ? cardDark : Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 18),
@@ -430,7 +524,7 @@ class MemoryDetailScreen extends StatelessWidget {
                 tileColor: isDarkMode ? cardDark.withOpacity(0.5) : null,
                 onTap: () {
                   Navigator.pop(context);
-                  onEdit();
+                  widget.onEdit();
                 },
               ),
 
@@ -478,7 +572,7 @@ class MemoryDetailScreen extends StatelessWidget {
                 tileColor: isDarkMode ? cardDark.withOpacity(0.5) : null,
                 onTap: () {
                   Navigator.pop(context);
-                  onDelete();
+                  widget.onDelete();
                 },
               ),
             ],
@@ -494,14 +588,14 @@ class MemoryDetailScreen extends StatelessWidget {
       context: context,
       builder: (context) {
         return MemoryForm(
-          location: LatLng(memory.latitude, memory.longitude),
-          existingMemory: memory,
+          location: LatLng(widget.memory.latitude, widget.memory.longitude),
+          existingMemory: widget.memory,
           onSave: (updatedMemory) {
             Navigator.pop(context);
             Navigator.pop(context);
 
-            if (onUpdate != null) {
-              onUpdate!(updatedMemory);
+            if (widget.onUpdate != null) {
+              widget.onUpdate!(updatedMemory);
             }
 
             ScaffoldMessenger.of(context).showSnackBar(

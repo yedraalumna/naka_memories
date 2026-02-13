@@ -19,6 +19,7 @@ import '../constants/colors.dart';
 import '../constants/map_style.dart';
 import '../screens/coordinate_input_screen.dart';
 import '../providers/theme_provider.dart';
+import 'package:video_thumbnail/video_thumbnail.dart'; // pa la miniatura del video
 
 class MapScreen extends StatefulWidget {
   final bool isLibrary;
@@ -66,146 +67,175 @@ class _MapScreenState extends State<MapScreen> {
     const int targetWidth = 80;
     const double borderRadius = 12.0;
     const double borderWidth = 3.0;
-    
-    try {
-      Uint8List bytes;
 
-      if (path == null || path.isEmpty) {
-        return await _createDefaultMarkerIconSquare();
+    Uint8List?
+        bytes; // el "?" es pa que permita nulos pq crea confrontacion con la miniatura del video
+    bool isVideo = path != null && path.toLowerCase().contains('.mp4');
+
+    if (path == null || path.isEmpty) {
+      return await _createDefaultMarkerIconSquare();
+    }
+    try {
+      if (isVideo) {
+        // En WEB saltamos directo al fallback (cuadrado negro) porque video_thumbnail suele fallar
+        if (!_isWeb) {
+          try {
+            bytes = await VideoThumbnail.thumbnailData(
+              video: path,
+              imageFormat: ImageFormat.PNG,
+              maxWidth: targetWidth,
+              quality: 50,
+            );
+          } catch (e) {
+            debugPrint("Fallo miniatura (usando icono por defecto): $e");
+          }
+        }
+      } else {
+        // carga de imagenes normal
+        if (path.startsWith('assets/')) {
+          ByteData data = await rootBundle.load(path);
+          bytes = data.buffer.asUint8List();
+        } else if (_isWeb || path.startsWith('http')) {
+          final response = await http.get(Uri.parse(path));
+          if (response.statusCode == 200) bytes = response.bodyBytes;
+        } else {
+          final file = File(path);
+          if (await file.exists()) bytes = await file.readAsBytes();
+        }
       }
 
-      // 1. Obtención de bytes según plataforma y origen
-      if (path.startsWith('assets/')) {
-        ByteData data = await rootBundle.load(path);
-        bytes = data.buffer.asUint8List();
-      } else if (_isWeb || path.startsWith('http')) {
-        final response = await http.get(Uri.parse(path));
-        if (response.statusCode != 200) {
-          throw Exception('Failed to load image: ${response.statusCode}');
-        }
-        bytes = response.bodyBytes;
-      } else {
-        final file = File(path);
-        if (await file.exists()) {
-          bytes = await file.readAsBytes();
-        } else {
-          return await _createDefaultMarkerIconSquare();
-        }
+      // Si bytes sigue siendo null (falló miniatura o carga),
+      // devolvemos el marcador genérico
+      if (bytes == null) {
+        return await _createDefaultMarkerIconSquare(isVideo: isVideo);
       }
 
       // 2. Redimensionamos la imagen
-      ui.Codec codec = await ui.instantiateImageCodec(
-        bytes, 
-        targetWidth: targetWidth
-      );
+      ui.Codec codec =
+          await ui.instantiateImageCodec(bytes, targetWidth: targetWidth);
       ui.FrameInfo fi = await codec.getNextFrame();
-      
-      // 3. Crearmos la imagen cuadrada con bordes redondeados
+
       final pictureRecorder = ui.PictureRecorder();
       final canvas = ui.Canvas(pictureRecorder);
       final paint = ui.Paint();
-      
-      final rect = ui.Rect.fromLTWH(0, 0, targetWidth.toDouble(), targetWidth.toDouble());
-      final innerRect = ui.Rect.fromLTWH(
-        borderWidth, 
-        borderWidth, 
-        targetWidth - (borderWidth * 2), 
-        targetWidth - (borderWidth * 2)
-      );
-      
+
+      final rect = ui.Rect.fromLTWH(
+          0, 0, targetWidth.toDouble(), targetWidth.toDouble());
+      final innerRect = ui.Rect.fromLTWH(borderWidth, borderWidth,
+          targetWidth - (borderWidth * 2), targetWidth - (borderWidth * 2));
+
       // Dibujamos fondo con borde rosado
       paint.color = pinkPrimary;
       canvas.drawRRect(
         ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(borderRadius)),
         paint,
       );
-      
+
       // Dibujamos fondo interior blanco
       paint.color = Colors.white;
       canvas.drawRRect(
-        ui.RRect.fromRectAndRadius(innerRect, ui.Radius.circular(borderRadius - borderWidth)),
+        ui.RRect.fromRectAndRadius(
+            innerRect, ui.Radius.circular(borderRadius - borderWidth)),
         paint,
       );
-      
+
       // Recortamos con bordes redondeados
       final clipPath = ui.Path()
         ..addRRect(ui.RRect.fromRectAndRadius(
-          innerRect, 
-          ui.Radius.circular(borderRadius - borderWidth)
-        ));
-      
+            innerRect, ui.Radius.circular(borderRadius - borderWidth)));
+
       canvas.clipPath(clipPath);
-      
+
       // Dibujamos la imagen
       canvas.drawImageRect(
         fi.image,
-        ui.Rect.fromLTWH(0, 0, fi.image.width.toDouble(), fi.image.height.toDouble()),
+        ui.Rect.fromLTWH(
+            0, 0, fi.image.width.toDouble(), fi.image.height.toDouble()),
         innerRect,
         ui.Paint()..filterQuality = ui.FilterQuality.high,
       );
-      
-      // Convertimos a bitmap
+
+      // Icono Play si es video
+      if (isVideo) {
+        paint.color = Colors.black45;
+        canvas.drawRect(innerRect, paint);
+
+        final iconPlay = Icons.play_circle_fill;
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: String.fromCharCode(iconPlay.codePoint),
+            style: TextStyle(
+              fontSize: targetWidth * 0.4,
+              fontFamily: iconPlay.fontFamily,
+              color: Colors.white.withOpacity(0.9),
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+        textPainter.layout();
+        textPainter.paint(
+            canvas,
+            Offset(targetWidth / 2 - textPainter.width / 2,
+                targetWidth / 2 - textPainter.height / 2));
+      }
+
       final picture = pictureRecorder.endRecording();
       final image = await picture.toImage(targetWidth, targetWidth);
-      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      
-      if (byteData == null) {
-        throw Exception('Failed to convert image to byte data');
-      }
-      
-      return BitmapDescriptor.fromBytes(byteData.buffer.asUint8List());
-      
+      final ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+
+      return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
     } catch (e) {
-      debugPrint("Error creando marcador cuadrado: $e");
-      return await _createDefaultMarkerIconSquare();
+      // Fallback final
+      return await _createDefaultMarkerIconSquare(isVideo: isVideo);
     }
   }
 
-  Future<BitmapDescriptor> _createDefaultMarkerIconSquare() async {
+  Future<BitmapDescriptor> _createDefaultMarkerIconSquare(
+      {bool isVideo = false}) async {
     const double size = 80.0;
     const double borderRadius = 12.0;
     const double borderWidth = 3.0;
-    
+
     final pictureRecorder = ui.PictureRecorder();
     final canvas = ui.Canvas(pictureRecorder);
     final paint = ui.Paint();
-    
+
     final rect = ui.Rect.fromLTWH(0, 0, size, size);
-    final innerRect = ui.Rect.fromLTWH(
-      borderWidth, 
-      borderWidth, 
-      size - (borderWidth * 2), 
-      size - (borderWidth * 2)
-    );
-    
+    final innerRect = ui.Rect.fromLTWH(borderWidth, borderWidth,
+        size - (borderWidth * 2), size - (borderWidth * 2));
+
     // Fondo con borde rosado
     paint.color = pinkPrimary;
     canvas.drawRRect(
       ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(borderRadius)),
       paint,
     );
-    
-    // Fondo interior blanco
-    paint.color = Colors.white;
+
+    // Fondo interior blanco (o negro si es video, para que destaque)
+    paint.color = isVideo ? Colors.black87 : Colors.white; // CAMBIO
     canvas.drawRRect(
-      ui.RRect.fromRectAndRadius(innerRect, ui.Radius.circular(borderRadius - borderWidth)),
+      ui.RRect.fromRectAndRadius(
+          innerRect, ui.Radius.circular(borderRadius - borderWidth)),
       paint,
     );
-    
-    // Icono de foto
+
+    // Si es video ponemos Play, si no, Foto
+    final iconData = isVideo ? Icons.play_arrow : Icons.photo;
+
     final textStyle = ui.TextStyle(
       fontSize: size * 0.4,
-      fontFamily: Icons.photo.fontFamily,
-      color: pinkPrimary,
+      fontFamily: iconData.fontFamily,
+      color: isVideo ? Colors.white : pinkPrimary,
     );
-    
+
     final paragraphBuilder = ui.ParagraphBuilder(ui.ParagraphStyle())
       ..pushStyle(textStyle)
       ..addText(String.fromCharCode(Icons.photo.codePoint));
-    
+
     final paragraph = paragraphBuilder.build();
     paragraph.layout(ui.ParagraphConstraints(width: size));
-    
+
     canvas.drawParagraph(
       paragraph,
       ui.Offset(
@@ -213,24 +243,25 @@ class _MapScreenState extends State<MapScreen> {
         size / 2 - paragraph.height / 2,
       ),
     );
-    
+
     final picture = pictureRecorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
-    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    
+    final ByteData? byteData =
+        await image.toByteData(format: ui.ImageByteFormat.png);
+
     if (byteData == null) {
       return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
     }
-    
+
     return BitmapDescriptor.fromBytes(byteData.buffer.asUint8List());
   }
 
   // cargamos los recuerdos con marcadores personalizados
   Future<void> _loadMemories() async {
     if (_isLoading) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       final memories = await _memoryService.getMemories();
       Set<Marker> newMarkers = {};
@@ -239,7 +270,7 @@ class _MapScreenState extends State<MapScreen> {
       for (var memory in memories) {
         try {
           final icon = await _getMarkerIconSquare(memory.imageAsset);
-          
+
           newMarkers.add(
             Marker(
               markerId: MarkerId(memory.id),
@@ -392,16 +423,17 @@ class _MapScreenState extends State<MapScreen> {
           existingMemory: existingMemory,
           onSave: (memory) async {
             try {
-              await _memoryService.saveMemory(memory);
-              Navigator.of(context).pop();
-              _loadMemories();
-              _showSnackbar(
-                existingMemory == null 
-                  ? 'Recuerdo creado' 
-                  : 'Recuerdo actualizado'
-              );
+              // Borramos: await _memoryService.saveMemory(memory);
+              // El formulario ya lo guardó, si lo dejamos aqui se guarda dos veces
+
+              Navigator.of(context).pop(); // Cierra el diálogo
+              _loadMemories(); // Recarga los marcadores
+
+              _showSnackbar(existingMemory == null
+                  ? 'Recuerdo creado'
+                  : 'Recuerdo actualizado');
             } catch (e) {
-              _showSnackbar('Error al guardar: $e', isError: true);
+              _showSnackbar('Error al refrescar: $e', isError: true);
             }
           },
           onCancel: () => Navigator.of(context).pop(),
@@ -488,7 +520,7 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _confirmClearAllMemories() async {
     if (Navigator.canPop(context)) Navigator.pop(context);
-    
+
     if (_memories.isEmpty) {
       _showSnackbar('No hay recuerdos para eliminar', isError: true);
       return;
@@ -596,7 +628,8 @@ class _MapScreenState extends State<MapScreen> {
                 width: 60,
                 height: 60,
                 color: Colors.white,
-                child: memory.imageAsset != null && memory.imageAsset!.isNotEmpty
+                child: memory.imageAsset != null &&
+                        memory.imageAsset!.isNotEmpty
                     ? Image.network(
                         memory.imageAsset!,
                         width: 60,
@@ -604,7 +637,8 @@ class _MapScreenState extends State<MapScreen> {
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: pinkLighter,
-                          child: Icon(Icons.photo, color: pinkPrimary, size: 30),
+                          child:
+                              Icon(Icons.photo, color: pinkPrimary, size: 30),
                         ),
                       )
                     : Container(
@@ -764,8 +798,8 @@ class _MapScreenState extends State<MapScreen> {
     // Para móvil - Modo no biblioteca (selección de coordenadas)
     return GoogleMap(
       initialCameraPosition: CameraPosition(
-        target: widget.initialMarkers?.isNotEmpty == true 
-            ? widget.initialMarkers!.first.position 
+        target: widget.initialMarkers?.isNotEmpty == true
+            ? widget.initialMarkers!.first.position
             : const LatLng(40.4168, -3.7038),
         zoom: 15,
       ),

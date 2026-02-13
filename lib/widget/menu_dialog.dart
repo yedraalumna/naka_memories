@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
+import 'MemoryThumbnail.dart';
 
 class MenuDialog extends StatelessWidget {
   final List<Memory> memories;
@@ -22,7 +23,8 @@ class MenuDialog extends StatelessWidget {
     required this.onShowMemoryDetails,
   });
 
-  void _showMemoryListModal(BuildContext context, List<Memory> list, String title, ThemeData theme) {
+  void _showMemoryListModal(
+      BuildContext context, List<Memory> list, String title, ThemeData theme) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -33,14 +35,20 @@ class MenuDialog extends StatelessWidget {
           maxChildSize: 0.95,
           minChildSize: 0.5,
           builder: (context, scrollController) {
-            Color backgroundColor = theme.brightness == Brightness.dark ? backgroundDark : Colors.white;
-            Color textColor = theme.brightness == Brightness.dark ? Colors.white : Colors.black;
-            Color primaryColor = theme.brightness == Brightness.dark ? pinkLight : pinkPrimary;
-            
+            Color backgroundColor = theme.brightness == Brightness.dark
+                ? backgroundDark
+                : Colors.white;
+            Color textColor = theme.brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black;
+            Color primaryColor =
+                theme.brightness == Brightness.dark ? pinkLight : pinkPrimary;
+
             return Container(
               decoration: BoxDecoration(
                 color: backgroundColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
                 children: [
@@ -65,29 +73,38 @@ class MenuDialog extends StatelessWidget {
                             ),
                           )
                         : ListView.builder(
-                      controller: scrollController,
-                      itemCount: list.length,
-                      itemBuilder: (context, index) {
-                        final memory = list[index];
-                        return ListTile(
-                          leading: Icon(Icons.location_pin, color: primaryColor),
-                          title: Text(
-                            memory.title,
-                            style: TextStyle(color: textColor),
+                            controller: scrollController,
+                            itemCount: list.length,
+                            itemBuilder: (context, index) {
+                              final memory = list[index];
+                              return ListTile(
+                                leading: MemoryThumbnail(
+                                  imagePath: memory.imageAsset,
+                                  width: 50,
+                                  height: 50,
+                                ),
+                                title: Text(
+                                  memory.title,
+                                  style: TextStyle(color: textColor),
+                                ),
+                                subtitle: Text(
+                                  '${memory.date} | ${memory.location['latitude']?.toStringAsFixed(4)}, ${memory.location['longitude']?.toStringAsFixed(4)}',
+                                  style: TextStyle(
+                                      color: theme.brightness == Brightness.dark
+                                          ? Colors.grey[400]
+                                          : Colors.grey[700]),
+                                ),
+                                onTap: () {
+                                  // Cierra el modal de la lista y llama al callback de MapScreen
+                                  Navigator.pop(context);
+                                  onShowMemoryDetails(memory);
+                                },
+                                tileColor: theme.brightness == Brightness.dark
+                                    ? cardDark.withOpacity(0.5)
+                                    : null,
+                              );
+                            },
                           ),
-                          subtitle: Text(
-                            '${memory.date} | ${memory.location['latitude']?.toStringAsFixed(4)}, ${memory.location['longitude']?.toStringAsFixed(4)}',
-                            style: TextStyle(color: theme.brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[700]),
-                          ),
-                          onTap: () {
-                            // Cierra el modal de la lista y llama al callback de MapScreen
-                            Navigator.pop(context);
-                            onShowMemoryDetails(memory);
-                          },
-                          tileColor: theme.brightness == Brightness.dark ? cardDark.withOpacity(0.5) : null,
-                        );
-                      },
-                    ),
                   ),
                 ],
               ),
@@ -102,19 +119,21 @@ class MenuDialog extends StatelessWidget {
   void _showSortedByDate(BuildContext context, ThemeData theme) {
     Navigator.pop(context);
     final sortedMemories = List<Memory>.from(memories)
-      ..sort((a, b) => b.date.compareTo(a.date)); // Del más reciente al más antiguo
-    _showMemoryListModal(context, sortedMemories, 'Recuerdos por Fecha (Recientes)', theme);
+      ..sort((a, b) =>
+          b.date.compareTo(a.date)); // Del más reciente al más antiguo
+    _showMemoryListModal(
+        context, sortedMemories, 'Recuerdos por Fecha (Recientes)', theme);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     bool isDarkMode = theme.brightness == Brightness.dark;
-    
+
     Color backgroundColor = isDarkMode ? backgroundDark : Colors.white;
     Color textColor = isDarkMode ? Colors.white : Colors.black87;
     Color dividerColor = isDarkMode ? Colors.grey[700]! : pinkLighter;
-    
+
     return Container(
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
@@ -160,7 +179,8 @@ class MenuDialog extends StatelessWidget {
             color: pinkPrimary,
             onTap: () {
               Navigator.pop(context);
-              _showMemoryListModal(context, memories, 'Todos los Recuerdos', theme);
+              _showMemoryListModal(
+                  context, memories, 'Todos los Recuerdos', theme);
             },
             isDarkMode: isDarkMode,
           ),

@@ -10,6 +10,7 @@ import '../constants/colors.dart';
 import '../providers/theme_provider.dart';
 import 'dart:io'; //Importante para poder leer archivos del dispositivo
 import 'package:flutter/foundation.dart';
+import '../widget/MemoryThumbnail.dart';
 
 // 1. Pantalla de Galería
 class MemoryGalleryScreen extends StatefulWidget {
@@ -112,53 +113,13 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  // Método que soporta Assets y Fotos de la camara o la galeria
+  // Método que soporta Assets, Fotos y videos de la camara o la galeria
   Widget _buildMemoryImage(Memory memory) {
-    if (memory.imageAsset != null && memory.imageAsset!.isNotEmpty) {
-      // Asset
-      if (memory.imageAsset!.startsWith('assets/')) {
-        return Image.asset(
-          memory.imageAsset!,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
-        );
-      }
-      // web
-      else if (kIsWeb) {
-        return Image.network(
-          memory.imageAsset!,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
-        );
-      }
-      // Móvil
-      else {
-        return Image.file(
-          File(memory.imageAsset!),
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
-        );
-      }
-    }
-    return _buildPlaceholder();
-  }
-
-  Widget _buildPlaceholder() {
-    return Container(
-      color: Colors.grey[200],
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.photo, size: 50, color: Colors.grey[400]),
-            const SizedBox(height: 8),
-            const Text(
-              'Sin imagen',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
+    return MemoryThumbnail(
+      imagePath: memory.imageAsset,
+      width: double.infinity,
+      height: double.infinity,
+      borderRadius: 0,
     );
   }
 

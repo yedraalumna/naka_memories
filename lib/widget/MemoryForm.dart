@@ -38,9 +38,10 @@ class _MemoryFormState extends State<MemoryForm> {
   final MemoryService _memoryService = MemoryService();
 
   String? _selectedAsset;
-  bool _isLoadingImage = false;
+  bool _isLoadingMedia = false; // Renombrado para ser genérico (img o video)
   bool _isSaving = false;
-  Uint8List? _selectedImageBytes;
+  Uint8List? _selectedBytes; // Renombrado: puede ser imagen o video
+  bool _isVideo = false; // Bandera para saber si es video
 
   final List<String> _availableAssets = [
     'assets/images/gato.jpg',
@@ -57,6 +58,10 @@ class _MemoryFormState extends State<MemoryForm> {
       _descriptionController.text = widget.existingMemory!.description;
       _dateController.text = widget.existingMemory!.date;
       _selectedAsset = widget.existingMemory!.imageAsset;
+      // Detectar si lo que ya existía es un video (por extensión)
+      if (_selectedAsset != null && _selectedAsset!.endsWith('.mp4')) {
+        _isVideo = true;
+      }
     } else {
       _dateController.text = DateTime.now().toString().split(' ')[0];
       _selectedAsset = _availableAssets[0];
@@ -66,7 +71,7 @@ class _MemoryFormState extends State<MemoryForm> {
   Future<void> _selectDate(BuildContext context) async {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDarkMode = themeProvider.isDarkMode;
-    
+
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -109,83 +114,119 @@ class _MemoryFormState extends State<MemoryForm> {
       builder: (context) {
         final themeProvider = Provider.of<ThemeProvider>(context);
         final isDarkMode = themeProvider.isDarkMode;
-        
+
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: isDarkMode ? cardDark : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Seleccionar origen de imagen',
-                style: TextStyle(
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold, 
-                  color: isDarkMode ? textDarkMode : pinkDark,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Añadir Multimedia',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? textDarkMode : pinkDark,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              
-              // Opción de cámara (solo mostrar si no es web)
-              if (!kIsWeb) ...[
+                const SizedBox(height: 20),
+
+                // SECCIÓN FOTOS
+                if (!kIsWeb) ...[
+                  ListTile(
+                    leading: const Icon(Icons.camera_alt, color: pinkPrimary),
+                    title: Text('Tomar Foto',
+                        style: TextStyle(
+                            color: isDarkMode ? textDarkMode : Colors.black87)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _pickImageFromCamera();
+                    },
+                  ),
+                  ListTile(
+                    leading:
+                        const Icon(Icons.photo_library, color: pinkPrimary),
+                    title: Text('Galería de Fotos',
+                        style: TextStyle(
+                            color: isDarkMode ? textDarkMode : Colors.black87)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _pickImageFromGallery();
+                    },
+                  ),
+                ],
+
+                const Divider(),
+
+                // SECCIÓN VIDEOS
+                if (!kIsWeb) ...[
+                  ListTile(
+                    leading: const Icon(Icons.videocam, color: pinkPrimary),
+                    title: Text('Grabar Video (Max 20s)',
+                        style: TextStyle(
+                            color: isDarkMode ? textDarkMode : Colors.black87)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _pickVideoFromCamera();
+                    },
+                  ),
+                  ListTile(
+                    leading:
+                        const Icon(Icons.video_library, color: pinkPrimary),
+                    title: Text('Galería de Videos',
+                        style: TextStyle(
+                            color: isDarkMode ? textDarkMode : Colors.black87)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _pickVideoFromGallery();
+                    },
+                  ),
+                ],
+
+                // Opción Web
+                if (kIsWeb) ...[
+                  ListTile(
+                    leading:
+                        const Icon(Icons.photo_library, color: pinkPrimary),
+                    title: Text('Subir Foto',
+                        style: TextStyle(
+                            color: isDarkMode ? textDarkMode : Colors.black87)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _pickImageForWeb();
+                    },
+                  ),
+                  ListTile(
+                    leading:
+                        const Icon(Icons.video_library, color: pinkPrimary),
+                    title: Text('Subir Video',
+                        style: TextStyle(
+                            color: isDarkMode ? textDarkMode : Colors.black87)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _pickVideoForWeb();
+                    },
+                  ),
+                ],
+
+                const Divider(),
+
                 ListTile(
-                  leading: Icon(Icons.camera_alt, color: pinkPrimary),
-                  title: Text('Sacar una foto', style: TextStyle(
-                    color: isDarkMode ? textDarkMode : Colors.black87,
-                  )),
-                  tileColor: isDarkMode ? backgroundDark.withOpacity(0.3) : null,
-                  onTap: () async {
+                  leading: const Icon(Icons.image_search, color: Colors.grey),
+                  title: Text('Imágenes Predeterminadas',
+                      style: TextStyle(
+                          color: isDarkMode ? textDarkMode : Colors.black87)),
+                  onTap: () {
                     Navigator.pop(context);
-                    await _pickImageFromCamera();
+                    _selectAsset();
                   },
                 ),
               ],
-              
-              // Opción de galería (solo mostrar si no es web)
-              if (!kIsWeb) ...[
-                ListTile(
-                  leading: Icon(Icons.photo_library, color: pinkPrimary),
-                  title: Text('Elegir desde galería', style: TextStyle(
-                    color: isDarkMode ? textDarkMode : Colors.black87,
-                  )),
-                  tileColor: isDarkMode ? backgroundDark.withOpacity(0.3) : null,
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await _pickImageFromGallery();
-                  },
-                ),
-              ],
-              
-              // Opción para web (si no hay soporte de cámara/galería)
-              if (kIsWeb) ...[
-                ListTile(
-                  leading: Icon(Icons.photo_library, color: pinkPrimary),
-                  title: Text('Subir imagen', style: TextStyle(
-                    color: isDarkMode ? textDarkMode : Colors.black87,
-                  )),
-                  tileColor: isDarkMode ? backgroundDark.withOpacity(0.3) : null,
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await _pickImageForWeb();
-                  },
-                ),
-              ],
-              
-              ListTile(
-                leading: Icon(Icons.image_search, color: pinkPrimary),
-                title: Text('Imágenes predeterminadas', style: TextStyle(
-                  color: isDarkMode ? textDarkMode : Colors.black87,
-                )),
-                tileColor: isDarkMode ? backgroundDark.withOpacity(0.3) : null,
-                onTap: () {
-                  Navigator.pop(context);
-                  _selectAsset();
-                },
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -193,14 +234,15 @@ class _MemoryFormState extends State<MemoryForm> {
   }
 
   Future<void> _pickImageFromCamera() async {
-    setState(() => _isLoadingImage = true);
+    setState(() => _isLoadingMedia = true);
     try {
       final path = await _pickerService.pickImageFromCamera();
       if (path != null) {
         final bytes = await File(path).readAsBytes();
         setState(() {
           _selectedAsset = path;
-          _selectedImageBytes = bytes;
+          _selectedBytes = bytes;
+          _isVideo = false; // Es foto
         });
       }
     } catch (e) {
@@ -211,19 +253,20 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     } finally {
-      setState(() => _isLoadingImage = false);
+      setState(() => _isLoadingMedia = false);
     }
   }
 
   Future<void> _pickImageFromGallery() async {
-    setState(() => _isLoadingImage = true);
+    setState(() => _isLoadingMedia = true);
     try {
       final path = await _pickerService.pickImageFromGallery();
       if (path != null) {
         final bytes = await File(path).readAsBytes();
         setState(() {
           _selectedAsset = path;
-          _selectedImageBytes = bytes;
+          _selectedBytes = bytes;
+          _isVideo = false; // Es foto
         });
       }
     } catch (e) {
@@ -234,18 +277,68 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     } finally {
-      setState(() => _isLoadingImage = false);
+      setState(() => _isLoadingMedia = false);
+    }
+  }
+
+  // MÉTODOS DE SELECCIÓN DE VIDEO
+  Future<void> _pickVideoFromCamera() async {
+    setState(() => _isLoadingMedia = true);
+    try {
+      final path = await _pickerService.pickVideoFromCamera();
+      if (path != null) {
+        final bytes = await _pickerService.getBytesFromPath(path);
+        setState(() {
+          _selectedAsset = path;
+          _selectedBytes = bytes;
+          _isVideo = true; // MARCAMOS COMO VIDEO
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al grabar video: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isLoadingMedia = false);
+    }
+  }
+
+  Future<void> _pickVideoFromGallery() async {
+    setState(() => _isLoadingMedia = true);
+    try {
+      final path = await _pickerService.pickVideoFromGallery();
+      if (path != null) {
+        final bytes = await _pickerService.getBytesFromPath(path);
+        setState(() {
+          _selectedAsset = path;
+          _selectedBytes = bytes;
+          _isVideo = true; // MARCAMOS COMO VIDEO
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al seleccionar el video: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isLoadingMedia = false);
     }
   }
 
   Future<void> _pickImageForWeb() async {
-    setState(() => _isLoadingImage = true);
+    setState(() => _isLoadingMedia = true);
     try {
       final bytes = await _pickerService.pickImageBytesForWeb();
       if (bytes != null && bytes.isNotEmpty) {
         setState(() {
           _selectedAsset = 'data:image/jpeg;base64,${base64.encode(bytes)}';
-          _selectedImageBytes = bytes;
+          _selectedBytes = bytes;
+          _isVideo = false;
         });
       }
     } catch (e) {
@@ -256,7 +349,31 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     } finally {
-      setState(() => _isLoadingImage = false);
+      setState(() => _isLoadingMedia = false);
+    }
+  }
+
+  Future<void> _pickVideoForWeb() async {
+    setState(() => _isLoadingMedia = true);
+    try {
+      final bytes = await _pickerService.pickVideoBytesForWeb();
+      if (bytes != null && bytes.isNotEmpty) {
+        setState(() {
+          // Usamos un placeholder text para asset en web video, ya que no hay path real
+          _selectedAsset = 'web_video_upload.mp4';
+          _selectedBytes = bytes;
+          _isVideo = true;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al subir video: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isLoadingMedia = false);
     }
   }
 
@@ -266,7 +383,7 @@ class _MemoryFormState extends State<MemoryForm> {
       builder: (context) {
         final themeProvider = Provider.of<ThemeProvider>(context);
         final isDarkMode = themeProvider.isDarkMode;
-        
+
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -280,8 +397,8 @@ class _MemoryFormState extends State<MemoryForm> {
               Text(
                 'Seleccionar imagen',
                 style: TextStyle(
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold, 
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                   color: isDarkMode ? textDarkMode : pinkDark,
                 ),
               ),
@@ -300,20 +417,24 @@ class _MemoryFormState extends State<MemoryForm> {
                       onTap: () {
                         setState(() {
                           _selectedAsset = asset;
-                          _selectedImageBytes = null; // Es un asset, no bytes
+                          _selectedBytes = null; // Es un asset, no bytes
+                          _isVideo = false;
                         });
                         Navigator.pop(context);
                       },
                       child: Container(
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: _selectedAsset == asset ? pinkPrimary : Colors.transparent,
+                            color: _selectedAsset == asset
+                                ? pinkPrimary
+                                : Colors.transparent,
                             width: 3,
                           ),
                           borderRadius: BorderRadius.circular(10),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.grey.withOpacity(isDarkMode ? 0.1 : 0.3),
+                              color: Colors.grey
+                                  .withOpacity(isDarkMode ? 0.1 : 0.3),
                               blurRadius: 5,
                               offset: const Offset(0, 3),
                             ),
@@ -322,9 +443,10 @@ class _MemoryFormState extends State<MemoryForm> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image.asset(
-                            asset, 
+                            asset,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
                               color: isDarkMode ? cardLight : pinkLighter,
                               child: Icon(Icons.error, color: pinkDark),
                             ),
@@ -356,29 +478,45 @@ class _MemoryFormState extends State<MemoryForm> {
     );
   }
 
+  // WIDGET DE PREVISUALIZACIÓN (SOPORTA VIDEO)
   Widget _showSelectedImage() {
-    if (_isLoadingImage) {
-      return const Center(
-        child: CircularProgressIndicator(color: pinkPrimary),
-      );
+    if (_isLoadingMedia) {
+      return const Center(child: CircularProgressIndicator(color: pinkPrimary));
     }
 
     if (_selectedAsset == null || _selectedAsset!.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.photo_library, color: pinkPrimary, size: 40),
-            const SizedBox(height: 5),
-            Text('Seleccionar imagen', style: TextStyle(color: pinkPrimary)),
+          children: const [
+            Icon(Icons.add_a_photo, color: pinkPrimary, size: 40),
+            SizedBox(height: 5),
+            Text('Añadir Foto o Video', style: TextStyle(color: pinkPrimary)),
           ],
+        ),
+      );
+    }
+
+    // Si es video, muestra icono de video
+    if (_isVideo) {
+      return Container(
+        color: Colors.black87,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.play_circle_fill, color: Colors.white, size: 50),
+              SizedBox(height: 10),
+              Text('Video seleccionado', style: TextStyle(color: Colors.white)),
+            ],
+          ),
         ),
       );
     }
 
     if (_selectedAsset!.startsWith('assets/')) {
       return Image.asset(
-        _selectedAsset!, 
+        _selectedAsset!,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => Container(
           color: pinkLighter,
@@ -388,7 +526,7 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     }
-    
+
     // Para Web (data URL)
     if (_selectedAsset!.startsWith('data:image')) {
       try {
@@ -406,11 +544,11 @@ class _MemoryFormState extends State<MemoryForm> {
         );
       }
     }
-    
+
     // Para imágenes locales (path de archivo)
     if (_selectedAsset!.startsWith('/') || _selectedAsset!.contains('file:')) {
       return Image.file(
-        File(_selectedAsset!), 
+        File(_selectedAsset!),
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => Container(
           color: pinkLighter,
@@ -420,19 +558,19 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     }
-    
+
     // Para URLs web
     if (_selectedAsset!.startsWith('http')) {
       return Image.network(
-        _selectedAsset!, 
+        _selectedAsset!,
         fit: BoxFit.cover,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
           return Center(
             child: CircularProgressIndicator(
               value: loadingProgress.expectedTotalBytes != null
-                  ? loadingProgress.cumulativeBytesLoaded / 
-                    loadingProgress.expectedTotalBytes!
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
                   : null,
               color: pinkPrimary,
             ),
@@ -446,7 +584,7 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     }
-    
+
     // Por defecto
     return Center(
       child: Column(
@@ -462,25 +600,15 @@ class _MemoryFormState extends State<MemoryForm> {
 
   Future<void> _saveMemory() async {
     if (_isSaving) return;
-    
+
     final title = _titleController.text.trim();
     final description = _descriptionController.text.trim();
     final date = _dateController.text.trim();
 
-    if (title.isEmpty) {
+    if (title.isEmpty || date.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Por favor, ingresa un título'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    if (date.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, selecciona una fecha'),
+          content: Text('Por favor, completa los campos obligatorios'),
           backgroundColor: Colors.red,
         ),
       );
@@ -490,8 +618,8 @@ class _MemoryFormState extends State<MemoryForm> {
     setState(() => _isSaving = true);
 
     try {
-      // Crear memoria básica
-      final memory = Memory(
+      // 1. Crear el objeto base con los datos de los campos
+      Memory memoryToSave = Memory(
         id: widget.existingMemory?.id ?? '',
         title: title,
         description: description,
@@ -500,62 +628,62 @@ class _MemoryFormState extends State<MemoryForm> {
           'latitude': widget.location.latitude,
           'longitude': widget.location.longitude,
         },
-        imageAsset: null, // Se asignará después de subir
+        imageAsset: _selectedAsset, // Mantener el asset actual por defecto
       );
 
-      // Si hay imagen seleccionada y es local (no asset), subirla
-      if (_selectedImageBytes != null && 
-          _selectedImageBytes!.isNotEmpty &&
-          !(_selectedAsset?.startsWith('assets/') ?? true)) {
-        
-        print('📤 Subiendo imagen a Supabase...');
-        
-        // Usar saveMemoryWithImage que sube la imagen primero
-        await _memoryService.saveMemoryWithImage(
-          memory: memory,
-          imageBytes: _selectedImageBytes!,
-        );
-        
+      Memory
+          finalMemory; // Aquí guardaremos la versión final con URL de Supabase
+
+      // 2. LÓGICA DE GUARDADO SEGÚN EL TIPO DE ARCHIVO
+      if (_selectedBytes != null && _selectedBytes!.isNotEmpty) {
+        if (_isVideo) {
+          print('Subiendo video...');
+          finalMemory = await _memoryService.saveMemoryWithVideo(
+            memory: memoryToSave,
+            videoBytes: _selectedBytes!,
+          );
+        } else {
+          print('Subiendo imagen...');
+          // CAPTURAMOS EL ID: El servicio guarda en Supabase y local automáticamente
+          final savedId = await _memoryService.saveMemoryWithImage(
+            memory: memoryToSave,
+            imageBytes: _selectedBytes!,
+          );
+
+          // OBTENEMOS LA MEMORIA ACTUALIZADA (la que tiene el ?t= timestamp)
+          final memories = await _memoryService.getMemories();
+          finalMemory = memories.firstWhere((m) => m.id == savedId);
+        }
+      } else {
+        // Guardado simple (sin cambio de archivo o usando un asset predeterminado)
+        await _memoryService.saveMemory(memoryToSave);
+        finalMemory = memoryToSave;
+      }
+
+      // 3. NOTIFICAR ÉXITO Y ENVIAR AL PADRE LA MEMORIA REAL ACTUALIZADA
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Recuerdo guardado con imagen'),
+            content: Text('Recuerdo guardado correctamente'),
             backgroundColor: Colors.green,
           ),
         );
-      } else {
-        // Si es un asset predeterminado o no hay imagen
-        final memoryWithAsset = Memory(
-          id: memory.id,
-          title: memory.title,
-          description: memory.description,
-          date: memory.date,
-          location: memory.location,
-          imageAsset: _selectedAsset, // Puede ser asset o null
-        );
-        
-        await _memoryService.saveMemory(memoryWithAsset);
-        
+
+        // ¡IMPORTANTE!: Enviamos 'finalMemory', que es la que tiene la URL fresca
+        widget.onSave(finalMemory);
+      }
+    } catch (e) {
+      print('Error guardando recuerdo: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Recuerdo guardado'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text('Error al guardar: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-      
-      // Notificar al padre que se guardó
-      widget.onSave(memory);
-      
-    } catch (e) {
-      print('Error guardando recuerdo: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al guardar: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -579,8 +707,8 @@ class _MemoryFormState extends State<MemoryForm> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  widget.existingMemory == null 
-                      ? 'Crear Nuevo Recuerdo' 
+                  widget.existingMemory == null
+                      ? 'Crear Nuevo Recuerdo'
                       : 'Editar Recuerdo',
                   style: TextStyle(
                     fontSize: 24,
@@ -590,7 +718,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Campo de título
                 TextField(
                   controller: _titleController,
@@ -616,7 +744,8 @@ class _MemoryFormState extends State<MemoryForm> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: pinkPrimary, width: 2),
+                      borderSide:
+                          const BorderSide(color: pinkPrimary, width: 2),
                     ),
                     prefixIcon: Icon(Icons.title, color: pinkPrimary),
                     fillColor: isDarkMode ? cardDark : Colors.white,
@@ -624,7 +753,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   ),
                 ),
                 const SizedBox(height: 15),
-                
+
                 // Campo de descripción
                 TextField(
                   controller: _descriptionController,
@@ -650,7 +779,8 @@ class _MemoryFormState extends State<MemoryForm> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: pinkPrimary, width: 2),
+                      borderSide:
+                          const BorderSide(color: pinkPrimary, width: 2),
                     ),
                     prefixIcon: Icon(Icons.description, color: pinkPrimary),
                     fillColor: isDarkMode ? cardDark : Colors.white,
@@ -659,7 +789,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   maxLines: 3,
                 ),
                 const SizedBox(height: 15),
-                
+
                 // Campo de fecha
                 GestureDetector(
                   onTap: () => _selectDate(context),
@@ -672,7 +802,8 @@ class _MemoryFormState extends State<MemoryForm> {
                       decoration: InputDecoration(
                         labelText: 'Fecha *',
                         labelStyle: TextStyle(
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                          color:
+                              isDarkMode ? Colors.grey[400] : Colors.grey[700],
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -688,9 +819,11 @@ class _MemoryFormState extends State<MemoryForm> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: pinkPrimary, width: 2),
+                          borderSide:
+                              const BorderSide(color: pinkPrimary, width: 2),
                         ),
-                        prefixIcon: Icon(Icons.calendar_today, color: pinkPrimary),
+                        prefixIcon:
+                            Icon(Icons.calendar_today, color: pinkPrimary),
                         fillColor: isDarkMode ? cardDark : Colors.white,
                         filled: true,
                       ),
@@ -698,7 +831,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Selector de imagen
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -716,8 +849,8 @@ class _MemoryFormState extends State<MemoryForm> {
                       child: Container(
                         height: 200,
                         decoration: BoxDecoration(
-                          color: isDarkMode 
-                              ? cardDark.withOpacity(0.5) 
+                          color: isDarkMode
+                              ? cardDark.withOpacity(0.5)
                               : pinkLighter.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
@@ -727,7 +860,8 @@ class _MemoryFormState extends State<MemoryForm> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.grey.withOpacity(isDarkMode ? 0.1 : 0.2),
+                              color: Colors.grey
+                                  .withOpacity(isDarkMode ? 0.1 : 0.2),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -752,7 +886,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   ],
                 ),
                 const SizedBox(height: 25),
-                
+
                 // Coordenadas
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -772,7 +906,9 @@ class _MemoryFormState extends State<MemoryForm> {
                           'Ubicación: ${widget.location.latitude.toStringAsFixed(6)}, ${widget.location.longitude.toStringAsFixed(6)}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                            color: isDarkMode
+                                ? Colors.grey[400]
+                                : Colors.grey[700],
                           ),
                         ),
                       ),
@@ -780,7 +916,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   ),
                 ),
                 const SizedBox(height: 25),
-                
+
                 // Botones de acción
                 Row(
                   children: [
@@ -788,7 +924,8 @@ class _MemoryFormState extends State<MemoryForm> {
                       child: ElevatedButton(
                         onPressed: _isSaving ? null : widget.onCancel,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                          backgroundColor:
+                              isDarkMode ? Colors.grey[800] : Colors.grey[200],
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -809,7 +946,8 @@ class _MemoryFormState extends State<MemoryForm> {
                       child: ElevatedButton(
                         onPressed: _isSaving ? null : _saveMemory,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _isSaving ? Colors.grey : pinkPrimary,
+                          backgroundColor:
+                              _isSaving ? Colors.grey : pinkPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
