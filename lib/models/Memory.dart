@@ -6,7 +6,7 @@ class Memory {
   final String description;
   final String date;
   final Map<String, double> location;
-  final String? imageAsset; // ✅ El ? es CORRECTO porque puede ser null
+  final String? imageAsset; 
 
   Memory({
     required this.id,
@@ -14,7 +14,7 @@ class Memory {
     required this.description,
     required this.date,
     required this.location,
-    this.imageAsset, // ✅ Mantiene el ?
+    this.imageAsset,
   });
 
   // getters SEGUROS
@@ -36,7 +36,7 @@ class Memory {
     };
   }
 
-  // Creamos una instancia de Memory a partir de un Map - VERSIÓN SEGURA
+  // Creamos una instancia de Memory a partir de un Map 
   factory Memory.fromMap(Map<String, dynamic> map) {
     try {
       // ID - siempre convertir a String, con valor por defecto
@@ -67,10 +67,10 @@ class Memory {
           'latitude': latitude,
           'longitude': longitude,
         },
-        imageAsset: imageAsset, // ✅ Puede ser null
+        imageAsset: imageAsset, 
       );
     } catch (e) {
-      print('❌ ERROR en Memory.fromMap: $e');
+      print('ERROR en Memory.fromMap: $e');
       print('Map que causó el error: $map');
       
       // Retornar un Memory seguro en caso de error

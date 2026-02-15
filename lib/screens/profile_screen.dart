@@ -50,13 +50,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // 4. FORZAR RECARGA DE LA UI
           setState(() {});
           
-          _mostrarSnackbar('✅ Foto de perfil actualizada');
+          _mostrarSnackbar('Foto de perfil actualizada');
         }
       } else {
-        _mostrarSnackbar('❌ Error al subir la imagen', isError: true);
+        _mostrarSnackbar('Error al subir la imagen', isError: true);
       }
     } catch (e) {
-      print('❌ Error en _cambiarFoto: $e');
+      print('Error en _cambiarFoto: $e');
       _mostrarSnackbar('Error: $e', isError: true);
     } finally {
       if (mounted) {
@@ -99,6 +99,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       print('Error eliminando foto: $e');
+    }
+  }
+
+
+  // eliminamos cuenta
+  Future<void> _eliminarCuenta(AppAuthProvider auth) async {
+    try {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Eliminar cuenta'),
+
+          content: const Text('¿Estás seguro de que deseas eliminar tu cuenta?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        final success = await auth.deleteAccount();
+        
+        if (success && mounted) {
+          //al eliminar la cuenta, automaticamente se abrirá la pantalla de login
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+            (route) => false,
+          );
+          
+        // se muestra mensaje de confirmación
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cuenta eliminada exitosamente'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+    } catch (e) {
+      print('Error eliminando la cuenta: $e');
     }
   }
 
@@ -268,32 +319,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       
                       const SizedBox(height: 8),
-                      
-                      // id del usuario (solo si existe)
-                      if (userId.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: themeProvider.isDarkMode
-                                ? Colors.grey[800]
-                                : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'ID: ${userId.substring(0, 8)}...${userId.substring(userId.length - 4)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: themeProvider.isDarkMode
-                                  ? Colors.grey[400]
-                                  : Colors.grey[700],
-                              fontFamily: 'monospace',
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ),
+
                     ],
                   ),
                 ),
@@ -409,6 +435,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onTap: () => _eliminarFoto(authProvider),
                         ),
                       ],
+
+                      // línea divisoria antes de eliminar cuenta (siempre visible)
+                      const Divider(),
+
+                      //eliminar cuenta
+                      ListTile(
+                        leading: const Icon(Icons.delete_forever, color: Colors.red),
+                        title: Text(
+                          'Eliminar cuenta',
+                            style: TextStyle(
+                              color: themeProvider.isDarkMode
+                                  ? textLight
+                                  : Colors.black87,
+                            ),
+                          ),
+                          onTap: () => _eliminarCuenta(authProvider),
+                        ),
                     ],
                   ),
                 ),

@@ -47,7 +47,7 @@ class AppAuthProvider with ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      print('🖼️ Actualizando avatar en metadatos: $url');
+      print('Actualizando avatar en metadatos: $url');
 
       // 1. se actualiza en Supabase
       final response = await _supabase.auth.updateUser(
@@ -102,7 +102,7 @@ class AppAuthProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      print('❌ Error eliminando avatar: $e');
+      print('Error eliminando avatar: $e');
       _errorMessage = 'Error al eliminar foto de perfil: $e';
       _isLoading = false;
       notifyListeners();
@@ -233,6 +233,35 @@ class AppAuthProvider with ChangeNotifier {
     print('Sesión cerrada');
   }
 
+Future<bool> deleteAccount() async {
+  try {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    print('Eliminando cuenta permanentemente...');
+    
+    // Llamar a la función SQL
+    await _supabase.rpc('eliminar_usuario');
+    
+    print('Cuenta eliminada de Supabase');
+    
+    // Cerrar sesión local
+    await _supabase.auth.signOut();
+    _user = null;
+    
+    _isLoading = false;
+    notifyListeners();
+    return true;
+    
+  } catch (e) {
+    print('Error eliminando cuenta: $e');
+    _errorMessage = 'Error al eliminar cuenta';
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+}
   String? get userId => _user?.id;
   String? get userEmail => _user?.email;
 

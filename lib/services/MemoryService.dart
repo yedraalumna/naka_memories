@@ -20,7 +20,7 @@ class MemoryService {
     try {
       final user = _supabase.auth.currentUser;
       _isSupabaseAvailable = user != null;
-      print('🔌 Supabase disponible: $_isSupabaseAvailable');
+      print('Supabase disponible: $_isSupabaseAvailable');
     } catch (e) {
       print('Error checking Supabase connection: $e');
       _isSupabaseAvailable = false;
@@ -33,7 +33,7 @@ class MemoryService {
 
   Future<String?> uploadAvatar(Uint8List bytes, String userId) async {
     try {
-      print('🖼️ Subiendo avatar para usuario: $userId');
+      print('Subiendo avatar para usuario: $userId');
 
       final String fileName = 'avatar_$userId.jpg';
       final String path = 'avatars/$fileName';
