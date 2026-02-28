@@ -10,7 +10,6 @@ import '../providers/theme_provider.dart';
 import '../services/ImagePickerService.dart';
 import '../services/MemoryService.dart';
 import 'package:flutter/foundation.dart';
-import 'package:image_picker/image_picker.dart';
 
 class MemoryForm extends StatefulWidget {
   final LatLng location;
@@ -36,12 +35,16 @@ class _MemoryFormState extends State<MemoryForm> {
   final TextEditingController _dateController = TextEditingController();
   final ImagePickerService _pickerService = ImagePickerService();
   final MemoryService _memoryService = MemoryService();
+  final TextEditingController _customCategoryController =
+      TextEditingController();
 
   String? _selectedAsset;
   bool _isLoadingMedia = false; // Renombrado para ser genérico (img o video)
   bool _isSaving = false;
   Uint8List? _selectedBytes; // Renombrado: puede ser imagen o video
   bool _isVideo = false; // Bandera para saber si es video
+  String _selectedCategory = Memory.categoriesList[0]; // Categorias
+  bool _isCustomCategory = false; // Bandera para saber si es custom
 
   final List<String> _availableAssets = [
     'assets/images/gato.jpg',
@@ -58,7 +61,16 @@ class _MemoryFormState extends State<MemoryForm> {
       _descriptionController.text = widget.existingMemory!.description;
       _dateController.text = widget.existingMemory!.date;
       _selectedAsset = widget.existingMemory!.imageAsset;
-      // Detectar si lo que ya existía es un video (por extensión)
+
+      // Verificamos que la categoría exista en nuestra lista, si no, es una personalizada
+      if (Memory.categoriesList.contains(widget.existingMemory!.category)) {
+        _selectedCategory = widget.existingMemory!.category;
+        _isCustomCategory = false;
+      } else {
+        _isCustomCategory = true;
+        _customCategoryController.text = widget.existingMemory!.category;
+      }
+
       if (_selectedAsset != null && _selectedAsset!.endsWith('.mp4')) {
         _isVideo = true;
       }
@@ -139,7 +151,7 @@ class _MemoryFormState extends State<MemoryForm> {
                 if (!kIsWeb) ...[
                   ListTile(
                     leading: const Icon(Icons.camera_alt, color: pinkPrimary),
-                    title: Text('Tomar Foto',
+                    title: Text('Tomar foto',
                         style: TextStyle(
                             color: isDarkMode ? textDarkMode : Colors.black87)),
                     onTap: () async {
@@ -150,7 +162,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   ListTile(
                     leading:
                         const Icon(Icons.photo_library, color: pinkPrimary),
-                    title: Text('Galería de Fotos',
+                    title: Text('Galería de fotos',
                         style: TextStyle(
                             color: isDarkMode ? textDarkMode : Colors.black87)),
                     onTap: () async {
@@ -166,7 +178,7 @@ class _MemoryFormState extends State<MemoryForm> {
                 if (!kIsWeb) ...[
                   ListTile(
                     leading: const Icon(Icons.videocam, color: pinkPrimary),
-                    title: Text('Grabar Video (Max 20s)',
+                    title: Text('Grabar video (Max 20s)',
                         style: TextStyle(
                             color: isDarkMode ? textDarkMode : Colors.black87)),
                     onTap: () async {
@@ -177,7 +189,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   ListTile(
                     leading:
                         const Icon(Icons.video_library, color: pinkPrimary),
-                    title: Text('Galería de Videos',
+                    title: Text('Galería de videos',
                         style: TextStyle(
                             color: isDarkMode ? textDarkMode : Colors.black87)),
                     onTap: () async {
@@ -192,7 +204,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   ListTile(
                     leading:
                         const Icon(Icons.photo_library, color: pinkPrimary),
-                    title: Text('Subir Foto',
+                    title: Text('Subir foto',
                         style: TextStyle(
                             color: isDarkMode ? textDarkMode : Colors.black87)),
                     onTap: () async {
@@ -203,7 +215,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   ListTile(
                     leading:
                         const Icon(Icons.video_library, color: pinkPrimary),
-                    title: Text('Subir Video',
+                    title: Text('Subir video',
                         style: TextStyle(
                             color: isDarkMode ? textDarkMode : Colors.black87)),
                     onTap: () async {
@@ -217,7 +229,7 @@ class _MemoryFormState extends State<MemoryForm> {
 
                 ListTile(
                   leading: const Icon(Icons.image_search, color: Colors.grey),
-                  title: Text('Imágenes Predeterminadas',
+                  title: Text('Imágenes predeterminadas',
                       style: TextStyle(
                           color: isDarkMode ? textDarkMode : Colors.black87)),
                   onTap: () {
@@ -605,6 +617,7 @@ class _MemoryFormState extends State<MemoryForm> {
     final description = _descriptionController.text.trim();
     final date = _dateController.text.trim();
 
+    // Validaciones básicas
     if (title.isEmpty || date.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -615,10 +628,29 @@ class _MemoryFormState extends State<MemoryForm> {
       return;
     }
 
+    // LÓGICA DE CATEGORÍA: Determinar cuál usar
+    String finalCategory = _selectedCategory;
+
+    // Si el usuario eligió "Nueva categoría...", se valida y se usa su texto
+    if (_isCustomCategory) {
+      final customText = _customCategoryController.text.trim();
+      if (customText.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Por favor, escribe un nombre para la nueva categoría'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      finalCategory = customText; // Usamos lo que escribió
+    }
+
     setState(() => _isSaving = true);
 
     try {
-      // 1. Crear el objeto base con los datos de los campos
+      // 3. Crear el objeto Memory con la categoría correcta
       Memory memoryToSave = Memory(
         id: widget.existingMemory?.id ?? '',
         title: title,
@@ -628,13 +660,13 @@ class _MemoryFormState extends State<MemoryForm> {
           'latitude': widget.location.latitude,
           'longitude': widget.location.longitude,
         },
-        imageAsset: _selectedAsset, // Mantener el asset actual por defecto
+        imageAsset: _selectedAsset,
+        category: finalCategory,
       );
 
-      Memory
-          finalMemory; // Aquí guardaremos la versión final con URL de Supabase
+      Memory finalMemory; // Aquí se guarda la ver final sincronizada
 
-      // 2. LÓGICA DE GUARDADO SEGÚN EL TIPO DE ARCHIVO
+      // Lógica de guardado según el tipo de archivo (Imagen/Video/Nada)
       if (_selectedBytes != null && _selectedBytes!.isNotEmpty) {
         if (_isVideo) {
           print('Subiendo video...');
@@ -644,23 +676,23 @@ class _MemoryFormState extends State<MemoryForm> {
           );
         } else {
           print('Subiendo imagen...');
-          // CAPTURAMOS EL ID: El servicio guarda en Supabase y local automáticamente
+          // Guardamos y obtenemos el ID
           final savedId = await _memoryService.saveMemoryWithImage(
             memory: memoryToSave,
             imageBytes: _selectedBytes!,
           );
 
-          // OBTENEMOS LA MEMORIA ACTUALIZADA (la que tiene el ?t= timestamp)
+          // Recuperamos el objeto actualizado (con la URL de Supabase) usando el ID
           final memories = await _memoryService.getMemories();
           finalMemory = memories.firstWhere((m) => m.id == savedId);
         }
       } else {
-        // Guardado simple (sin cambio de archivo o usando un asset predeterminado)
+        // Guardado simple (sin cambio de archivo multimedia)
         await _memoryService.saveMemory(memoryToSave);
         finalMemory = memoryToSave;
       }
 
-      // 3. NOTIFICAR ÉXITO Y ENVIAR AL PADRE LA MEMORIA REAL ACTUALIZADA
+      // Notificar éxito y cerrar
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -669,7 +701,7 @@ class _MemoryFormState extends State<MemoryForm> {
           ),
         );
 
-        // ¡IMPORTANTE!: Enviamos 'finalMemory', que es la que tiene la URL fresca
+        // Devolvemos el recuerdo final al padre (MapScreen) para actualizar la UI
         widget.onSave(finalMemory);
       }
     } catch (e) {
@@ -830,6 +862,157 @@ class _MemoryFormState extends State<MemoryForm> {
                     ),
                   ),
                 ),
+
+                // Campo de categoría
+                const SizedBox(height: 15),
+
+                if (_isCustomCategory)
+                  // MODO ESCRITURA (TextField)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _customCategoryController,
+                          decoration: InputDecoration(
+                            labelText: 'Escribe la nueva categoría',
+                            hintText: 'Ej: Deportes, Conciertos...',
+                            labelStyle: TextStyle(
+                              color: isDarkMode
+                                  ? Colors.grey[400]
+                                  : Colors.grey[700],
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(
+                                color:
+                                    isDarkMode ? Colors.grey[700]! : pinkLight,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(
+                                color:
+                                    isDarkMode ? Colors.grey[700]! : pinkLight,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: pinkPrimary, width: 2),
+                            ),
+                            prefixIcon:
+                                const Icon(Icons.edit, color: pinkPrimary),
+                            filled: true,
+                            fillColor: isDarkMode ? cardDark : Colors.white,
+                          ),
+                          style: TextStyle(
+                            color: isDarkMode ? textDarkMode : Colors.black87,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Botón para cancelar y volver al dropdown
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? cardDark : Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isDarkMode
+                                ? Colors.grey[700]!
+                                : Colors.grey[300]!,
+                          ),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.grey),
+                          tooltip: 'Volver a la lista',
+                          onPressed: () {
+                            setState(() {
+                              _isCustomCategory = false;
+                              _selectedCategory =
+                                  Memory.categoriesList[0]; // Reset a General
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  // MODO SELECCIÓN (Dropdown con opción de crear)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? cardDark : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isDarkMode ? Colors.grey[700]! : pinkLight,
+                      ),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedCategory,
+                        isExpanded: true,
+                        dropdownColor: isDarkMode ? cardDark : Colors.white,
+                        icon: const Icon(Icons.arrow_drop_down,
+                            color: pinkPrimary),
+                        items: [
+                          // Las categorías predefinidas
+                          ...Memory.categoriesList.map((String category) {
+                            return DropdownMenuItem<String>(
+                              value: category,
+                              child: Row(
+                                children: [
+                                  Icon(_getCategoryIcon(category),
+                                      color: pinkPrimary, size: 20),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    category,
+                                    style: TextStyle(
+                                      color: isDarkMode
+                                          ? textDarkMode
+                                          : Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          // Opción especial al final para crear nueva
+                          DropdownMenuItem<String>(
+                            value:
+                                'custom_option_marker', // Valor identificador único
+                            child: Row(
+                              children: const [
+                                Icon(Icons.add_circle_outline,
+                                    color: pinkPrimary, size: 20),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Nueva categoría...',
+                                  style: TextStyle(
+                                    color: pinkPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onChanged: (String? newValue) {
+                          if (newValue == 'custom_option_marker') {
+                            // Si seleccionan "Nueva...", cambiamos a modo texto
+                            setState(() {
+                              _isCustomCategory = true;
+                              _customCategoryController.clear();
+                            });
+                          } else if (newValue != null) {
+                            // Si seleccionan una normal, actualizamos valor
+                            setState(() => _selectedCategory = newValue);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+
                 const SizedBox(height: 20),
 
                 // Selector de imagen
@@ -983,11 +1166,30 @@ class _MemoryFormState extends State<MemoryForm> {
     );
   }
 
+  // Icono de la categoria
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Viajes':
+        return Icons.flight;
+      case 'Amigos':
+        return Icons.people;
+      case 'Familia':
+        return Icons.home;
+      case 'Comida':
+        return Icons.restaurant;
+      case 'Estudio':
+        return Icons.school;
+      default:
+        return Icons.bookmark;
+    }
+  }
+
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     _dateController.dispose();
+    _customCategoryController.dispose();
     super.dispose();
   }
 }

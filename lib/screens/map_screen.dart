@@ -48,6 +48,8 @@ class _MapScreenState extends State<MapScreen> {
   List<Memory> _memories = [];
   final MemoryService _memoryService = MemoryService();
   bool _isLoading = false;
+  String _selectedCategory = 'Todos'; // Filtros
+  List<String> _dynamicCategories = []; // Lista de categorias
 
   // Detectar si es web
   bool get _isWeb => kIsWeb;
@@ -256,19 +258,38 @@ class _MapScreenState extends State<MapScreen> {
     return BitmapDescriptor.fromBytes(byteData.buffer.asUint8List());
   }
 
-  // cargamos los recuerdos con marcadores personalizados
+  // Cargamos los recuerdos con marcadores personalizados
   Future<void> _loadMemories() async {
     if (_isLoading) return;
-
     setState(() => _isLoading = true);
 
     try {
-      final memories = await _memoryService.getMemories();
+      final allMemories = await _memoryService.getMemories();
+
+      // Logica de categorias
+      // Las predefinidias
+      Set<String> uniqueCategories = Set.from(Memory.categoriesList);
+
+      // Se añaden las que vengan de los recuerdos
+      for (var m in allMemories) {
+        if (m.category.isNotEmpty) {
+          uniqueCategories.add(m.category);
+        }
+      }
+
+      // Se guardan en la lista
+      _dynamicCategories = uniqueCategories.toList();
+
+      final filteredList = _selectedCategory == 'Todas'
+          ? allMemories
+          : allMemories.where((m) => m.category == _selectedCategory).toList();
+
+      // Creamos los marcadores SOLO para la lista filtrada
       Set<Marker> newMarkers = {};
 
-      // Creamos marcadores para cada memoria
-      for (var memory in memories) {
+      for (var memory in filteredList) {
         try {
+          // Generamos el icono personalizado (foto o default)
           final icon = await _getMarkerIconSquare(memory.imageAsset);
 
           newMarkers.add(
@@ -276,42 +297,72 @@ class _MapScreenState extends State<MapScreen> {
               markerId: MarkerId(memory.id),
               position: memory.toLatLng,
               icon: icon,
-              anchor: const Offset(0.5, 0.5), // Centramos el marcador
+              anchor: const Offset(0.5, 0.5), // Centramos el icono
               infoWindow: InfoWindow(
                 title: memory.title,
-                snippet: memory.description,
+                // Mostramos la categoría en el subtítulo del marcador
+                snippet: memory.category,
                 onTap: () => _showMemoryDetails(memory),
               ),
               onTap: () => _showMemoryDetails(memory),
             ),
           );
         } catch (e) {
-          debugPrint("Error creando marcador para ${memory.title}: $e");
-          // Usamos el marcador por defecto si hay error
-          newMarkers.add(
-            Marker(
-              markerId: MarkerId(memory.id),
-              position: memory.toLatLng,
-              infoWindow: InfoWindow(
-                title: memory.title,
-                snippet: memory.description,
-                onTap: () => _showMemoryDetails(memory),
-              ),
-              onTap: () => _showMemoryDetails(memory),
-            ),
-          );
+          debugPrint(
+              "Error creando marcador individual para ${memory.title}: $e");
+          // Si falla un marcador específico, el bucle continúa con los demás
         }
       }
 
+      // Actualizamos el estado
       setState(() {
-        _memories = memories;
+        _memories = allMemories;
         _markers = newMarkers;
         _isLoading = false;
       });
     } catch (e) {
+      // Manejo de errores general
       setState(() => _isLoading = false);
       _showErrorDialog('Error al cargar recuerdos: $e');
     }
+  }
+
+  // Función que crea un chip de filtro
+  Widget _buildFilterChip(String label) {
+    final bool isSelected = _selectedCategory == label;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      child: FilterChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (bool selected) {
+          setState(() {
+            // Si desmarcan el actual, volvemos a 'Todas', si no, ponemos la categoría
+            if (!selected && label != 'Todas') {
+              _selectedCategory = 'Todas';
+            } else {
+              _selectedCategory = label;
+            }
+          });
+          // Recargamos los marcadores con el nuevo filtro
+          _loadMemories();
+        },
+        backgroundColor: Colors.white,
+        selectedColor: pinkPrimary,
+        checkmarkColor: Colors.white,
+        labelStyle: TextStyle(
+          color: isSelected ? Colors.white : pinkPrimary,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: pinkPrimary, width: 1),
+        ),
+        elevation: 2,
+        pressElevation: 4,
+      ),
+    );
   }
 
   // manejamos el menú y la navegación
@@ -681,18 +732,18 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // widget build con lógica para mostrar el mapa y la UI según plataforma y modo
+  // Widget principal
   @override
   Widget build(BuildContext context) {
-    // 1. obtenemos el estado del tema para configurar colores
+    // Obtenemos el estado del tema para configurar colores
     final themeProvider = Provider.of<ThemeProvider>(context);
     final bool isDarkMode = themeProvider.isDarkMode;
 
-    // 2. configuramos colores dinámicos para la UI
+    // Configuramos colores dinámicos para la UI
     final Color appBarBg = isDarkMode ? backgroundDark : backgroundLight;
     final Color titleColor = isDarkMode ? textDarkMode : textDark;
     final Color iconColor = pinkPrimary;
-    final Color progressColor = pinkPrimary; // Color para el loading indicator
+    final Color progressColor = pinkPrimary;
 
     // Si es web y estamos en modo biblioteca
     if (_isWeb && widget.isLibrary) {
@@ -716,11 +767,12 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ],
         ),
-        body: _buildWebMap(),
+        body:
+            _buildWebMap(), // Nota: Si quieres filtros en web, deberías pasarlos a este método o poner el Stack aquí.
       );
     }
 
-    // Si es web pero no es biblioteca (modo selección)
+    // Si es web pero no es biblioteca (modo selección de coordenadas)
     if (_isWeb && !widget.isLibrary) {
       return _buildWebMap();
     }
@@ -749,6 +801,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
         body: Stack(
           children: [
+            // Mapa
             GoogleMap(
               initialCameraPosition: const CameraPosition(
                 target: LatLng(40.4168, -3.7038),
@@ -760,15 +813,15 @@ class _MapScreenState extends State<MapScreen> {
                 if (widget.onMapCreatedCallback != null) {
                   widget.onMapCreatedCallback!(controller);
                 }
-                _loadMemories();
+                _loadMemories(); // Carga inicial con filtros
               },
               onCameraMove: (position) {
                 _currentCameraPosition = position.target;
-                // actualizamos las coordenadas en tiempo real
                 if (widget.onCameraMoveCallback != null) {
                   widget.onCameraMoveCallback!(position.target);
                 }
               },
+              // Usamos _markers (que ya vienen filtrados por _loadMemories)
               markers: _markers,
               onLongPress: (position) {
                 if (widget.onLongPressCallback != null) {
@@ -777,7 +830,8 @@ class _MapScreenState extends State<MapScreen> {
                   _onMapLongPress(position);
                 }
               },
-              zoomControlsEnabled: true,
+              zoomControlsEnabled:
+                  false, // Quitamos controles nativos para que no se solapen
               myLocationEnabled: true,
               myLocationButtonEnabled: true,
               compassEnabled: true,
@@ -786,6 +840,29 @@ class _MapScreenState extends State<MapScreen> {
               zoomGesturesEnabled: true,
               tiltGesturesEnabled: true,
             ),
+
+            // Filtros
+            Positioned(
+              top: 10,
+              left: 0,
+              right: 0,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: [
+                    _buildFilterChip('Todas'),
+
+                    // AHORA USAMOS LA LISTA DINÁMICA _dynamicCategories EN LUGAR DE Memory.categoriesList
+                    ..._dynamicCategories.map((category) {
+                      return _buildFilterChip(category);
+                    }).toList(),
+                  ],
+                ),
+              ),
+            ),
+
+            // Indicador de carga
             if (_isLoading)
               const Center(
                 child: CircularProgressIndicator(color: pinkPrimary),
@@ -811,7 +888,6 @@ class _MapScreenState extends State<MapScreen> {
         }
       },
       onCameraMove: (position) {
-        // actualizamos el callback aquí también
         if (widget.onCameraMoveCallback != null) {
           widget.onCameraMoveCallback!(position.target);
         }

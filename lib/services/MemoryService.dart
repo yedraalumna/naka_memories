@@ -120,6 +120,7 @@ class MemoryService {
               'latitude': _parseDouble(item['latitude']),
               'longitude': _parseDouble(item['longitude']),
               'imageAsset': item['imageAsset']?.toString(),
+              'category': item['category']?.toString() ?? '',
             });
             memories.add(memory);
           } catch (e) {
@@ -173,7 +174,7 @@ class MemoryService {
     }
   }
 
-  // 2. subimir imagen a Supabase (retorna URL pública o null)
+  // subir imagen a Supabase (retorna URL pública o null)
   Future<String?> uploadImage(Uint8List imageBytes) async {
     try {
       if (imageBytes.isEmpty) {
@@ -235,7 +236,7 @@ class MemoryService {
     }
   }
 
-  // 3. GUARDAR RECUERDO CON IMAGEN
+  // GUARDAR RECUERDO CON IMAGEN
   Future<String> saveMemoryWithImage({
     required Memory memory,
     required Uint8List imageBytes,
@@ -282,7 +283,7 @@ class MemoryService {
     }
   }
 
-  // 3.5. Método específico para subir video a Supabase
+  // Metodo específico para subir video a Supabase
   Future<String?> uploadVideo(Uint8List videoBytes) async {
     try {
       if (videoBytes.isEmpty) return null;
@@ -359,7 +360,7 @@ class MemoryService {
     }
   }
 
-  // 4. guardar recuerdo en Supabase
+  // Guardar recuerdo en Supabase
   Future<void> _saveMemoryToSupabase(Memory memory) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -382,6 +383,7 @@ class MemoryService {
         'latitude': memory.location['latitude'] ?? 0.0,
         'longitude': memory.location['longitude'] ?? 0.0,
         'imageAsset': memory.imageAsset,
+        'category': memory.category,
         'created_at': DateTime.now().toIso8601String(),
       };
 
@@ -399,7 +401,7 @@ class MemoryService {
     }
   }
 
-  // 5. guardar localmente
+  // Guardar en local
   Future<void> _saveMemoryToLocal(Memory memory) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -429,10 +431,10 @@ class MemoryService {
     }
   }
 
-  // 6. guardar recuerdo sin imagen
+  // Guardar recuerdo sin imagen
   Future<void> saveMemory(Memory memory) async {
     try {
-      print('💾 Guardando recuerdo: ${memory.id}');
+      print('Guardando recuerdo: ${memory.id}');
 
       final memoryId = memory.id.isNotEmpty ? memory.id : _generateId();
       final finalMemory = memory.copyWith(id: memoryId);
@@ -450,7 +452,7 @@ class MemoryService {
     }
   }
 
-  // 7. metodo para verificar y crear bucket
+  // Metodo para verificar y crear bucket
   Future<void> verifyStorageBucket() async {
     try {
       print('Verificando bucket de Storage...');
@@ -488,7 +490,7 @@ class MemoryService {
     }
   }
 
-  // 8. metodo completo de prueba - sin errores
+  // Metodo completo de prueba - sin errores
   Future<void> testSupabaseConnection() async {
     try {
       print('PRUEBA COMPLETA DE SUPABASE 🧪');
@@ -639,6 +641,7 @@ extension MemoryCopyWith on Memory {
     String? date,
     Map<String, double>? location,
     String? imageAsset,
+    String? category,
   }) {
     return Memory(
       id: id ?? this.id,
@@ -647,6 +650,7 @@ extension MemoryCopyWith on Memory {
       date: date ?? this.date,
       location: location ?? this.location,
       imageAsset: imageAsset ?? this.imageAsset,
+      category: category ?? this.category,
     );
   }
 }

@@ -6,7 +6,18 @@ class Memory {
   final String description;
   final String date;
   final Map<String, double> location;
-  final String? imageAsset; 
+  final String? imageAsset;
+  final String category;
+
+  // Lista de las categorias
+  static const List<String> categoriesList = [
+    'General',
+    'Viajes',
+    'Amigos',
+    'Familia',
+    'Comida',
+    'Estudio',
+  ];
 
   Memory({
     required this.id,
@@ -15,6 +26,7 @@ class Memory {
     required this.date,
     required this.location,
     this.imageAsset,
+    this.category = 'Sin categoría',
   });
 
   // getters SEGUROS
@@ -33,30 +45,37 @@ class Memory {
       'latitude': latitude,
       'longitude': longitude,
       'imageAsset': imageAsset,
+      'category': category,
     };
   }
 
-  // Creamos una instancia de Memory a partir de un Map 
+  // Creamos una instancia de Memory a partir de un Map
   factory Memory.fromMap(Map<String, dynamic> map) {
     try {
       // ID - siempre convertir a String, con valor por defecto
-      final id = _safeString(map['id'], defaultValue: DateTime.now().millisecondsSinceEpoch.toString());
-      
+      final id = _safeString(map['id'],
+          defaultValue: DateTime.now().millisecondsSinceEpoch.toString());
+
       // Title - con valor por defecto
       final title = _safeString(map['title'], defaultValue: 'Sin título');
-      
+
       // Description - puede ser null
       final description = _safeString(map['description']);
-      
+
       // Date - con valor por defecto
-      final date = _safeString(map['date'], defaultValue: DateTime.now().toIso8601String());
-      
+      final date = _safeString(map['date'],
+          defaultValue: DateTime.now().toIso8601String());
+
       // Latitude y Longitude - manejar nulls y tipos
       final latitude = _safeDouble(map['latitude']);
       final longitude = _safeDouble(map['longitude']);
-      
+
       // ImageAsset - puede ser null
       final imageAsset = map['imageAsset']?.toString();
+
+      // Category - con valor por defecto
+      final category =
+          _safeString(map['category'], defaultValue: 'Sin categoría');
 
       return Memory(
         id: id,
@@ -67,13 +86,11 @@ class Memory {
           'latitude': latitude,
           'longitude': longitude,
         },
-        imageAsset: imageAsset, 
+        imageAsset: imageAsset,
+        category: category,
       );
     } catch (e) {
       print('ERROR en Memory.fromMap: $e');
-      print('Map que causó el error: $map');
-      
-      // Retornar un Memory seguro en caso de error
       return Memory(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: 'Recuerdo con error',
@@ -81,6 +98,7 @@ class Memory {
         date: DateTime.now().toIso8601String(),
         location: {'latitude': 0.0, 'longitude': 0.0},
         imageAsset: null,
+        category: 'General',
       );
     }
   }
@@ -110,6 +128,6 @@ class Memory {
   // Método opcional para debug
   @override
   String toString() {
-    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset}';
+    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category}';
   }
 }

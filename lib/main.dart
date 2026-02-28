@@ -9,13 +9,13 @@ import 'constants/colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Inicializar Supabase
   await Supabase.initialize(
-    url: 'https://bbpqvckqycllhklqxjis.supabase.co', 
+    url: 'https://bbpqvckqycllhklqxjis.supabase.co',
     anonKey: 'sb_publishable_B2UiEGYTG1-OfhVcuTMBzg_5SPe__-a',
   );
-  
+
   runApp(const MiApp());
 }
 

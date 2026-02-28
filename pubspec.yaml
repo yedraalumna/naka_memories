@@ -31,6 +31,11 @@ dependencies:
   provider: ^6.1.1
   cupertino_icons: ^1.0.6
 
+  #para la funciones del pdf
+  pdf: ^3.11.3
+  printing: ^5.10.0
+  http: ^1.1.0 
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -41,3 +46,4 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/icons/

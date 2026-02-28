@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:provider/provider.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
 import 'MemoryThumbnail.dart';
+import '../services/pdfService.dart';
+import '../providers/app_auth_provider.dart';
+import '../providers/theme_provider.dart';
 
 class MenuDialog extends StatelessWidget {
   final List<Memory> memories;
@@ -23,8 +27,8 @@ class MenuDialog extends StatelessWidget {
     required this.onShowMemoryDetails,
   });
 
-  void _showMemoryListModal(
-      BuildContext context, List<Memory> list, String title, ThemeData theme) {
+  void _showMemoryListModal(BuildContext context, List<Memory> list,
+      String title, ThemeData theme, bool isDarkMode) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -35,12 +39,8 @@ class MenuDialog extends StatelessWidget {
           maxChildSize: 0.95,
           minChildSize: 0.5,
           builder: (context, scrollController) {
-            Color backgroundColor = theme.brightness == Brightness.dark
-                ? backgroundDark
-                : Colors.white;
-            Color textColor = theme.brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black;
+            Color backgroundColor = isDarkMode ? backgroundDark : Colors.white;
+            Color textColor = isDarkMode ? Colors.white : Colors.black;
             Color primaryColor =
                 theme.brightness == Brightness.dark ? pinkLight : pinkPrimary;
 
@@ -116,22 +116,33 @@ class MenuDialog extends StatelessWidget {
   }
 
   // ordenamos por fecha de la mas reciente a la mas antigua
-  void _showSortedByDate(BuildContext context, ThemeData theme) {
+  void _showSortedByDate(
+      BuildContext context, ThemeData theme, bool isDarkMode) {
     Navigator.pop(context);
     final sortedMemories = List<Memory>.from(memories)
       ..sort((a, b) =>
           b.date.compareTo(a.date)); // Del más reciente al más antiguo
-    _showMemoryListModal(
-        context, sortedMemories, 'Recuerdos por Fecha (Recientes)', theme);
+    _showMemoryListModal(context, sortedMemories,
+        'Recuerdos por Fecha (Recientes)', theme, isDarkMode);
   }
 
   @override
   Widget build(BuildContext context) {
+    // 1. En lugar de preguntar al "context" general, preguntamos a tu Provider
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final theme = Theme.of(context);
-    bool isDarkMode = theme.brightness == Brightness.dark;
+
+    // 2. Determinamos si es oscuro basándonos en tu configuración real
+    bool isDarkMode;
+    if (themeProvider.themeMode == ThemeMode.system) {
+      // Si es sistema, miramos el brillo del sistema
+      isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    } else {
+      // Si no, miramos si el modo elegido es Dark
+      isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+    }
 
     Color backgroundColor = isDarkMode ? backgroundDark : Colors.white;
-    Color textColor = isDarkMode ? Colors.white : Colors.black87;
     Color dividerColor = isDarkMode ? Colors.grey[700]! : pinkLighter;
 
     return Container(
@@ -180,7 +191,7 @@ class MenuDialog extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               _showMemoryListModal(
-                  context, memories, 'Todos los Recuerdos', theme);
+                  context, memories, 'Todos los Recuerdos', theme, isDarkMode);
             },
             isDarkMode: isDarkMode,
           ),
@@ -189,7 +200,33 @@ class MenuDialog extends StatelessWidget {
             icon: Icons.date_range,
             title: 'Listar por fecha (Recientes)',
             color: pinkPrimary,
-            onTap: () => _showSortedByDate(context, theme),
+            onTap: () => _showSortedByDate(context, theme, isDarkMode),
+            isDarkMode: isDarkMode,
+          ),
+
+          Divider(color: dividerColor),
+
+          // Nuevo elemento: Exportar a PDF
+          _buildMenuItem(
+            icon: Icons.picture_as_pdf,
+            title: 'Exportar recuerdos a PDF',
+            color: Colors.redAccent,
+            onTap: () async {
+              // Cerrar el menú primero
+              Navigator.pop(context);
+
+              final authProvider =
+                  Provider.of<AppAuthProvider>(context, listen: false);
+              final userName = authProvider.user?.email ?? 'Usuario';
+
+              // Mostrar un indicador de carga
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Generando PDF... por favor espera')),
+              );
+
+              await PdfService().generarPdf(memories, userName);
+            },
             isDarkMode: isDarkMode,
           ),
 

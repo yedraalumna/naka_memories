@@ -11,7 +11,7 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 
 class MemoryDetailScreen extends StatefulWidget {
-  // CAMBIO IMPORTANTE: Antes era StatelessWidget, se cambia pq es necesario pa video
+  // Antes era StatelessWidget, se cambia pq es necesario para video
   final Memory memory;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -299,15 +299,66 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
 
   // Muestra el título principal de la memoria
   Widget _buildTitle(bool isDarkMode) {
-    return Text(
-      widget.memory.title,
-      style: TextStyle(
-        color: isDarkMode ? textDarkMode : pinkDark,
-        fontSize: 28,
-        fontWeight: FontWeight.bold,
-        height: 1.2,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // categoría
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: pinkPrimary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: pinkPrimary.withOpacity(0.5)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_getCategoryIcon(widget.memory.category),
+                  size: 16, color: pinkPrimary),
+              const SizedBox(width: 6),
+              Text(
+                widget.memory.category,
+                style: const TextStyle(
+                  color: pinkPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Titulo
+        Text(
+          widget.memory.title,
+          style: TextStyle(
+            color: isDarkMode ? textDarkMode : pinkDark,
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            height: 1.2,
+          ),
+        ),
+      ],
     );
+  }
+
+  // Helper de iconos (puedes ponerlo global en constants si prefieres no repetir)
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Viajes':
+        return Icons.flight;
+      case 'Amigos':
+        return Icons.people;
+      case 'Familia':
+        return Icons.home;
+      case 'Comida':
+        return Icons.restaurant;
+      case 'Estudio':
+        return Icons.school;
+      default:
+        return Icons.bookmark;
+    }
   }
 
   // mostramos la fecha del recuerdo con icono de calendario
