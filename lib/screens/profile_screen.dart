@@ -423,7 +423,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       if (hasAvatar) ...[
                         const Divider(),
                         ListTile(
-                          leading: const Icon(Icons.delete, color: Colors.red),
+                          leading: const Icon(Icons.delete, color: pinkPrimary),
                           title: Text(
                             'Eliminar foto de perfil',
                             style: TextStyle(
@@ -441,7 +441,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       //eliminar cuenta
                       ListTile(
-                        leading: const Icon(Icons.delete_forever, color: Colors.red),
+                        leading: const Icon(Icons.delete_forever, color: pinkPrimary),
                         title: Text(
                           'Eliminar cuenta',
                             style: TextStyle(

@@ -210,7 +210,7 @@ class MenuDialog extends StatelessWidget {
           _buildMenuItem(
             icon: Icons.picture_as_pdf,
             title: 'Exportar recuerdos a PDF',
-            color: Colors.redAccent,
+            color: pinkPrimary,
             onTap: () async {
               // Cerrar el menú primero
               Navigator.pop(context);
