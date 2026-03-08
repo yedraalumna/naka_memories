@@ -20,6 +20,7 @@ import '../constants/map_style.dart';
 import '../screens/coordinate_input_screen.dart';
 import '../providers/theme_provider.dart';
 import 'package:video_thumbnail/video_thumbnail.dart'; // pa la miniatura del video
+import '../providers/favorite_provider.dart';
 
 class MapScreen extends StatefulWidget {
   final bool isLibrary;
@@ -57,11 +58,14 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.isLibrary) {
-      _loadMemories();
-    } else if (widget.initialMarkers != null) {
-      _markers = widget.initialMarkers!;
-    }
+    // 1. Cargar recuerdos
+    _loadMemories().then((_) {
+      // 2. Una vez cargados, sincronizar el provider
+      if (mounted) {
+        Provider.of<FavoriteProvider>(context, listen: false)
+            .loadFavorites(_memories);
+      }
+    });
   }
 
   // crea marcador cuadrado con bordes redondeados
@@ -408,6 +412,38 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  // Función para centrar el mapa en la lista
+  void _centerMapOnList(List<Memory> list) {
+    if (list.isEmpty) return;
+
+    if (!_isWeb) {
+      // 1. Calculamos los límites (bounds) de esta lista específica
+      double minLat = list.first.latitude;
+      double maxLat = list.first.latitude;
+      double minLng = list.first.longitude;
+      double maxLng = list.first.longitude;
+
+      for (var m in list) {
+        minLat = math.min(minLat, m.latitude);
+        maxLat = math.max(maxLat, m.latitude);
+        minLng = math.min(minLng, m.longitude);
+        maxLng = math.max(maxLng, m.longitude);
+      }
+
+      // 2. Movemos la cámara del mapa
+      mapController.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: LatLng(minLat, minLng),
+            northeast: LatLng(maxLat, maxLng),
+          ),
+          100, // Padding en píxeles
+        ),
+      );
+    }
+    _showSnackbar('Centrando en ${list.length} recuerdos');
+  }
+
   LatLngBounds _calculateBounds() {
     double minLat = _memories[0].toLatLng.latitude;
     double maxLat = _memories[0].toLatLng.latitude;
@@ -452,6 +488,7 @@ class _MapScreenState extends State<MapScreen> {
           onSaveCurrentCoordinates: _handleSaveCoordinatesFromMenu,
           onClearAllMemories: _confirmClearAllMemories,
           onShowMemoryDetails: _showMemoryDetails,
+          onCenterList: _centerMapOnList,
         );
       },
     );

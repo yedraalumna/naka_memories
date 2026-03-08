@@ -121,6 +121,7 @@ class MemoryService {
               'longitude': _parseDouble(item['longitude']),
               'imageAsset': item['imageAsset']?.toString(),
               'category': item['category']?.toString() ?? '',
+              'isFavorite': item['isFavorite'] ?? false,
             });
             memories.add(memory);
           } catch (e) {
@@ -452,6 +453,38 @@ class MemoryService {
     }
   }
 
+  Future<void> updateFavoriteStatus(String memoryId, bool isFavorite) async {
+    try {
+      // 1. Actualizar en Almacenamiento Local
+      final prefs = await SharedPreferences.getInstance();
+      final memories = await _getMemoriesFromLocal();
+
+      final index = memories.indexWhere((m) => m.id == memoryId);
+      if (index >= 0) {
+        memories[index] = memories[index].copyWith(isFavorite: isFavorite);
+        final memoriesJson =
+            memories.map((m) => jsonEncode(m.toMap())).toList();
+        await prefs.setStringList(_memoriesKey, memoriesJson);
+        print('Estado de favorito actualizado localmente: $isFavorite');
+      }
+
+      // 2. Actualizar en Supabase
+      if (_isSupabaseAvailable) {
+        final userId = _supabase.auth.currentUser?.id;
+        if (userId != null) {
+          await _supabase
+              .from('nayeka memories')
+              .update({'isFavorite': isFavorite})
+              .eq('id', memoryId)
+              .eq('user_id', userId);
+          print('Favorito actualizado en Supabase: $memoryId -> $isFavorite');
+        }
+      }
+    } catch (e) {
+      print('Error actualizando estado de favorito: $e');
+    }
+  }
+
   // Metodo para verificar y crear bucket
   Future<void> verifyStorageBucket() async {
     try {
@@ -642,6 +675,7 @@ extension MemoryCopyWith on Memory {
     Map<String, double>? location,
     String? imageAsset,
     String? category,
+    bool? isFavorite,
   }) {
     return Memory(
       id: id ?? this.id,
@@ -651,6 +685,7 @@ extension MemoryCopyWith on Memory {
       location: location ?? this.location,
       imageAsset: imageAsset ?? this.imageAsset,
       category: category ?? this.category,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
   }
 }

@@ -16,6 +16,7 @@ class MenuDialog extends StatelessWidget {
   final VoidCallback onSaveCurrentCoordinates;
   final VoidCallback onClearAllMemories;
   final Function(Memory) onShowMemoryDetails;
+  final Function(List<Memory>) onCenterList;
 
   const MenuDialog({
     super.key,
@@ -25,6 +26,7 @@ class MenuDialog extends StatelessWidget {
     required this.onSaveCurrentCoordinates,
     required this.onClearAllMemories,
     required this.onShowMemoryDetails,
+    required this.onCenterList,
   });
 
   void _showMemoryListModal(BuildContext context, List<Memory> list,
@@ -184,6 +186,23 @@ class MenuDialog extends StatelessWidget {
             isDarkMode: isDarkMode,
           ),
 
+          // Centrar favoritos
+          _buildMenuItem(
+            icon: Icons.filter_center_focus,
+            title: 'Centrar favoritos',
+            color: pinkPrimary,
+            onTap: () {
+              Navigator.pop(context);
+              final favs = memories.where((m) => m.isFavorite).toList();
+              if (favs.isNotEmpty) {
+                onCenterList(favs); // Necesitamos crear este nuevo método
+              } else {
+                // Opcional: mostrar un mensaje si no hay favoritos
+              }
+            },
+            isDarkMode: isDarkMode,
+          ),
+
           _buildMenuItem(
             icon: Icons.list,
             title: 'Listar todos los recuerdos',
@@ -192,6 +211,20 @@ class MenuDialog extends StatelessWidget {
               Navigator.pop(context);
               _showMemoryListModal(
                   context, memories, 'Todos los Recuerdos', theme, isDarkMode);
+            },
+            isDarkMode: isDarkMode,
+          ),
+
+          //Listar Favoritos
+          _buildMenuItem(
+            icon: Icons.favorite,
+            title: 'Listar favoritos',
+            color: pinkPrimary,
+            onTap: () {
+              Navigator.pop(context);
+              final favs = memories.where((m) => m.isFavorite).toList();
+              _showMemoryListModal(
+                  context, favs, 'Mis Favoritos', theme, isDarkMode);
             },
             isDarkMode: isDarkMode,
           ),

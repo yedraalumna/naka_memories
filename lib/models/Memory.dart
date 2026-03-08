@@ -8,6 +8,7 @@ class Memory {
   final Map<String, double> location;
   final String? imageAsset;
   final String category;
+  final bool isFavorite;
 
   // Lista de las categorias
   static const List<String> categoriesList = [
@@ -27,6 +28,7 @@ class Memory {
     required this.location,
     this.imageAsset,
     this.category = 'Sin categoría',
+    this.isFavorite = false,
   });
 
   // getters SEGUROS
@@ -46,6 +48,7 @@ class Memory {
       'longitude': longitude,
       'imageAsset': imageAsset,
       'category': category,
+      'isFavorite': isFavorite,
     };
   }
 
@@ -77,6 +80,10 @@ class Memory {
       final category =
           _safeString(map['category'], defaultValue: 'Sin categoría');
 
+      // isFavorite - con valor por defecto
+      final isFavorite =
+          (map['isFavorite'] == true) || (map['is_favorite'] == true);
+
       return Memory(
         id: id,
         title: title,
@@ -88,6 +95,7 @@ class Memory {
         },
         imageAsset: imageAsset,
         category: category,
+        isFavorite: isFavorite,
       );
     } catch (e) {
       print('ERROR en Memory.fromMap: $e');
@@ -99,6 +107,7 @@ class Memory {
         location: {'latitude': 0.0, 'longitude': 0.0},
         imageAsset: null,
         category: 'General',
+        isFavorite: false,
       );
     }
   }
@@ -128,6 +137,6 @@ class Memory {
   // Método opcional para debug
   @override
   String toString() {
-    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category}';
+    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category, isFavorite: $isFavorite}';
   }
 }

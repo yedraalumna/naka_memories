@@ -8,8 +8,8 @@ import 'map_screen.dart';
 import 'profile_screen.dart';
 import '../constants/colors.dart';
 import '../providers/theme_provider.dart';
-import 'dart:io'; //Importante para poder leer archivos del dispositivo
-import 'package:flutter/foundation.dart';
+import '../providers/favorite_provider.dart';
+import 'favorite_screen.dart';
 import '../widget/MemoryThumbnail.dart';
 
 // 1. Pantalla de Galería
@@ -37,8 +37,17 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     setState(() {
       _isLoading = true;
     });
+
     try {
       final memories = await _memoryService.getMemories();
+
+      // Sincronizamos los favoritos en el Provider una vez que tenemos los datos
+      if (mounted) {
+        // Verificamos que el widget siga activo
+        Provider.of<FavoriteProvider>(context, listen: false)
+            .loadFavorites(memories);
+      }
+
       setState(() {
         _memories = memories;
         _isLoading = false;
@@ -129,20 +138,33 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Memory Places',
-          style: TextStyle(
-            color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
-            fontWeight: FontWeight.bold,
+          title: Text(
+            'Memory Places',
+            style: TextStyle(
+              color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        backgroundColor:
-            themeProvider.isDarkMode ? backgroundDark : Colors.white,
-        elevation: 0,
-        iconTheme: IconThemeData(
-          color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
-        ),
-      ),
+          backgroundColor:
+              themeProvider.isDarkMode ? backgroundDark : Colors.white,
+          elevation: 0,
+          iconTheme: IconThemeData(
+            color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
+          ),
+          // Boton de favoritos
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.favorite, color: pinkPrimary),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FavoriteScreen(),
+                  ),
+                );
+              },
+            ),
+          ]),
       backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: pinkPrimary))
@@ -218,33 +240,69 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                                 child: _buildMemoryImage(memory),
                               ),
                             ),
-                            // Título
+                            // Título y botón favorito
                             Padding(
                               padding: const EdgeInsets.all(8.0),
-                              child: Column(
+                              child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    memory.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: themeProvider.isDarkMode
-                                          ? textDarkMode
-                                          : Colors.black87,
+                                  // Textos
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          memory.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: themeProvider.isDarkMode
+                                                ? textDarkMode
+                                                : Colors.black87,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          memory.date,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: themeProvider.isDarkMode
+                                                ? Colors.grey[400]
+                                                : Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    memory.date,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: themeProvider.isDarkMode
-                                          ? Colors.grey[400]
-                                          : Colors.grey[600],
-                                    ),
+                                  // Botón de Favorito
+                                  Consumer<FavoriteProvider>(
+                                    builder: (context, favProvider, child) {
+                                      final isFav =
+                                          favProvider.isFavorite(memory.id);
+                                      return SizedBox(
+                                        width: 30,
+                                        height: 30,
+                                        child: IconButton(
+                                          padding: EdgeInsets.zero,
+                                          icon: Icon(
+                                            isFav
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
+                                            color: isFav
+                                                ? pinkPrimary
+                                                : Colors.grey,
+                                            size: 22,
+                                          ),
+                                          onPressed: () {
+                                            favProvider
+                                                .toggleFavorite(memory.id);
+                                          },
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),

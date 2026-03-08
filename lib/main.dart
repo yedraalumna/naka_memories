@@ -5,6 +5,7 @@ import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'providers/app_auth_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/favorite_provider.dart';
 import 'constants/colors.dart';
 
 void main() async {
@@ -28,6 +29,7 @@ class MiApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AppAuthProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => FavoriteProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
