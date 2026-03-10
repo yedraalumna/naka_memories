@@ -37,6 +37,38 @@ class Memory {
 
   LatLng get toLatLng => LatLng(latitude, longitude);
 
+  // Getter para verificar si el asset es un video
+  bool get isVideo {
+    if (imageAsset == null) return false;
+    final lowerCaseAsset = imageAsset!.toLowerCase();
+    return lowerCaseAsset.contains('.mp4') || 
+           lowerCaseAsset.contains('.mov') || 
+           lowerCaseAsset.contains('.avi') ||
+           lowerCaseAsset.contains('.mkv') ||
+           lowerCaseAsset.contains('.webm');
+  }
+
+  // Getter para verificar si es una imagen
+  bool get isImage {
+    if (imageAsset == null) return false;
+    if (isVideo) return false;
+    final lowerCaseAsset = imageAsset!.toLowerCase();
+    return lowerCaseAsset.contains('.jpg') || 
+           lowerCaseAsset.contains('.jpeg') || 
+           lowerCaseAsset.contains('.png') ||
+           lowerCaseAsset.contains('.gif') ||
+           lowerCaseAsset.contains('.bmp') ||
+           lowerCaseAsset.contains('.webp');
+  }
+
+  // Getter para obtener el tipo de multimedia
+  String get mediaType {
+    if (imageAsset == null) return 'none';
+    if (isVideo) return 'video';
+    if (isImage) return 'image';
+    return 'unknown';
+  }
+
   // Convertimos el objeto Memory a un Map para ser almacenado
   Map<String, dynamic> toMap() {
     return {
@@ -134,9 +166,45 @@ class Memory {
     return defaultValue;
   }
 
+  // Método para crear una copia con valores actualizados
+  Memory copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? date,
+    Map<String, double>? location,
+    String? imageAsset,
+    String? category,
+    bool? isFavorite,
+  }) {
+    return Memory(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      date: date ?? this.date,
+      location: location ?? this.location,
+      imageAsset: imageAsset ?? this.imageAsset,
+      category: category ?? this.category,
+      isFavorite: isFavorite ?? this.isFavorite,
+    );
+  }
+
   // Método opcional para debug
   @override
   String toString() {
-    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category, isFavorite: $isFavorite}';
+    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category, isFavorite: $isFavorite, mediaType: $mediaType}';
   }
+
+  // Método para comparar dos memorias
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Memory &&
+        other.id == id &&
+        other.title == title &&
+        other.date == date;
+  }
+
+  @override
+  int get hashCode => id.hashCode ^ title.hashCode ^ date.hashCode;
 }

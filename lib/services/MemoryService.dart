@@ -6,11 +6,11 @@ import '../models/Memory.dart';
 import 'package:uuid/uuid.dart';
 
 class MemoryService {
-  static const String _memoriesKey = 'nayeka memories';
+  static const String _memoriesKey = 'nayeka memories';  
   static const String _storageBucket = 'nayeka memories';
   final SupabaseClient _supabase = Supabase.instance.client;
   bool _isSupabaseAvailable = false;
-  final Uuid _uuid = Uuid();
+  final Uuid _uuid = const Uuid();
 
   MemoryService() {
     _checkSupabaseConnection();
@@ -31,6 +31,27 @@ class MemoryService {
     return _uuid.v4();
   }
 
+  /// Obtiene la URL pública de un archivo en el bucket de almacenamiento
+  String getPublicUrl(String path) {
+    try {
+      return _supabase.storage.from(_storageBucket).getPublicUrl(path);
+    } catch (e) {
+      print('Error obteniendo URL pública: $e');
+      return '';
+    }
+  }
+
+  // Método helper para obtener URL pública con cache buster
+  String _getPublicUrlWithCacheBuster(String path) {
+    try {
+      final publicUrl = getPublicUrl(path);
+      return '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+    } catch (e) {
+      print('Error obteniendo URL pública con cache buster: $e');
+      return '';
+    }
+  }
+
   Future<String?> uploadAvatar(Uint8List bytes, String userId) async {
     try {
       print('Subiendo avatar para usuario: $userId');
@@ -44,17 +65,12 @@ class MemoryService {
             bytes,
             fileOptions: const FileOptions(
               contentType: 'image/jpeg',
-              upsert: true, // 👈 IMPORTANTE: Sobrescribir
+              upsert: true,
             ),
           );
 
-      // Obtener URL pública
-      final String publicUrl =
-          _supabase.storage.from(_storageBucket).getPublicUrl(path);
-
-      // Añadimos timestamp para evitar caché
-      final String cacheBusterUrl =
-          '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      // Obtener URL pública con cache buster
+      final String cacheBusterUrl = _getPublicUrlWithCacheBuster(path);
 
       print('Avatar subido exitosamente: $cacheBusterUrl');
       return cacheBusterUrl;
@@ -64,7 +80,7 @@ class MemoryService {
     }
   }
 
-  // 1. obtener recuerdos (intenta de Supabase, si falla, de local)
+  // obtenemos los recuerdos
   Future<List<Memory>> getMemories() async {
     try {
       if (_isSupabaseAvailable) {
@@ -73,17 +89,56 @@ class MemoryService {
           final supabaseMemories = await _getMemoriesFromSupabase();
           if (supabaseMemories.isNotEmpty) {
             print('${supabaseMemories.length} recuerdos cargados de Supabase');
+            
+            // Sincronizar locales con los de Supabase
+            await _syncLocalWithSupabase(supabaseMemories);
+            
             return supabaseMemories;
           }
         } catch (e) {
           print('Error obteniendo de Supabase: $e');
         }
       }
+      
       print('Cargando desde almacenamiento local...');
       return await _getMemoriesFromLocal();
     } catch (e) {
       print('Error general obteniendo recuerdos: $e');
-      return await _getMemoriesFromLocal();
+      return [];
+    }
+  }
+
+  // Sincronizar almacenamiento local con Supabase
+  Future<void> _syncLocalWithSupabase(List<Memory> supabaseMemories) async {
+    try {
+      final localMemories = await _getMemoriesFromLocal();
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Crear mapa de memorias de Supabase por ID
+      final Map<String, Memory> supabaseMap = {
+        for (var m in supabaseMemories) m.id: m
+      };
+      
+      // Combinar memorias
+      final Set<String> allIds = {...supabaseMap.keys, ...localMemories.map((m) => m.id)};
+      final List<Memory> mergedMemories = [];
+      
+      for (final id in allIds) {
+        if (supabaseMap.containsKey(id)) {
+          mergedMemories.add(supabaseMap[id]!);
+        } else {
+          final localMemory = localMemories.firstWhere((m) => m.id == id);
+          mergedMemories.add(localMemory);
+        }
+      }
+      
+      // Guardar versión sincronizada localmente
+      final memoriesJson = mergedMemories.map((m) => jsonEncode(m.toMap())).toList();
+      await prefs.setStringList(_memoriesKey, memoriesJson);
+      
+      print('Sincronización local completada: ${mergedMemories.length} recuerdos');
+    } catch (e) {
+      print('Error sincronizando con local: $e');
     }
   }
 
@@ -99,7 +154,7 @@ class MemoryService {
       print('Buscando recuerdos para usuario: $userId');
 
       final response = await _supabase
-          .from('nayeka memories')
+          .from('nayeka memories') 
           .select()
           .eq('user_id', userId)
           .order('date', ascending: false);
@@ -115,12 +170,11 @@ class MemoryService {
               'id': item['id']?.toString() ?? '',
               'title': item['title']?.toString() ?? 'Sin título',
               'description': item['description']?.toString() ?? '',
-              'date':
-                  item['date']?.toString() ?? DateTime.now().toIso8601String(),
+              'date': item['date']?.toString() ?? DateTime.now().toIso8601String(),
               'latitude': _parseDouble(item['latitude']),
               'longitude': _parseDouble(item['longitude']),
               'imageAsset': item['imageAsset']?.toString(),
-              'category': item['category']?.toString() ?? '',
+              'category': item['category']?.toString() ?? 'General',
               'isFavorite': item['isFavorite'] ?? false,
             });
             memories.add(memory);
@@ -175,7 +229,7 @@ class MemoryService {
     }
   }
 
-  // subir imagen a Supabase (retorna URL pública o null)
+  // subir imagen a Supabase
   Future<String?> uploadImage(Uint8List imageBytes) async {
     try {
       if (imageBytes.isEmpty) {
@@ -193,12 +247,13 @@ class MemoryService {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final random = _uuid.v4().substring(0, 8);
       final fileName = '${userId}_${timestamp}_$random.jpg';
+      final path = 'memories/$fileName';
 
-      print('Subiendo imagen: $fileName (${imageBytes.length} bytes)');
+      print('Subiendo imagen: $path (${imageBytes.length} bytes)');
 
       // Subida a Supabase Storage
       await _supabase.storage.from(_storageBucket).uploadBinary(
-            fileName,
+            path,
             imageBytes,
             fileOptions: const FileOptions(
               contentType: 'image/jpeg',
@@ -209,15 +264,8 @@ class MemoryService {
 
       print('Imagen subida exitosamente a Storage');
 
-      // Obtener URL pública
-      final String publicUrl =
-          _supabase.storage.from(_storageBucket).getPublicUrl(fileName);
-
-      // Cache Buster
-      // Añadimos un timestamp a la URL para forzar a la App a descargar
-      // la imagen nueva si se llega a editar o reemplazar.
-      final String cacheBusterUrl =
-          '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      // Obtener URL pública con cache buster
+      final String cacheBusterUrl = _getPublicUrlWithCacheBuster(path);
 
       print('URL final generada: $cacheBusterUrl');
       return cacheBusterUrl;
@@ -231,13 +279,14 @@ class MemoryService {
 
         if (e.statusCode == '404') {
           print('Error: El bucket "$_storageBucket" no existe.');
+          print('Crea el bucket en Supabase Dashboard > Storage');
         }
       }
       return null;
     }
   }
 
-  // GUARDAR RECUERDO CON IMAGEN
+  // Guardamos el recuerdo con imagen
   Future<String> saveMemoryWithImage({
     required Memory memory,
     required Uint8List imageBytes,
@@ -284,7 +333,7 @@ class MemoryService {
     }
   }
 
-  // Metodo específico para subir video a Supabase
+  // Método específico para subir video a Supabase
   Future<String?> uploadVideo(Uint8List videoBytes) async {
     try {
       if (videoBytes.isEmpty) return null;
@@ -294,33 +343,34 @@ class MemoryService {
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final random = _uuid.v4().substring(0, 8);
-      // CAMBIO CLAVE: Extensión .mp4
       final fileName = '${userId}_${timestamp}_$random.mp4';
+      final path = 'videos/$fileName';
 
-      print('Subiendo video: $fileName (${videoBytes.length} bytes)');
+      print('Subiendo video: $path (${videoBytes.length} bytes)');
 
       // Subida usando uploadBinary
       await _supabase.storage.from(_storageBucket).uploadBinary(
-            fileName,
+            path,
             videoBytes,
             fileOptions: const FileOptions(
-              contentType: 'video/mp4', // Tipo MIME
+              contentType: 'video/mp4',
+              cacheControl: '3600',
               upsert: false,
             ),
           );
 
-      final publicUrl =
-          _supabase.storage.from(_storageBucket).getPublicUrl(fileName);
+      // Obtener URL pública con cache buster
+      final String cacheBusterUrl = _getPublicUrlWithCacheBuster(path);
 
-      print('Video subido: $publicUrl');
-      return publicUrl;
+      print('Video subido: $cacheBusterUrl');
+      return cacheBusterUrl;
     } catch (e) {
       print('Error subiendo video: $e');
       return null;
     }
   }
 
-  // 3.6. Guardar recuerdo con video
+  // Guardar recuerdo con video
   Future<Memory> saveMemoryWithVideo({
     required Memory memory,
     required Uint8List videoBytes,
@@ -332,11 +382,9 @@ class MemoryService {
       String? videoUrl;
 
       if (_isSupabaseAvailable) {
-        // Subimos el video
         videoUrl = await uploadVideo(videoBytes);
       }
 
-      // Guardamos la URL del video en imageAsset
       final finalMemory = memory.copyWith(
         id: memoryId,
         imageAsset: videoUrl,
@@ -379,21 +427,21 @@ class MemoryService {
         'id': memory.id,
         'user_id': userId,
         'title': memory.title,
-        'description': memory.description ?? '',
+        'description': memory.description,
         'date': memory.date,
-        'latitude': memory.location['latitude'] ?? 0.0,
-        'longitude': memory.location['longitude'] ?? 0.0,
+        'latitude': memory.latitude,
+        'longitude': memory.longitude,
         'imageAsset': memory.imageAsset,
         'category': memory.category,
-        'created_at': DateTime.now().toIso8601String(),
+        'isFavorite': memory.isFavorite,
+        'updated_at': DateTime.now().toIso8601String(),
       };
 
       print('Datos a guardar: $memoryData');
 
-      final response = await _supabase
+      await _supabase
           .from('nayeka memories')
-          .upsert(memoryData, onConflict: 'id')
-          .select();
+          .upsert(memoryData, onConflict: 'id');
 
       print('Recuerdo guardado en Supabase: ${memory.id}');
     } catch (e) {
@@ -402,14 +450,13 @@ class MemoryService {
     }
   }
 
-  // Guardar en local
+  // Guardamos en local
   Future<void> _saveMemoryToLocal(Memory memory) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final List<Memory> memories = await _getMemoriesFromLocal();
 
       final String memoryId = memory.id.isNotEmpty ? memory.id : _generateId();
-
       final finalMemory = memory.copyWith(id: memoryId);
 
       final existingIndex = memories.indexWhere((m) => m.id == memoryId);
@@ -432,7 +479,7 @@ class MemoryService {
     }
   }
 
-  // Guardar recuerdo sin imagen
+  // Guardamos recuerdo sin imagen
   Future<void> saveMemory(Memory memory) async {
     try {
       print('Guardando recuerdo: ${memory.id}');
@@ -462,8 +509,7 @@ class MemoryService {
       final index = memories.indexWhere((m) => m.id == memoryId);
       if (index >= 0) {
         memories[index] = memories[index].copyWith(isFavorite: isFavorite);
-        final memoriesJson =
-            memories.map((m) => jsonEncode(m.toMap())).toList();
+        final memoriesJson = memories.map((m) => jsonEncode(m.toMap())).toList();
         await prefs.setStringList(_memoriesKey, memoriesJson);
         print('Estado de favorito actualizado localmente: $isFavorite');
       }
@@ -473,7 +519,7 @@ class MemoryService {
         final userId = _supabase.auth.currentUser?.id;
         if (userId != null) {
           await _supabase
-              .from('nayeka memories')
+              .from('nayeka memories') 
               .update({'isFavorite': isFavorite})
               .eq('id', memoryId)
               .eq('user_id', userId);
@@ -485,33 +531,32 @@ class MemoryService {
     }
   }
 
-  // Metodo para verificar y crear bucket
+  // Método para verificar y crear bucket
   Future<void> verifyStorageBucket() async {
     try {
       print('Verificando bucket de Storage...');
 
       try {
         final files = await _supabase.storage.from(_storageBucket).list();
-
         print('Bucket "$_storageBucket" accesible');
         print('Archivos en bucket: ${files.length}');
 
-        // Verificar si existe la carpeta 'avatars'
-        try {
-          final avatars = await _supabase.storage
-              .from(_storageBucket)
-              .list(path: 'avatars');
-          print('Carpeta avatars encontrada: ${avatars.length} archivos');
-        } catch (e) {
-          print(
-              'La carpeta "avatars" aún no existe (se creará automáticamente al subir)');
+        // Verificar carpetas
+        final folders = ['avatars', 'memories', 'videos'];
+        for (final folder in folders) {
+          try {
+            final contents = await _supabase.storage.from(_storageBucket).list(path: folder);
+            print('Carpeta $folder encontrada: ${contents.length} archivos');
+          } catch (e) {
+            print('La carpeta "$folder" se creará automáticamente al subir archivos');
+          }
         }
       } catch (e) {
         if (e is StorageException && e.message.contains('not found')) {
           print('El bucket "$_storageBucket" no existe');
           print('Ve a Supabase Dashboard > Storage y:');
           print('   1. Click en "Create a new bucket"');
-          print('   2. Nombre: "nayeka memories" (con espacio)');
+          print('   2. Nombre: "$_storageBucket" (con espacio)');
           print('   3. Marca "Make it public"');
           print('   4. Click "Create bucket"');
         } else {
@@ -523,7 +568,7 @@ class MemoryService {
     }
   }
 
-  // Metodo completo de prueba - sin errores
+  // Método completo de prueba
   Future<void> testSupabaseConnection() async {
     try {
       print('PRUEBA COMPLETA DE SUPABASE 🧪');
@@ -537,59 +582,49 @@ class MemoryService {
       print('Usuario autenticado: ${user.id}');
 
       // 1. Verificar tabla
-      print('\n1️⃣ VERIFICANDO TABLA "nayeka memories"...');
+      print('\n verificamos la table "nayeka memories"...');
       try {
-        final response =
-            await _supabase.from('nayeka memories').select('id').limit(1);
+        final response = await _supabase
+            .from('nayeka memories') 
+            .select('id')
+            .limit(1);
 
         if (response != null) {
-          print('Tabla accesible - ${response.length} registros encontrados');
+          print('Tabla accesible');
         }
       } catch (e) {
         print('Error accediendo a tabla: $e');
+        print('   Crea la tabla en Supabase Dashboard > SQL Editor:');
+        print('''
+          CREATE TABLE "nayeka memories" (  
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            user_id UUID NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            date TEXT NOT NULL,
+            latitude DOUBLE PRECISION,
+            longitude DOUBLE PRECISION,
+            imageAsset TEXT,
+            category TEXT,
+            isFavorite BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+        ''');
       }
 
+      // 2. Verificar Storage
+      print('\n verificando storage...');
       await verifyStorageBucket();
 
-      // 3. Prueba de escritura
-      final testId = _generateId();
-      final testData = {
-        'id': testId,
-        'user_id': user.id,
-        'title': 'Prueba de conexión',
-        'description': 'Este es un registro de prueba',
-        'date': DateTime.now().toIso8601String(),
-        'latitude': 0.0,
-        'longitude': 0.0,
-        'imageAsset': null,
-        'created_at': DateTime.now().toIso8601String(),
-      };
-
-      try {
-        await _supabase.from('nayeka memories').insert(testData);
-        print('Escritura exitosa en tabla');
-
-        final response =
-            await _supabase.from('nayeka memories').select().eq('id', testId);
-
-        if (response != null && response.isNotEmpty) {
-          print('Lectura exitosa de tabla');
-        }
-
-        await _supabase.from('nayeka memories').delete().eq('id', testId);
-        print('Datos de prueba eliminados');
-      } catch (e) {
-        print('Error en prueba de escritura: $e');
-      }
-
       print('\n' + '=' * 50);
-      print('PRUEBA COMPLETADA 🧪');
+      print('prueba completa');
     } catch (e) {
       print('Error en testSupabaseConnection: $e');
     }
   }
 
-  // 9. eliminar recuerdo
+  // Eliminar recuerdo
   Future<void> deleteMemory(String id) async {
     try {
       print('Eliminando recuerdo: $id');
@@ -609,8 +644,7 @@ class MemoryService {
       final memories = await _getMemoriesFromLocal();
 
       final updatedMemories = memories.where((m) => m.id != id).toList();
-      final memoriesJson =
-          updatedMemories.map((m) => jsonEncode(m.toMap())).toList();
+      final memoriesJson = updatedMemories.map((m) => jsonEncode(m.toMap())).toList();
 
       await prefs.setStringList(_memoriesKey, memoriesJson);
       print('Recuerdo eliminado localmente: $id');
@@ -622,7 +656,10 @@ class MemoryService {
 
   Future<void> _deleteMemoryFromSupabase(String id) async {
     try {
-      await _supabase.from('nayeka memories').delete().eq('id', id);
+      await _supabase
+          .from('nayeka memories') 
+          .delete()
+          .eq('id', id);
 
       print('Recuerdo eliminado de Supabase: $id');
     } catch (e) {
@@ -630,7 +667,7 @@ class MemoryService {
     }
   }
 
-  // 10. limpiar todos los recuerdos
+  // Limpiar todos los recuerdos
   Future<void> clearAllMemories() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -650,7 +687,10 @@ class MemoryService {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId != null) {
-        await _supabase.from('nayeka memories').delete().eq('user_id', userId);
+        await _supabase
+            .from('nayeka memories') 
+            .delete()
+            .eq('user_id', userId);
 
         print('Todos los recuerdos eliminados de Supabase');
       }
@@ -659,7 +699,7 @@ class MemoryService {
     }
   }
 
-  // 11. VERIFICAR CONEXIÓN SUPABASE
+  // Verificamos la conexión a Supabase
   bool isSupabaseConnected() {
     return _isSupabaseAvailable;
   }

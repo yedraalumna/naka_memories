@@ -103,7 +103,7 @@ class PdfService {
     final descriptionIcon = await _loadIcon('description');
     final locationIcon = await _loadIcon('location');
 
-    // --- PORTADA ---
+    // Portada del PDF
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -227,21 +227,23 @@ class PdfService {
       ),
     );
 
-    // --- PÁGINAS DE RECUERDOS ---
+    // Paginas de recuerdos
     for (var i = 0; i < recuerdos.length; i++) {
       final recuerdo = recuerdos[i];
-
-      // SOLUCIÓN AL ERROR DEL CONTADOR:
-      // Creamos una variable local para que el "build" capture el valor correcto de esta iteración.
       final int numeroRecuerdo = i + 1;
 
-      bool isVideo =
-          recuerdo.imageAsset?.toLowerCase().contains('mp4') ?? false;
-      bool isMov = recuerdo.imageAsset?.toLowerCase().contains('mov') ?? false;
-
+      final bool esVideo = recuerdo.isVideo;
+      final bool esImagen = !esVideo && recuerdo.imageAsset != null;
+      
       Uint8List? imageBytes;
-      if (!isVideo && !isMov) {
+      if (esImagen) {
         imageBytes = await _getImageBytes(recuerdo.imageAsset);
+      }
+
+      // Debug: Verificar la URL del video
+      if (esVideo && recuerdo.imageAsset != null) {
+        print('🎬 Video $numeroRecuerdo: ${recuerdo.imageAsset}');
+        print('   ¿Es URL? ${recuerdo.imageAsset!.startsWith('http')}');
       }
 
       pdf.addPage(
@@ -252,6 +254,7 @@ class PdfService {
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
+                // cabecera con número de recuerdo y categoría
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
@@ -264,7 +267,7 @@ class PdfService {
                         ),
                         pw.SizedBox(width: 10),
                         pw.Text(
-                          'RECUERDO $numeroRecuerdo', // Usamos la variable local fija
+                          'RECUERDO $numeroRecuerdo',
                           style: pw.TextStyle(
                             fontSize: 14,
                             color: PdfColors.pink,
@@ -293,6 +296,8 @@ class PdfService {
                   ],
                 ),
                 pw.SizedBox(height: 15),
+
+                // Título del recuerdo
                 pw.Text(
                   recuerdo.title,
                   style: pw.TextStyle(
@@ -302,6 +307,8 @@ class PdfService {
                   ),
                 ),
                 pw.SizedBox(height: 5),
+
+                // fecha del recuerdo
                 pw.Row(
                   children: [
                     _getIconWidget(calendarIcon, size: 16),
@@ -314,7 +321,10 @@ class PdfService {
                   ],
                 ),
                 pw.SizedBox(height: 20),
-                if (imageBytes != null)
+
+                // sección de imagen o video
+                if (esImagen && imageBytes != null)
+                  //imagen
                   pw.Container(
                     padding: const pw.EdgeInsets.all(8),
                     decoration: pw.BoxDecoration(
@@ -332,32 +342,117 @@ class PdfService {
                       ),
                     ),
                   )
-                else if (isVideo || isMov)
+                else if (esVideo)
+                  // video con enlace (si es URL) o mensaje para videos locales
                   pw.Container(
-                    height: 200,
                     padding: const pw.EdgeInsets.all(20),
                     decoration: pw.BoxDecoration(
                       color: PdfColors.grey100,
                       borderRadius: pw.BorderRadius.circular(15),
+                      border: pw.Border.all(color: PdfColors.blue100, width: 1),
                     ),
                     child: pw.Column(
-                      mainAxisAlignment: pw.MainAxisAlignment.center,
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        _getIconWidget(videoIcon, size: 40),
-                        pw.SizedBox(height: 10),
-                        pw.Text(
-                          "Video: ${recuerdo.imageAsset?.split('/').last}",
-                          style: pw.TextStyle(
-                            color: PdfColors.grey600,
-                            fontStyle: pw.FontStyle.italic,
-                            fontSize: 12,
-                          ),
-                          textAlign: pw.TextAlign.center,
+                        pw.Row(
+                          children: [
+                            _getIconWidget(videoIcon, size: 24),
+                            pw.SizedBox(width: 10),
+                            pw.Expanded(
+                              child: pw.Text(
+                                'Video adjunto',
+                                style: pw.TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColors.blue700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
+                        pw.SizedBox(height: 15),
+                        
+                        // Nombre del archivo
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(8),
+                          decoration: pw.BoxDecoration(
+                            color: PdfColors.blue50,
+                            borderRadius: pw.BorderRadius.circular(8),
+                          ),
+                          child: pw.Row(
+                            children: [
+                              pw.Expanded(
+                                child: pw.Text(
+                                  '${recuerdo.imageAsset?.split('/').last ?? 'video.mp4'}',
+                                  style: pw.TextStyle(
+                                    fontSize: 11,
+                                    color: PdfColors.blue800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        pw.SizedBox(height: 15),
+                        
+                        // enlace para videos de red o mensaje para videos locales
+                                                // ENLACE PARA VER EL VIDEO (si es URL)
+                        if (recuerdo.imageAsset != null && recuerdo.imageAsset!.startsWith('http'))
+                          pw.UrlLink(
+                            destination: recuerdo.imageAsset!,
+                            child: pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                              decoration: pw.BoxDecoration(
+                                color: PdfColors.pink,
+                                borderRadius: pw.BorderRadius.circular(30),
+                              ),
+                              child: pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.center,
+                                children: [
+                                  pw.Text(
+                                    'VER VIDEO EN EL NAVEGADOR',
+                                    style: pw.TextStyle(
+                                      color: PdfColors.white,
+                                      fontSize: 14,
+                                      fontWeight: pw.FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          // Mensaje para videos locales
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(12),
+                            decoration: pw.BoxDecoration(
+                              color: PdfColors.amber100,
+                              borderRadius: pw.BorderRadius.circular(8),
+                              border: pw.Border.all(color: PdfColors.amber, width: 1),
+                            ),
+                            child: pw.Row(
+                              children: [
+                                pw.Expanded(
+                                  child: pw.Text(
+                                    'Video guardado localmente. Abre la aplicacion Nayeka Memories para verlo.',
+                                    style: pw.TextStyle(
+                                      fontSize: 11,
+                                      color: PdfColors.amber900,
+                                      fontWeight: pw.FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),
+
                 pw.SizedBox(height: 20),
+
+                // descripción del recuerdo
                 pw.Container(
                   padding: const pw.EdgeInsets.all(15),
                   decoration: pw.BoxDecoration(
@@ -384,7 +479,9 @@ class PdfService {
                       ),
                       pw.SizedBox(height: 8),
                       pw.Text(
-                        recuerdo.description,
+                        recuerdo.description.isNotEmpty 
+                            ? recuerdo.description 
+                            : 'Sin descripción',
                         style: const pw.TextStyle(
                           fontSize: 12,
                           height: 1.5,
@@ -395,6 +492,8 @@ class PdfService {
                   ),
                 ),
                 pw.Spacer(),
+
+                //pie de página con logo y ubicación
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
@@ -434,10 +533,23 @@ class PdfService {
       );
     }
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-      name: 'Mis_Recuerdos_${nombreUsuario.replaceAll('@', '_')}.pdf',
-    );
+    // guardar y compartir el PDF
+    try {
+      final pdfBytes = await pdf.save();
+      
+      // Mostrar opciones para compartir/guardar
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'Mis_Recuerdos_${nombreUsuario.replaceAll(' ', '_')}.pdf',
+      );
+      
+      print('PDF generado y listo para compartir');
+      print('Nombre: Mis_Recuerdos_${nombreUsuario.replaceAll(' ', '_')}.pdf');
+      print('Total de recuerdos: ${recuerdos.length}');
+      
+    } catch (e) {
+      print('Error al guardar/compartir PDF: $e');
+    }
   }
 
   pw.Widget _buildStatItem({
