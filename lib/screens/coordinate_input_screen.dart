@@ -8,10 +8,12 @@ import 'map_screen.dart';
 // Esta pantalla se encarga de que el usuario elija una coordenada
 class CoordinateInputScreen extends StatefulWidget {
   final Memory? existingMemory;
+  final String? initialCategory;
 
   const CoordinateInputScreen({
     super.key,
     this.existingMemory,
+    this.initialCategory,
   });
 
   @override
@@ -38,6 +40,10 @@ class _CoordinateInputScreenState extends State<CoordinateInputScreen> {
         ),
       };
     }
+
+    // El initialCategory se pasará al MemoryForm cuando se cree
+    // No necesitamos almacenarlo en una variable aquí
+    print('InitialCategory recibido: ${widget.initialCategory}'); // Solo para debug
   }
 
   // Para web: crear un mapa simple con flutter_map

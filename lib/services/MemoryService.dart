@@ -274,8 +274,8 @@ class MemoryService {
 
       if (e is StorageException) {
         print('Detalles del error de Storage:');
-        print('  - Código: ${e.statusCode}');
-        print('  - Mensaje: ${e.message}');
+        print('Código: ${e.statusCode}');
+        print('Mensaje: ${e.message}');
 
         if (e.statusCode == '404') {
           print('Error: El bucket "$_storageBucket" no existe.');
@@ -291,7 +291,7 @@ class MemoryService {
     required Memory memory,
     required Uint8List imageBytes,
   }) async {
-    print('Guardando recuerdo con imagen...');
+    print('Guardando recuerdo con imagen');
 
     try {
       final memoryId = memory.id.isNotEmpty ? memory.id : _generateId();
@@ -299,7 +299,7 @@ class MemoryService {
 
       String? imageUrl;
       if (_isSupabaseAvailable) {
-        print('Intentando subir imagen a Supabase...');
+        print('Intentando subir imagen a Supabase');
         imageUrl = await uploadImage(imageBytes);
         if (imageUrl != null) {
           print('Imagen subida: $imageUrl');
@@ -409,7 +409,7 @@ class MemoryService {
     }
   }
 
-  // Guardar recuerdo en Supabase
+  // Guardar recuerdo en Supabase 
   Future<void> _saveMemoryToSupabase(Memory memory) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -434,7 +434,6 @@ class MemoryService {
         'imageAsset': memory.imageAsset,
         'category': memory.category,
         'isFavorite': memory.isFavorite,
-        'updated_at': DateTime.now().toIso8601String(),
       };
 
       print('Datos a guardar: $memoryData');
@@ -555,10 +554,10 @@ class MemoryService {
         if (e is StorageException && e.message.contains('not found')) {
           print('El bucket "$_storageBucket" no existe');
           print('Ve a Supabase Dashboard > Storage y:');
-          print('   1. Click en "Create a new bucket"');
-          print('   2. Nombre: "$_storageBucket" (con espacio)');
-          print('   3. Marca "Make it public"');
-          print('   4. Click "Create bucket"');
+          print('1. Click en "Create a new bucket"');
+          print('2. Nombre: "$_storageBucket" (con espacio)');
+          print('3. Marca "Make it public"');
+          print('4. Click "Create bucket"');
         } else {
           print('Error accediendo al bucket: $e');
         }
@@ -607,8 +606,7 @@ class MemoryService {
             imageAsset TEXT,
             category TEXT,
             isFavorite BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
           );
         ''');
       }

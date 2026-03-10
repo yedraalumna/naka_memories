@@ -242,8 +242,8 @@ class PdfService {
 
       // Debug: Verificar la URL del video
       if (esVideo && recuerdo.imageAsset != null) {
-        print('🎬 Video $numeroRecuerdo: ${recuerdo.imageAsset}');
-        print('   ¿Es URL? ${recuerdo.imageAsset!.startsWith('http')}');
+        print('Video $numeroRecuerdo: ${recuerdo.imageAsset}');
+        print('¿Es URL? ${recuerdo.imageAsset!.startsWith('http')}');
       }
 
       pdf.addPage(
@@ -397,7 +397,6 @@ class PdfService {
                         pw.SizedBox(height: 15),
                         
                         // enlace para videos de red o mensaje para videos locales
-                                                // ENLACE PARA VER EL VIDEO (si es URL)
                         if (recuerdo.imageAsset != null && recuerdo.imageAsset!.startsWith('http'))
                           pw.UrlLink(
                             destination: recuerdo.imageAsset!,
