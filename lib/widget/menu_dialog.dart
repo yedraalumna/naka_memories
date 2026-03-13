@@ -14,6 +14,7 @@ class MenuDialog extends StatelessWidget {
 
   final VoidCallback onShowAllMemories;
   final VoidCallback onSaveCurrentCoordinates;
+  final VoidCallback onCreateNewMemory;
   final VoidCallback onClearAllMemories;
   final Function(Memory) onShowMemoryDetails;
   final Function(List<Memory>) onCenterList;
@@ -24,6 +25,7 @@ class MenuDialog extends StatelessWidget {
     required this.currentPosition,
     required this.onShowAllMemories,
     required this.onSaveCurrentCoordinates,
+    required this.onCreateNewMemory,
     required this.onClearAllMemories,
     required this.onShowMemoryDetails,
     required this.onCenterList,
@@ -169,9 +171,12 @@ class MenuDialog extends StatelessWidget {
           // Guardamos un nuevo recuerdo
           _buildMenuItem(
             icon: Icons.add_location_alt,
-            title: 'Guardar nuevo recuerdo (Elegir coordenadas)',
+            title: 'Guardar nuevo recuerdo',
             color: pinkAccent,
-            onTap: onSaveCurrentCoordinates,
+            onTap: () {
+              Navigator.pop(context); // Cierra el menú
+              onCreateNewMemory(); // Llama directamente al formulario
+            },
             isDarkMode: isDarkMode,
           ),
 

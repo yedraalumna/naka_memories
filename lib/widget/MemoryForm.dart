@@ -10,6 +10,8 @@ import '../providers/theme_provider.dart';
 import '../services/ImagePickerService.dart';
 import '../services/MemoryService.dart';
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
+import '../screens/coordinate_input_screen.dart';
 
 class MemoryForm extends StatefulWidget {
   final LatLng location;
@@ -45,6 +47,11 @@ class _MemoryFormState extends State<MemoryForm> {
   bool _isVideo = false; // Bandera para saber si es video
   String _selectedCategory = Memory.categoriesList[0]; // Categorias
   bool _isCustomCategory = false; // Bandera para saber si es custom
+  double? _photoLatitude; // Para guardar latitud de la foto
+  double? _photoLongitude; // Para guardar longitud de la foto
+  bool _usePhotoLocation = false; // Indica si usar ubicación de la foto
+
+  late LatLng _currentFormLocation; // Para poder actualizar la ubicación
 
   final List<String> _availableAssets = [
     'assets/images/gato.jpg',
@@ -56,6 +63,9 @@ class _MemoryFormState extends State<MemoryForm> {
   @override
   void initState() {
     super.initState();
+
+      _currentFormLocation = widget.location; // Guardamos la ubicación inicial
+
     if (widget.existingMemory != null) {
       _titleController.text = widget.existingMemory!.title;
       _descriptionController.text = widget.existingMemory!.description;
@@ -251,6 +261,13 @@ class _MemoryFormState extends State<MemoryForm> {
       final path = await _pickerService.pickImageFromCamera();
       if (path != null) {
         final bytes = await File(path).readAsBytes();
+
+        try{
+          await getCurrentLocation();
+        }catch(e){
+          print('Error obteniendo ubicación: $e');
+        }
+
         setState(() {
           _selectedAsset = path;
           _selectedBytes = bytes;
@@ -267,6 +284,49 @@ class _MemoryFormState extends State<MemoryForm> {
     } finally {
       setState(() => _isLoadingMedia = false);
     }
+  }
+
+  Future<Position> determinePosition() async {
+    LocationPermission permission;
+
+    // Verificar permisos de ubicación
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception('Permisos de ubicación denegados');
+      }
+    }
+  
+    // Verificar si la ubicación está activada
+  bool isLocationServiceEnabled = await Geolocator.isLocationServiceEnabled();
+  if (!isLocationServiceEnabled) {
+    throw Exception('Ubicación desactivada');
+  }
+
+    // Obtener la posición actual
+    return await Geolocator.getCurrentPosition();
+  }
+
+  Future<void> getCurrentLocation() async {
+    try{
+      Position position = await determinePosition();
+      print(position.latitude);
+      print(position.longitude);
+      
+      // Guardar la ubicación obtenida
+      setState(() {
+        _photoLatitude = position.latitude;
+        _photoLongitude = position.longitude;
+        _usePhotoLocation = true;
+      });
+      
+  }catch (e) {
+      print('Error obteniendo ubicación: $e');
+      setState(() {
+        _usePhotoLocation = false;
+      });
+  }
   }
 
   Future<void> _pickImageFromGallery() async {
@@ -650,6 +710,33 @@ class _MemoryFormState extends State<MemoryForm> {
     setState(() => _isSaving = true);
 
     try {
+      // Determinar qué ubicación usar
+      double latitude, longitude;
+
+      // Verificar si el usuario ha modificado la ubicación manualmente
+      bool ubicacionModificada = 
+          _currentFormLocation.latitude != widget.location.latitude || 
+          _currentFormLocation.longitude != widget.location.longitude;
+
+      if (ubicacionModificada) {
+        // El usuario cambió la ubicación manualmente - PRIORIDAD MÁXIMA
+        latitude = _currentFormLocation.latitude;
+        longitude = _currentFormLocation.longitude;
+        print('Usando ubicación manual: $latitude, $longitude');
+      }
+      else if (_usePhotoLocation && _photoLatitude != null && _photoLongitude != null) {
+        // Usar ubicación de la foto
+        latitude = _photoLatitude!;
+        longitude = _photoLongitude!;
+        print('Usando ubicación actual: $latitude, $longitude');
+      }
+      else {
+        // Usar ubicación del formulario
+        latitude = _currentFormLocation.latitude;
+        longitude = _currentFormLocation.longitude;
+        print('Usando ubicación del formulario: $latitude, $longitude');
+      }
+
       // 3. Crear el objeto Memory con la categoría correcta
       Memory memoryToSave = Memory(
         id: widget.existingMemory?.id ?? '',
@@ -657,8 +744,8 @@ class _MemoryFormState extends State<MemoryForm> {
         description: description,
         date: date,
         location: {
-          'latitude': widget.location.latitude,
-          'longitude': widget.location.longitude,
+          'latitude': latitude,
+          'longitude': longitude,
         },
         imageAsset: _selectedAsset,
         category: finalCategory,
@@ -1070,34 +1157,92 @@ class _MemoryFormState extends State<MemoryForm> {
                 ),
                 const SizedBox(height: 25),
 
+
+
+
+
                 // Coordenadas
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? cardDark : pinkLighter.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isDarkMode ? Colors.grey[700]! : pinkLight,
+                 GestureDetector(
+                  onTap: () async {
+                    // Guardar los datos actuales antes de salir
+                    final currentTitle = _titleController.text;
+                    final currentDescription = _descriptionController.text;
+                    final currentDate = _dateController.text;
+                    final currentCategory = _selectedCategory;
+                    final currentAsset = _selectedAsset;
+                    final currentBytes = _selectedBytes;
+                    final currentIsVideo = _isVideo;
+                    final currentCustomCategory = _customCategoryController.text;
+                    final currentIsCustom = _isCustomCategory;
+                    
+                    // Navegar a la pantalla de selección de coordenadas (mapa)
+                    final LatLng? selectedLocation = await Navigator.of(context).push<LatLng>(
+                      MaterialPageRoute(
+                        builder: (context) => const CoordinateInputScreen(),
+                      ),
+                    );
+                    
+                    // Si seleccionó una ubicación, actualizar la ubicación actual
+                    if (selectedLocation != null && mounted) {
+                      setState(() {
+                        _currentFormLocation = selectedLocation;
+                      });
+                      
+                      // Mostrar mensaje de confirmación
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Ubicación actualizada'),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? cardDark : pinkLighter.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isDarkMode ? Colors.grey[700]! : pinkPrimary,
+                        width: 1.5,
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.location_on, color: pinkPrimary, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Ubicación: ${widget.location.latitude.toStringAsFixed(6)}, ${widget.location.longitude.toStringAsFixed(6)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDarkMode
-                                ? Colors.grey[400]
-                                : Colors.grey[700],
+                    child: Row(
+                      children: [
+                        Icon(Icons.location_on, color: pinkPrimary, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ubicación (toca para cambiar en el mapa)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_currentFormLocation.latitude.toStringAsFixed(6)}, ${_currentFormLocation.longitude.toStringAsFixed(6)}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: pinkPrimary,
+                                  fontWeight: FontWeight.w500,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
+                        Icon(Icons.open_in_new, color: pinkPrimary, size: 18),
+                      ],
+                    ),
                   ),
                 ),
+
                 const SizedBox(height: 25),
 
                 // Botones de acción

@@ -375,6 +375,13 @@ class _MapScreenState extends State<MapScreen> {
     _navigateToCoordinateInput();
   }
 
+  // Abre directamente el formulario con la posición actual
+  void _openMemoryFormDirectly() {
+    if (Navigator.canPop(context)) Navigator.pop(context);
+  
+    _showMemoryForm(_currentCameraPosition); // Usa la posición actual del mapa
+  }
+
   void _goToFirstMemory() {
     if (_memories.isNotEmpty) {
       final firstMemory = _memories.first;
@@ -486,6 +493,7 @@ class _MapScreenState extends State<MapScreen> {
           currentPosition: _currentCameraPosition,
           onShowAllMemories: _goToAllMemories,
           onSaveCurrentCoordinates: _handleSaveCoordinatesFromMenu,
+          onCreateNewMemory: _openMemoryFormDirectly,
           onClearAllMemories: _confirmClearAllMemories,
           onShowMemoryDetails: _showMemoryDetails,
           onCenterList: _centerMapOnList,
