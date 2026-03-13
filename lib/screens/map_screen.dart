@@ -49,7 +49,7 @@ class _MapScreenState extends State<MapScreen> {
   List<Memory> _memories = [];
   final MemoryService _memoryService = MemoryService();
   bool _isLoading = false;
-  String _selectedCategory = 'Todos'; // Filtros
+  String _selectedCategory = 'Todas'; // Filtros
   List<String> _dynamicCategories = []; // Lista de categorias
 
   // Detectar si es web
@@ -331,14 +331,37 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // Función que crea un chip de filtro
+  // Nuevo método para no duplicar código en Web y Móvil
+  Widget _buildFiltersOverlay() {
+    return Positioned(
+      top: 10,
+      left: 0,
+      right: 0,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Row(
+          children: [
+            _buildFilterChip('Todas'),
+            ..._dynamicCategories.map((category) {
+              return _buildFilterChip(category);
+            }).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Función que crea un chip de filtro (ahora más grande)
   Widget _buildFilterChip(String label) {
     final bool isSelected = _selectedCategory == label;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      padding: const EdgeInsets.symmetric(horizontal: 6.0),
       child: FilterChip(
         label: Text(label),
+        // AUMENTAMOS EL PADDING PARA FACILITAR EL TOQUE (Dedos gruesos)
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         selected: isSelected,
         onSelected: (bool selected) {
           setState(() {
@@ -356,12 +379,13 @@ class _MapScreenState extends State<MapScreen> {
         selectedColor: pinkPrimary,
         checkmarkColor: Colors.white,
         labelStyle: TextStyle(
+          fontSize: 16, // Letra un poco más grande
           color: isSelected ? Colors.white : pinkPrimary,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: pinkPrimary, width: 1),
+          borderRadius: BorderRadius.circular(25), // Bordes más suaves
+          side: const BorderSide(color: pinkPrimary, width: 1.5),
         ),
         elevation: 2,
         pressElevation: 4,
@@ -378,7 +402,7 @@ class _MapScreenState extends State<MapScreen> {
   // Abre directamente el formulario con la posición actual
   void _openMemoryFormDirectly() {
     if (Navigator.canPop(context)) Navigator.pop(context);
-  
+
     _showMemoryForm(_currentCameraPosition); // Usa la posición actual del mapa
   }
 
@@ -656,47 +680,54 @@ class _MapScreenState extends State<MapScreen> {
 
   // mapa para web usando flutter_map
   Widget _buildWebMap() {
-    return Scaffold(
-      body: Stack(
-        children: [
-          fmap.FlutterMap(
-            options: fmap.MapOptions(
-              initialCenter: latlong2.LatLng(40.4168, -3.7038),
-              initialZoom: 15.0,
-            ),
-            children: [
-              fmap.TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.memory_places',
-              ),
-              fmap.RichAttributionWidget(
-                attributions: [
-                  fmap.TextSourceAttribution(
-                    'OpenStreetMap contributors',
-                    onTap: () => launchUrl(
-                      Uri.parse('https://openstreetmap.org/copyright'),
-                    ),
-                  ),
-                ],
-              ),
-              // Agregamos marcadores para web usando MarkerLayer
-              if (_memories.isNotEmpty)
-                fmap.MarkerLayer(
-                  markers: _buildWebMarkers(),
-                ),
-            ],
+    // Quitamos el Scaffold de aquí, porque ya hay uno envolviéndolo en el build()
+    return Stack(
+      children: [
+        fmap.FlutterMap(
+          options: fmap.MapOptions(
+            initialCenter: latlong2.LatLng(40.4168, -3.7038),
+            initialZoom: 15.0,
           ),
-          if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(color: pinkPrimary),
+          children: [
+            fmap.TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.memory_places',
             ),
-        ],
-      ),
+            fmap.RichAttributionWidget(
+              attributions: [
+                fmap.TextSourceAttribution(
+                  'OpenStreetMap contributors',
+                  onTap: () => launchUrl(
+                    Uri.parse('https://openstreetmap.org/copyright'),
+                  ),
+                ),
+              ],
+            ),
+            // Agregamos marcadores para web usando MarkerLayer
+            if (_memories.isNotEmpty)
+              fmap.MarkerLayer(
+                markers: _buildWebMarkers(),
+              ),
+          ],
+        ),
+        // ¡AQUÍ AÑADIMOS EL PANEL DE FILTROS EN LA WEB!
+        if (widget.isLibrary) _buildFiltersOverlay(),
+
+        if (_isLoading)
+          const Center(
+            child: CircularProgressIndicator(color: pinkPrimary),
+          ),
+      ],
     );
   }
 
   List<fmap.Marker> _buildWebMarkers() {
-    return _memories.map((memory) {
+    // FILTRAMOS LA LISTA SEGÚN LA CATEGORÍA ANTES DE CREAR LOS PINES WEB
+    final filteredList = _selectedCategory == 'Todas'
+        ? _memories
+        : _memories.where((m) => m.category == _selectedCategory).toList();
+
+    return filteredList.map((memory) {
       return fmap.Marker(
         point: latlong2.LatLng(
           memory.toLatLng.latitude,
@@ -875,8 +906,7 @@ class _MapScreenState extends State<MapScreen> {
                   _onMapLongPress(position);
                 }
               },
-              zoomControlsEnabled:
-                  false, // Quitamos controles nativos para que no se solapen
+              zoomControlsEnabled: false,
               myLocationEnabled: true,
               myLocationButtonEnabled: true,
               compassEnabled: true,
@@ -887,25 +917,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
 
             // Filtros
-            Positioned(
-              top: 10,
-              left: 0,
-              right: 0,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Row(
-                  children: [
-                    _buildFilterChip('Todas'),
-
-                    // AHORA USAMOS LA LISTA DINÁMICA _dynamicCategories EN LUGAR DE Memory.categoriesList
-                    ..._dynamicCategories.map((category) {
-                      return _buildFilterChip(category);
-                    }).toList(),
-                  ],
-                ),
-              ),
-            ),
+            _buildFiltersOverlay(),
 
             // Indicador de carga
             if (_isLoading)
