@@ -11,6 +11,7 @@ import '../providers/theme_provider.dart';
 import '../providers/favorite_provider.dart';
 import 'favorite_screen.dart';
 import '../widget/MemoryThumbnail.dart';
+import '../providers/category_provider.dart';
 
 class MemoryGalleryScreen extends StatefulWidget {
   const MemoryGalleryScreen({super.key});
@@ -24,12 +25,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   List<Memory> _memories = [];
   bool _isLoading = true;
   String? _selectedCategory;
-  
-  // Lista de categorías predefinidas
-  final List<String> _allCategories = Memory.categoriesList;
-  
-  // Categorías personalizadas
-  final Set<String> _customCategories = {};
 
   @override
   void initState() {
@@ -64,10 +59,11 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   // Mostrar diálogo para crear nueva carpeta
   void _showNewCategoryDialog() {
     final TextEditingController controller = TextEditingController();
-    
+
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
+        // Cambié context por dialogContext para evitar confusión
         return AlertDialog(
           title: const Text('Nueva Carpeta'),
           content: Column(
@@ -88,17 +84,17 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
               onPressed: () {
                 final newCategory = controller.text.trim();
                 if (newCategory.isNotEmpty) {
-                  setState(() {
-                    _customCategories.add(newCategory);
-                  });
-                  Navigator.pop(context);
+                  Provider.of<CategoryProvider>(context, listen: false)
+                      .addCategoryLocally(newCategory);
+
+                  Navigator.pop(dialogContext);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Carpeta "$newCategory" creada'),
@@ -123,7 +119,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   // Navegar a crear recuerdo en la carpeta seleccionada
   void _navigateToCreateMemoryInCategory() {
     if (_selectedCategory == null) return;
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -132,12 +128,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
         ),
       ),
     ).then((_) => _loadMemories());
-  }
-
-  // Obtener todas las categorías
-  List<String> _getAllCategories() {
-    Set<String> allCategories = {..._allCategories, ..._customCategories};
-    return allCategories.toList()..sort();
   }
 
   // Obtener recuerdos de una categoría
@@ -217,7 +207,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             Icon(
               Icons.folder_open,
               size: 80,
-              color: themeProvider.isDarkMode ? Colors.grey[600] : Colors.grey[400],
+              color: themeProvider.isDarkMode
+                  ? Colors.grey[600]
+                  : Colors.grey[400],
             ),
             const SizedBox(height: 20),
             Text(
@@ -225,7 +217,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                color: themeProvider.isDarkMode
+                    ? Colors.grey[400]
+                    : Colors.grey[600],
               ),
             ),
             const SizedBox(height: 10),
@@ -233,7 +227,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               'Crea tu primera carpeta con el botón +',
               style: TextStyle(
                 fontSize: 14,
-                color: themeProvider.isDarkMode ? Colors.grey[500] : Colors.grey[700],
+                color: themeProvider.isDarkMode
+                    ? Colors.grey[500]
+                    : Colors.grey[700],
               ),
               textAlign: TextAlign.center,
             ),
@@ -268,7 +264,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       itemBuilder: (context, index) {
         final cat = categories[index];
         final categoryMemories = _getMemoriesForCategory(cat);
-        final lastMemory = categoryMemories.isNotEmpty ? categoryMemories.last : null;
+        final lastMemory =
+            categoryMemories.isNotEmpty ? categoryMemories.last : null;
         final memoryCount = categoryMemories.length;
 
         return GestureDetector(
@@ -278,7 +275,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('La carpeta "$cat" está vacía. Añade recuerdos desde el botón +'),
+                  content: Text(
+                      'La carpeta "$cat" está vacía. Añade recuerdos desde el botón +'),
                   backgroundColor: pinkPrimary,
                   duration: const Duration(seconds: 2),
                 ),
@@ -307,8 +305,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                       width: 70,
                       height: 70,
                       decoration: BoxDecoration(
-                        color: memoryCount > 0 
-                            ? pinkPrimary.withOpacity(0.1) 
+                        color: memoryCount > 0
+                            ? pinkPrimary.withOpacity(0.1)
                             : Colors.grey.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -351,13 +349,15 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  memoryCount == 0 
-                      ? 'Carpeta vacía' 
+                  memoryCount == 0
+                      ? 'Carpeta vacía'
                       : '$memoryCount ${memoryCount == 1 ? 'recuerdo' : 'recuerdos'}',
                   style: TextStyle(
                     fontSize: 11,
                     color: memoryCount > 0
-                        ? (themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600])
+                        ? (themeProvider.isDarkMode
+                            ? Colors.grey[400]
+                            : Colors.grey[600])
                         : Colors.grey,
                   ),
                 ),
@@ -383,7 +383,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             Icon(
               Icons.photo_library,
               size: 80,
-              color: themeProvider.isDarkMode ? Colors.grey[600] : Colors.grey[400],
+              color: themeProvider.isDarkMode
+                  ? Colors.grey[600]
+                  : Colors.grey[400],
             ),
             const SizedBox(height: 20),
             Text(
@@ -391,7 +393,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                color: themeProvider.isDarkMode
+                    ? Colors.grey[400]
+                    : Colors.grey[600],
               ),
             ),
             const SizedBox(height: 10),
@@ -399,7 +403,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               'Añade tu primer recuerdo con el botón +',
               style: TextStyle(
                 fontSize: 14,
-                color: themeProvider.isDarkMode ? Colors.grey[500] : Colors.grey[700],
+                color: themeProvider.isDarkMode
+                    ? Colors.grey[500]
+                    : Colors.grey[700],
               ),
               textAlign: TextAlign.center,
             ),
@@ -524,7 +530,10 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final allCategories = _getAllCategories();
+
+    // AHORA LEEMOS LAS CATEGORÍAS DESDE EL PROVIDER
+    final categoryProvider = Provider.of<CategoryProvider>(context);
+    final allCategories = categoryProvider.categories;
 
     return Scaffold(
       appBar: AppBar(
@@ -554,7 +563,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             ),
           // Botón para crear nueva carpeta
           IconButton(
-            icon: const Icon(Icons.create_new_folder, color: Colors.white, size: 28),
+            icon: const Icon(Icons.create_new_folder,
+                color: Colors.white, size: 28),
             onPressed: _showNewCategoryDialog,
             tooltip: 'Crear nueva carpeta',
           ),
@@ -600,6 +610,15 @@ class _HomeScreenState extends State<HomeScreen> {
     MapScreen(isLibrary: true),
     const ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Cargamos las categorías en cuanto se inicia la pantalla principal
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<CategoryProvider>(context, listen: false).loadCategories();
+    });
+  }
 
   void _onItemTapped(int index) {
     setState(() {

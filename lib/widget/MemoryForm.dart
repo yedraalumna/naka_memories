@@ -12,6 +12,7 @@ import '../services/MemoryService.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import '../screens/coordinate_input_screen.dart';
+import '../providers/category_provider.dart';
 
 class MemoryForm extends StatefulWidget {
   final LatLng location;
@@ -45,7 +46,7 @@ class _MemoryFormState extends State<MemoryForm> {
   bool _isSaving = false;
   Uint8List? _selectedBytes; // Renombrado: puede ser imagen o video
   bool _isVideo = false; // Bandera para saber si es video
-  String _selectedCategory = Memory.categoriesList[0]; // Categorias
+  String _selectedCategory = ''; // Categorias
   bool _isCustomCategory = false; // Bandera para saber si es custom
   double? _photoLatitude; // Para guardar latitud de la foto
   double? _photoLongitude; // Para guardar longitud de la foto
@@ -64,7 +65,20 @@ class _MemoryFormState extends State<MemoryForm> {
   void initState() {
     super.initState();
 
-      _currentFormLocation = widget.location; // Guardamos la ubicación inicial
+    _currentFormLocation = widget.location; // Guardamos la ubicación inicial
+
+    // 1. Obtenemos la lista de categorías del Provider (listen: false es obligatorio en initState)
+    final categoryProvider =
+        Provider.of<CategoryProvider>(context, listen: false);
+    final currentCategories = categoryProvider.categories;
+
+    // 2. Inicializamos un valor por defecto seguro por si es un nuevo recuerdo
+    if (currentCategories.isNotEmpty) {
+      _selectedCategory = currentCategories.first;
+    } else {
+      _selectedCategory =
+          'General'; // Respaldo en caso de que la lista esté vacía
+    }
 
     if (widget.existingMemory != null) {
       _titleController.text = widget.existingMemory!.title;
@@ -72,8 +86,8 @@ class _MemoryFormState extends State<MemoryForm> {
       _dateController.text = widget.existingMemory!.date;
       _selectedAsset = widget.existingMemory!.imageAsset;
 
-      // Verificamos que la categoría exista en nuestra lista, si no, es una personalizada
-      if (Memory.categoriesList.contains(widget.existingMemory!.category)) {
+      // 3. Verificamos contra la lista dinámica del Provider
+      if (currentCategories.contains(widget.existingMemory!.category)) {
         _selectedCategory = widget.existingMemory!.category;
         _isCustomCategory = false;
       } else {
@@ -262,9 +276,9 @@ class _MemoryFormState extends State<MemoryForm> {
       if (path != null) {
         final bytes = await File(path).readAsBytes();
 
-        try{
+        try {
           await getCurrentLocation();
-        }catch(e){
+        } catch (e) {
           print('Error obteniendo ubicación: $e');
         }
 
@@ -297,36 +311,35 @@ class _MemoryFormState extends State<MemoryForm> {
         throw Exception('Permisos de ubicación denegados');
       }
     }
-  
+
     // Verificar si la ubicación está activada
-  bool isLocationServiceEnabled = await Geolocator.isLocationServiceEnabled();
-  if (!isLocationServiceEnabled) {
-    throw Exception('Ubicación desactivada');
-  }
+    bool isLocationServiceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!isLocationServiceEnabled) {
+      throw Exception('Ubicación desactivada');
+    }
 
     // Obtener la posición actual
     return await Geolocator.getCurrentPosition();
   }
 
   Future<void> getCurrentLocation() async {
-    try{
+    try {
       Position position = await determinePosition();
       print(position.latitude);
       print(position.longitude);
-      
+
       // Guardar la ubicación obtenida
       setState(() {
         _photoLatitude = position.latitude;
         _photoLongitude = position.longitude;
         _usePhotoLocation = true;
       });
-      
-  }catch (e) {
+    } catch (e) {
       print('Error obteniendo ubicación: $e');
       setState(() {
         _usePhotoLocation = false;
       });
-  }
+    }
   }
 
   Future<void> _pickImageFromGallery() async {
@@ -691,7 +704,6 @@ class _MemoryFormState extends State<MemoryForm> {
     // LÓGICA DE CATEGORÍA: Determinar cuál usar
     String finalCategory = _selectedCategory;
 
-    // Si el usuario eligió "Nueva categoría...", se valida y se usa su texto
     if (_isCustomCategory) {
       final customText = _customCategoryController.text.trim();
       if (customText.isEmpty) {
@@ -704,7 +716,11 @@ class _MemoryFormState extends State<MemoryForm> {
         );
         return;
       }
-      finalCategory = customText; // Usamos lo que escribió
+      finalCategory = customText;
+
+      // ¡NUEVO! Añadimos la categoría localmente al provider para que aparezca la próxima vez
+      Provider.of<CategoryProvider>(context, listen: false)
+          .addCategoryLocally(finalCategory);
     }
 
     setState(() => _isSaving = true);
@@ -714,23 +730,23 @@ class _MemoryFormState extends State<MemoryForm> {
       double latitude, longitude;
 
       // Verificar si el usuario ha modificado la ubicación manualmente
-      bool ubicacionModificada = 
-          _currentFormLocation.latitude != widget.location.latitude || 
-          _currentFormLocation.longitude != widget.location.longitude;
+      bool ubicacionModificada =
+          _currentFormLocation.latitude != widget.location.latitude ||
+              _currentFormLocation.longitude != widget.location.longitude;
 
       if (ubicacionModificada) {
         // El usuario cambió la ubicación manualmente - PRIORIDAD MÁXIMA
         latitude = _currentFormLocation.latitude;
         longitude = _currentFormLocation.longitude;
         print('Usando ubicación manual: $latitude, $longitude');
-      }
-      else if (_usePhotoLocation && _photoLatitude != null && _photoLongitude != null) {
+      } else if (_usePhotoLocation &&
+          _photoLatitude != null &&
+          _photoLongitude != null) {
         // Usar ubicación de la foto
         latitude = _photoLatitude!;
         longitude = _photoLongitude!;
         print('Usando ubicación actual: $latitude, $longitude');
-      }
-      else {
+      } else {
         // Usar ubicación del formulario
         latitude = _currentFormLocation.latitude;
         longitude = _currentFormLocation.longitude;
@@ -810,6 +826,9 @@ class _MemoryFormState extends State<MemoryForm> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
+
+    // Escuchamos los cambios en las categorías
+    final categoryProvider = Provider.of<CategoryProvider>(context);
 
     return Dialog(
       backgroundColor: isDarkMode ? backgroundDark : Colors.white,
@@ -961,6 +980,8 @@ class _MemoryFormState extends State<MemoryForm> {
                         child: TextField(
                           controller: _customCategoryController,
                           decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(
+                                vertical: 20, horizontal: 15),
                             labelText: 'Escribe la nueva categoría',
                             hintText: 'Ej: Deportes, Conciertos...',
                             labelStyle: TextStyle(
@@ -994,12 +1015,15 @@ class _MemoryFormState extends State<MemoryForm> {
                           ),
                           style: TextStyle(
                             color: isDarkMode ? textDarkMode : Colors.black87,
+                            fontSize: 16,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       // Botón para cancelar y volver al dropdown
                       Container(
+                        height: 60,
+                        width: 60,
                         decoration: BoxDecoration(
                           color: isDarkMode ? cardDark : Colors.white,
                           borderRadius: BorderRadius.circular(10),
@@ -1010,13 +1034,19 @@ class _MemoryFormState extends State<MemoryForm> {
                           ),
                         ),
                         child: IconButton(
+                          iconSize: 30,
                           icon: const Icon(Icons.close, color: Colors.grey),
                           tooltip: 'Volver a la lista',
                           onPressed: () {
                             setState(() {
                               _isCustomCategory = false;
-                              _selectedCategory =
-                                  Memory.categoriesList[0]; // Reset a General
+                              // Volvemos a la primera opción de la lista dinámica
+                              if (categoryProvider.categories.isNotEmpty) {
+                                _selectedCategory =
+                                    categoryProvider.categories[0];
+                              } else {
+                                _selectedCategory = 'General';
+                              }
                             });
                           },
                         ),
@@ -1027,7 +1057,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   // MODO SELECCIÓN (Dropdown con opción de crear)
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
                     decoration: BoxDecoration(
                       color: isDarkMode ? cardDark : Colors.white,
                       borderRadius: BorderRadius.circular(10),
@@ -1037,24 +1067,33 @@ class _MemoryFormState extends State<MemoryForm> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
-                        value: _selectedCategory,
+                        // Aseguramos que el valor seleccionado exista en la lista actual
+                        value: categoryProvider.categories
+                                .contains(_selectedCategory)
+                            ? _selectedCategory
+                            : (categoryProvider.categories.isNotEmpty
+                                ? categoryProvider.categories.first
+                                : null),
                         isExpanded: true,
+                        itemHeight:
+                            60, // Altura ampliada para facilitar el toque
                         dropdownColor: isDarkMode ? cardDark : Colors.white,
                         icon: const Icon(Icons.arrow_drop_down,
-                            color: pinkPrimary),
+                            color: pinkPrimary, size: 30),
                         items: [
-                          // Las categorías predefinidas
-                          ...Memory.categoriesList.map((String category) {
+                          // Las categorías desde el Provider
+                          ...categoryProvider.categories.map((String category) {
                             return DropdownMenuItem<String>(
                               value: category,
                               child: Row(
                                 children: [
                                   Icon(_getCategoryIcon(category),
-                                      color: pinkPrimary, size: 20),
-                                  const SizedBox(width: 10),
+                                      color: pinkPrimary, size: 24),
+                                  const SizedBox(width: 15),
                                   Text(
                                     category,
                                     style: TextStyle(
+                                      fontSize: 16,
                                       color: isDarkMode
                                           ? textDarkMode
                                           : Colors.black87,
@@ -1071,11 +1110,12 @@ class _MemoryFormState extends State<MemoryForm> {
                             child: Row(
                               children: const [
                                 Icon(Icons.add_circle_outline,
-                                    color: pinkPrimary, size: 20),
-                                SizedBox(width: 10),
+                                    color: pinkPrimary, size: 24),
+                                SizedBox(width: 15),
                                 Text(
                                   'Nueva categoría...',
                                   style: TextStyle(
+                                    fontSize: 16,
                                     color: pinkPrimary,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1157,12 +1197,8 @@ class _MemoryFormState extends State<MemoryForm> {
                 ),
                 const SizedBox(height: 25),
 
-
-
-
-
                 // Coordenadas
-                 GestureDetector(
+                GestureDetector(
                   onTap: () async {
                     // Guardar los datos actuales antes de salir
                     final currentTitle = _titleController.text;
@@ -1172,22 +1208,24 @@ class _MemoryFormState extends State<MemoryForm> {
                     final currentAsset = _selectedAsset;
                     final currentBytes = _selectedBytes;
                     final currentIsVideo = _isVideo;
-                    final currentCustomCategory = _customCategoryController.text;
+                    final currentCustomCategory =
+                        _customCategoryController.text;
                     final currentIsCustom = _isCustomCategory;
-                    
+
                     // Navegar a la pantalla de selección de coordenadas (mapa)
-                    final LatLng? selectedLocation = await Navigator.of(context).push<LatLng>(
+                    final LatLng? selectedLocation =
+                        await Navigator.of(context).push<LatLng>(
                       MaterialPageRoute(
                         builder: (context) => const CoordinateInputScreen(),
                       ),
                     );
-                    
+
                     // Si seleccionó una ubicación, actualizar la ubicación actual
                     if (selectedLocation != null && mounted) {
                       setState(() {
                         _currentFormLocation = selectedLocation;
                       });
-                      
+
                       // Mostrar mensaje de confirmación
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -1201,7 +1239,8 @@ class _MemoryFormState extends State<MemoryForm> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isDarkMode ? cardDark : pinkLighter.withOpacity(0.2),
+                      color:
+                          isDarkMode ? cardDark : pinkLighter.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isDarkMode ? Colors.grey[700]! : pinkPrimary,
@@ -1221,7 +1260,9 @@ class _MemoryFormState extends State<MemoryForm> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                                  color: isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[700],
                                 ),
                               ),
                               const SizedBox(height: 2),
