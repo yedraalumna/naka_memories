@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/colors.dart';
+import 'home_screen.dart';
 
 class TermsScreen extends StatefulWidget {
   const TermsScreen({super.key});
@@ -9,6 +11,42 @@ class TermsScreen extends StatefulWidget {
 }
 
 class _TermsScreenState extends State<TermsScreen> {
+  bool _hasAccepted = false;
+  bool _vieneDelRegistro = false; // Para saber si viene del enlace o no
+
+  @override
+  void initState() {
+    super.initState();
+    // Verificamos si hay algo en el stack de navegación
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Si la pantalla anterior es RegisterScreen, entonces viene del registro
+      // pero como no podemos acceder directamente, usamos un truco simple:
+      // Si hay más de una pantalla en el stack, probablemente viene del registro
+      setState(() {
+        _vieneDelRegistro = Navigator.canPop(context);
+      });
+    });
+  }
+
+  Future<void> _acceptAndContinue() async {
+    if (_hasAccepted) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('cookies_accepted', true);
+      if (!mounted) return;
+      
+      // Si venía del GestorAutenticacion, va al Home
+      // Si venía del registro, vuelve atrás
+      if (_vieneDelRegistro) {
+        Navigator.pop(context); // Vuelve al registro
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      }
+    }
+  }
+  
   Widget _buildLegalContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,7 +117,6 @@ class _TermsScreenState extends State<TermsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // AppBar para poder volver atrás fácilmente
       appBar: AppBar(
         title: const Text(
           "Términos y Privacidad",
@@ -89,17 +126,16 @@ class _TermsScreenState extends State<TermsScreen> {
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context), // Permite volver al registro
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       
-      // para que todo el contenido sea desplazable
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icono decorativo de cookie centrado con título y subtítulo
+            // Icono decorativo
             Center(
               child: Column(
                 children: [
@@ -111,9 +147,11 @@ class _TermsScreenState extends State<TermsScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Lee atentamente nuestros términos antes de continuar',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  Text(
+                    _vieneDelRegistro 
+                        ? 'Lee los términos y luego vuelve al registro' 
+                        : 'Acepta los términos para continuar',
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -122,28 +160,108 @@ class _TermsScreenState extends State<TermsScreen> {
             
             const SizedBox(height: 30),
             
-            // Contenido legal completo
+            // Contenido legal
             _buildLegalContent(),
             
             const SizedBox(height: 30),
             
-            // Botón para volver al registro (informativo)
-            Center(
-              child: TextButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back, color: pinkPrimary),
-                label: const Text(
-                  'Volver al registro',
-                  style: TextStyle(
-                    color: pinkPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+            // Solo mostramos el checkbox si NO viene del registro
+            // (o sea, si es un usuario antiguo que necesita aceptar)
+            if (!_vieneDelRegistro) ...[
+              const Divider(),
+              const SizedBox(height: 20),
+              
+              const Text(
+                'Para continuar usando Memory Places, necesitamos tu consentimiento:',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 15),
+              
+              // Checkbox para aceptar
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: CheckboxListTile(
+                  title: const Text(
+                    "He leído y acepto los términos y condiciones",
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  value: _hasAccepted,
+                  activeColor: pinkPrimary,
+                  onChanged: (bool? value) {
+                    setState(() {
+                      _hasAccepted = value ?? false;
+                    });
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Botón para continuar
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  onPressed: _hasAccepted ? _acceptAndContinue : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: pinkPrimary,
+                    disabledBackgroundColor: Colors.grey[300],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 2,
+                  ),
+                  child: const Text(
+                    'Aceptar y continuar',
+                    style: TextStyle(
+                      color: Colors.white, 
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
-            ),
+              
+              if (!_hasAccepted)
+                Padding(
+                  padding: const EdgeInsets.only(top: 15),
+                  child: Center(
+                    child: Text(
+                      'Debes aceptar los términos para continuar',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.red[400],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ),
+            ] else ...[
+              // Si viene del registro, solo mostramos un botón para volver
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, color: pinkPrimary),
+                  label: const Text(
+                    'Volver al registro',
+                    style: TextStyle(
+                      color: pinkPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ],
             
-            const SizedBox(height: 20),
+            const SizedBox(height: 30),
           ],
         ),
       ),

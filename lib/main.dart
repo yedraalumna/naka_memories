@@ -128,9 +128,11 @@ class _GestorAutenticacionState extends State<GestorAutenticacion> {
       return const LoginScreen();
     }
 
-    // 3. Si está autenticado pero NO ha aceptado cookies (usuarios antiguos)
+    // 3. Si está autenticado pero NO ha aceptado cookies (¡USUARIOS ANTIGUOS!)
     if (!_cookiesAccepted!) {
-      return const TermsScreen(); // Esta pantalla ya no se usará para usuarios nuevos
+      // Usamos un flag para saber si ya mostramos los términos
+      // pero como es la primera vez que inicia sesión, le mostramos TermsScreen
+      return const TermsScreen();
     }
 
     // 4. Si está autenticado Y aceptó cookies, entra a la app
