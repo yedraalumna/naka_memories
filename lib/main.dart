@@ -10,11 +10,12 @@ import 'providers/theme_provider.dart';
 import 'providers/favorite_provider.dart';
 import 'providers/category_provider.dart';
 import 'constants/colors.dart';
+import 'providers/memory_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializar Supabase
+  // Inicializamos la Supabase
   await Supabase.initialize(
     url: 'https://bbpqvckqycllhklqxjis.supabase.co',
     anonKey: 'sb_publishable_B2UiEGYTG1-OfhVcuTMBzg_5SPe__-a',
@@ -34,6 +35,7 @@ class MiApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => FavoriteProvider()),
         ChangeNotifierProvider(create: (_) => CategoryProvider()),
+        ChangeNotifierProvider(create: (_) => MemoryProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
@@ -122,19 +124,16 @@ class _GestorAutenticacionState extends State<GestorAutenticacion> {
     if (auth.isLoading || _cookiesAccepted == null) {
       return const PantallaCarga();
     }
-
-    // 2. Si NO está autenticado, va al Login
+    // 2. Si no está autenticado, va al Login
     if (!auth.isAuthenticated) {
       return const LoginScreen();
     }
-
-    // 3. Si está autenticado pero NO ha aceptado cookies (¡USUARIOS ANTIGUOS!)
+    // 3. Si está autenticado pero NO ha aceptado cookies
     if (!_cookiesAccepted!) {
       // Usamos un flag para saber si ya mostramos los términos
       // pero como es la primera vez que inicia sesión, le mostramos TermsScreen
       return const TermsScreen();
     }
-
     // 4. Si está autenticado Y aceptó cookies, entra a la app
     return const HomeScreen();
   }

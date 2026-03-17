@@ -5,9 +5,59 @@ import '../providers/app_auth_provider.dart';
 import '../providers/theme_provider.dart';
 import 'login_screen.dart';
 import 'change_password_screen.dart';
+import 'travel_goals_screen.dart';
+import 'visited_places_screen.dart'; 
 import '../constants/colors.dart';
 import '../services/ImagePickerService.dart';
 import '../services/MemoryService.dart';
+
+class TarjetaNavegacion extends StatelessWidget {
+  final IconData icono;
+  final Color colorIcono;
+  final String titulo;
+  final String subtitulo;
+  final Widget pantallaDestino;
+
+  const TarjetaNavegacion({
+    super.key,
+    required this.icono,
+    required this.colorIcono,
+    required this.titulo,
+    required this.subtitulo,
+    required this.pantallaDestino,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15)
+      ),
+      color: themeProvider.isDarkMode ? cardDark : Colors.grey[100],
+      child: ListTile(
+        leading: Icon(icono, color: colorIcono),
+        title: Text(
+          titulo,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        subtitle: Text(
+          subtitulo,
+          style: const TextStyle(fontSize: 13),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => pantallaDestino),
+          );
+        },
+      ),
+    );
+  }
+}
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -47,7 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final success = await auth.updateProfilePhoto(url);
         
         if (success && mounted) {
-          // 4. FORZAR RECARGA DE LA UI
+          // 4. forzamos la actualización de la UI para reflejar el cambio inmediatamente
           setState(() {});
           
           _mostrarSnackbar('Foto de perfil actualizada');
@@ -102,7 +152,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-
   // eliminamos cuenta
   Future<void> _eliminarCuenta(AppAuthProvider auth) async {
     try {
@@ -110,7 +159,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Eliminar cuenta'),
-
           content: const Text('¿Estás seguro de que deseas eliminar tu cuenta?'),
           actions: [
             TextButton(
@@ -130,24 +178,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final success = await auth.deleteAccount();
         
         if (success && mounted) {
-          //al eliminar la cuenta, automaticamente se abrirá la pantalla de login
+          // al eliminar la cuenta, automaticamente se abrirá la pantalla de login
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const LoginScreen()),
             (route) => false,
           );
           
-        // se muestra mensaje de confirmación
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cuenta eliminada exitosamente'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+          // se muestra mensaje de confirmación
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cuenta eliminada exitosamente'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
-    }
     } catch (e) {
       print('Error eliminando la cuenta: $e');
     }
@@ -195,7 +243,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Obtenemos los datos del usuario
     String userEmail = authProvider.userEmail ?? 'Usuario';
-    String userId = authProvider.userId ?? '';
     String avatarUrl = authProvider.avatarUrl ?? '';
     bool hasAvatar = authProvider.hasAvatar;
     String registeredAt = authProvider.registeredAt ?? '';
@@ -214,8 +261,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-
-              // tarjeta de perfil con avatar
+              
+              // tarjeta de perfil
               Card(
                 color: themeProvider.isDarkMode ? cardDark : Colors.white,
                 elevation: 3,
@@ -319,13 +366,116 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       
                       const SizedBox(height: 8),
-
                     ],
                   ),
                 ),
               ),
 
               const SizedBox(height: 30),
+
+              // tarjeta de metas de viaje
+              Card(
+                color: themeProvider.isDarkMode ? cardDark : Colors.white,
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: Text(
+                          'Mis Metas de Viaje',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: themeProvider.isDarkMode
+                                ? textLight
+                                : Colors.black87,
+                          ),
+                        ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.emoji_events, color: pinkPrimary),
+                        title: const Text(
+                          "Ver progreso",
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        subtitle: const Text(
+                          "Mira tu progreso por el mundo",
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TravelGoalsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // tarjeta de lugares visitados
+              Card(
+                color: themeProvider.isDarkMode ? cardDark : Colors.white,
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: Text(
+                          'Mis lugares visitados',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: themeProvider.isDarkMode
+                                ? textLight
+                                : Colors.black87,
+                          ),
+                        ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.map, color: pinkPrimary),
+                        title: const Text(
+                          "Ver lugares",
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        subtitle: const Text(
+                          "Explora todos los países y ciudades que has visitado",
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const VisitedPlacesScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
 
               // configuración
               Card(
@@ -436,22 +586,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
 
-                      // línea divisoria antes de eliminar cuenta (siempre visible)
+                      // línea divisoria antes de eliminar cuenta
                       const Divider(),
 
-                      //eliminar cuenta
+                      // eliminar cuenta
                       ListTile(
                         leading: const Icon(Icons.delete_forever, color: pinkPrimary),
                         title: Text(
                           'Eliminar cuenta',
-                            style: TextStyle(
-                              color: themeProvider.isDarkMode
-                                  ? textLight
-                                  : Colors.black87,
-                            ),
+                          style: TextStyle(
+                            color: themeProvider.isDarkMode
+                                ? textLight
+                                : Colors.black87,
                           ),
-                          onTap: () => _eliminarCuenta(authProvider),
                         ),
+                        onTap: () => _eliminarCuenta(authProvider),
+                      ),
                     ],
                   ),
                 ),
