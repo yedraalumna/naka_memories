@@ -91,27 +91,74 @@ class GestorAutenticacion extends StatefulWidget {
 
 class _GestorAutenticacionState extends State<GestorAutenticacion> {
   bool? _cookiesAccepted;
+  bool _verificandoCookies = true;
 
   @override
   void initState() {
     super.initState();
     _checkCookieStatus();
+    
+    // Escuchar cambios en la autenticación
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = Provider.of<AppAuthProvider>(context, listen: false);
+      auth.addListener(_onAuthChange);
+    });
+  }
+
+  @override
+  void dispose() {
+    // Limpiar el listener
+    final auth = Provider.of<AppAuthProvider>(context, listen: false);
+    auth.removeListener(_onAuthChange);
+    super.dispose();
+  }
+
+  void _onAuthChange() {
+    // Cuando cambia la autenticación (login/logout), volvemos a verificar cookies
+    print('🔄 Cambio en autenticación, reverificando cookies...');
+    _checkCookieStatus();
   }
 
   Future<void> _checkCookieStatus() async {
+    setState(() => _verificandoCookies = true);
+    
     try {
       final prefs = await SharedPreferences.getInstance();
+      final auth = Provider.of<AppAuthProvider>(context, listen: false);
+
+      bool aceptoCookies = false;
+
+      // SIEMPRE preguntar a Supabase si el usuario está autenticado
+      if (auth.isAuthenticated && auth.userId != null) {
+        aceptoCookies = await auth.usuarioAceptoCookies(auth.userId!);
+        print('📊 Supabase dice: cookies_accepted = $aceptoCookies');
+        
+        // Actualizar local
+        await prefs.setBool('cookies_accepted', aceptoCookies);
+      } else {
+        // Usuario no autenticado, usamos local
+        aceptoCookies = prefs.getBool('cookies_accepted') ?? false;
+        print('📊 Usuario no autenticado, cookies locales: $aceptoCookies');
+      }
+
+      // Actualizar el estado SOLO si el widget sigue montado
       if (mounted) {
+        setState(() {
+          _cookiesAccepted = aceptoCookies;
+        });
+      }
+      
+    } catch (e) {
+      print('❌ Error al verificar cookies: $e');
+      if (mounted) {
+        final prefs = await SharedPreferences.getInstance();
         setState(() {
           _cookiesAccepted = prefs.getBool('cookies_accepted') ?? false;
         });
       }
-    } catch (e) {
-      print('Error al verificar cookies: $e');
+    } finally {
       if (mounted) {
-        setState(() {
-          _cookiesAccepted = false;
-        });
+        setState(() => _verificandoCookies = false);
       }
     }
   }
@@ -120,21 +167,24 @@ class _GestorAutenticacionState extends State<GestorAutenticacion> {
   Widget build(BuildContext context) {
     final auth = Provider.of<AppAuthProvider>(context);
 
-    // 1. Mientras carga
-    if (auth.isLoading || _cookiesAccepted == null) {
+    // Mostrar carga mientras verificamos
+    if (_verificandoCookies || _cookiesAccepted == null) {
       return const PantallaCarga();
     }
-    // 2. Si no está autenticado, va al Login
+
+    // Si no está autenticado, va al Login
     if (!auth.isAuthenticated) {
       return const LoginScreen();
     }
-    // 3. Si está autenticado pero NO ha aceptado cookies
+
+    // Si está autenticado pero NO ha aceptado cookies (según Supabase)
     if (!_cookiesAccepted!) {
-      // Usamos un flag para saber si ya mostramos los términos
-      // pero como es la primera vez que inicia sesión, le mostramos TermsScreen
+      print('🟡 Mostrando TermsScreen porque cookies_accepted = false');
       return const TermsScreen();
     }
-    // 4. Si está autenticado Y aceptó cookies, entra a la app
+
+    // Todo bien, va al Home
+    print('🟢 Entrando a Home porque cookies_accepted = true');
     return const HomeScreen();
   }
 }

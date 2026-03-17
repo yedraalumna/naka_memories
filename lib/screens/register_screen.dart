@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/gestures.dart'; // IMPORTANTE: necesario para TapGestureRecognizer
+import 'package:flutter/gestures.dart';
 import '../providers/app_auth_provider.dart';
 import '../providers/theme_provider.dart';
 import 'home_screen.dart';
-import 'terms_screen.dart'; // IMPORTANTE: importar la pantalla de términos
+import 'terms_screen.dart';
 import '../constants/colors.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -18,15 +18,15 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  // Controladores para capturar el texto de los campos del formulario
+  // Controladores para capturar el texto de los campos
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmarController = TextEditingController();
 
-  // Clave global para manejar y validar el estado del formulario
+  // Clave para validar el formulario
   final formKey = GlobalKey<FormState>();
   
-  // Variables para alternar la visibilidad de las contraseñas
+  // Variables para mostrar/ocultar contraseñas
   bool ocultarPassword = true;
   bool ocultarConfirmar = true;
   
@@ -41,57 +41,77 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  // Método que maneja el proceso de registro del usuario
+  // ============ FUNCIONES SENCILLAS ============
+
+  // Función para registrar al usuario
   Future<void> registrar(BuildContext context) async {
-    // Validar que el formulario sea correcto
-    if (!formKey.currentState!.validate()) return;
-    
-    // Validar que haya aceptado las cookies
+    // Validar que el checkbox esté marcado
     if (!aceptaCookies) {
-      mostrarError(context, 'Debes aceptar las cookies para registrarte');
+      mostrarMensaje('Debes aceptar los términos para registrarte');
       return;
     }
 
-    // Obtener el proveedor de autenticación
+    // Validar que el formulario sea correcto
+    if (!formKey.currentState!.validate()) return;
+    
     final auth = Provider.of<AppAuthProvider>(context, listen: false);
 
-    // Intentar registrar al usuario
-    final exito = await auth.register(
+    // Intentar registrar en Supabase (CORREGIDO: register en lugar de signUp)
+    final success = await auth.register(
       emailController.text.trim(),
       passwordController.text,
     );
 
-    // Si el registro es exitoso
-    if (exito && context.mounted) {
-      // Guardar que aceptó las cookies
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('cookies_accepted', true);
+    if (success && context.mounted) {
+      // Guardar en el dispositivo que el usuario ya aceptó las cookies
+      await guardarCookiesAceptadas();
       
-      // Navegar a la pantalla principal
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
-    }
-    // Si falla, muestra un mensaje de error
-    else if (!exito && context.mounted) {
-      mostrarError(context, 'No se pudo crear la cuenta');
+      // Navegar al Home y limpiar el historial
+      irAlHome();
+    } else if (context.mounted) {
+      // Si falla, mostramos el error
+      mostrarMensaje(auth.errorMessage ?? 'Error al registrar');
     }
   }
 
-  // Muestra un mensaje de error temporal
-  void mostrarError(BuildContext context, String mensaje) {
+  // Función para guardar que aceptó cookies
+  Future<void> guardarCookiesAceptadas() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('cookies_accepted', true);
+    print('✅ Cookies aceptadas guardadas en SharedPreferences');
+  }
+
+  // Función para ir al Home
+  void irAlHome() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+      (route) => false,
+    );
+  }
+
+  // Función para mostrar mensajes
+  void mostrarMensaje(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(mensaje),
         backgroundColor: Colors.pink,
+        duration: const Duration(seconds: 3),
       ),
+    );
+  }
+
+  // Función para ir a la pantalla de términos
+  void irATermsScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const TermsScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Obtiene los providers
+    // Obtener providers
     final auth = Provider.of<AppAuthProvider>(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
 
@@ -110,9 +130,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Padding(
@@ -123,12 +141,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 30),
 
               // Icono decorativo
-              Icon(
-                Icons.person_add,
-                size: 80,
-                color: iconColor,
-              ),
-
+              Icon(Icons.person_add, size: 80, color: iconColor),
               const SizedBox(height: 20),
 
               // Título
@@ -140,7 +153,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   color: iconColor,
                 ),
               ),
-
               const SizedBox(height: 10),
 
               // Texto descriptivo
@@ -151,7 +163,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey,
                 ),
               ),
-
               const SizedBox(height: 30),
 
               // Mensaje de error si existe
@@ -190,13 +201,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: Icon(
-                          Icons.close, 
-                          size: 18,
-                          color: themeProvider.isDarkMode 
-                              ? Colors.red[300] 
-                              : Colors.black,
-                        ),
+                        icon: Icon(Icons.close, size: 18),
                         onPressed: auth.clearError,
                       ),
                     ],
@@ -239,7 +244,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return null;
                       },
                     ),
-
                     const SizedBox(height: 15),
 
                     // Campo contraseña
@@ -286,7 +290,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return null;
                       },
                     ),
-
                     const SizedBox(height: 15),
 
                     // Campo confirmar contraseña
@@ -333,10 +336,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return null;
                       },
                     ),
-
                     const SizedBox(height: 20),
 
-                    // para aceptar las cookies y puedas ver los terminos con un enlace
+                    // Checkbox para aceptar cookies con enlace a términos
                     CheckboxListTile(
                       value: aceptaCookies,
                       activeColor: pinkPrimary,
@@ -363,26 +365,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 decoration: TextDecoration.underline,
                                 fontWeight: FontWeight.bold,
                               ),
-                              // Hace que el texto sea clickeable y lleve a la pantalla de términos
                               recognizer: TapGestureRecognizer()
-                                ..onTap = () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => const TermsScreen()),
-                                  );
-                                },
+                                ..onTap = irATermsScreen,
                             ),
                             const TextSpan(text: " para poder crear mi cuenta."),
                           ],
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 15),
 
-
-                    // boton de registro (se deshabilita si no acepta cookies)
-                    // Se deshabilita si: está cargando O no aceptó cookies
+                    // Botón de registro (se deshabilita si no acepta cookies)
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -412,7 +405,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 20),
             ],
           ),

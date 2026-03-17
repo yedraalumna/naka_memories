@@ -9,23 +9,7 @@ class MemoryService {
   static const String _memoriesKey = 'nayeka memories';  
   static const String _storageBucket = 'nayeka memories';
   final SupabaseClient _supabase = Supabase.instance.client;
-  bool _isSupabaseAvailable = false;
   final Uuid _uuid = const Uuid();
-
-  MemoryService() {
-    _checkSupabaseConnection();
-  }
-
-  Future<void> _checkSupabaseConnection() async {
-    try {
-      final user = _supabase.auth.currentUser;
-      _isSupabaseAvailable = user != null;
-      print('Supabase disponible: $_isSupabaseAvailable');
-    } catch (e) {
-      print('Error checking Supabase connection: $e');
-      _isSupabaseAvailable = false;
-    }
-  }
 
   String _generateId() {
     return _uuid.v4();
@@ -80,13 +64,17 @@ class MemoryService {
     }
   }
 
-  // obtenemos los recuerdos
+  // obtenemos los recuerdos - AHORA SIEMPRE USA SUPABASE SI HAY USUARIO
   Future<List<Memory>> getMemories() async {
     try {
-      if (_isSupabaseAvailable) {
+      final user = _supabase.auth.currentUser;
+      
+      // Si hay usuario autenticado, SIEMPRE intentamos con Supabase primero
+      if (user != null) {
         try {
-          print('Intentando obtener de Supabase...');
+          print('Intentando obtener de Supabase para usuario: ${user.id}');
           final supabaseMemories = await _getMemoriesFromSupabase();
+          
           if (supabaseMemories.isNotEmpty) {
             print('${supabaseMemories.length} recuerdos cargados de Supabase');
             
@@ -97,11 +85,14 @@ class MemoryService {
           }
         } catch (e) {
           print('Error obteniendo de Supabase: $e');
+          // Si falla Supabase, intentamos con local
         }
       }
       
+      // Si no hay usuario o falló Supabase, cargamos de local
       print('Cargando desde almacenamiento local...');
       return await _getMemoriesFromLocal();
+      
     } catch (e) {
       print('Error general obteniendo recuerdos: $e');
       return [];
@@ -298,7 +289,9 @@ class MemoryService {
       print('ID generado para memoria: $memoryId');
 
       String? imageUrl;
-      if (_isSupabaseAvailable) {
+      final user = _supabase.auth.currentUser;
+      
+      if (user != null) {
         print('Intentando subir imagen a Supabase');
         imageUrl = await uploadImage(imageBytes);
         if (imageUrl != null) {
@@ -307,7 +300,7 @@ class MemoryService {
           print('No se pudo subir la imagen');
         }
       } else {
-        print('Sin conexión a Supabase, omitiendo subida de imagen');
+        print('Sin usuario autenticado, omitiendo subida de imagen');
       }
 
       final finalMemory = memory.copyWith(
@@ -318,7 +311,7 @@ class MemoryService {
       await _saveMemoryToLocal(finalMemory);
       print('Memoria guardada localmente: $memoryId');
 
-      if (_isSupabaseAvailable) {
+      if (user != null) {
         try {
           await _saveMemoryToSupabase(finalMemory);
           print('Memoria guardada en Supabase: $memoryId');
@@ -381,7 +374,9 @@ class MemoryService {
       final memoryId = memory.id.isNotEmpty ? memory.id : _generateId();
       String? videoUrl;
 
-      if (_isSupabaseAvailable) {
+      final user = _supabase.auth.currentUser;
+      
+      if (user != null) {
         videoUrl = await uploadVideo(videoBytes);
       }
 
@@ -393,7 +388,7 @@ class MemoryService {
       await _saveMemoryToLocal(finalMemory);
       print('Memoria (video) guardada localmente: $memoryId');
 
-      if (_isSupabaseAvailable) {
+      if (user != null) {
         try {
           await _saveMemoryToSupabase(finalMemory);
           print('Memoria (video) guardada en Supabase: $memoryId');
@@ -488,7 +483,8 @@ class MemoryService {
 
       await _saveMemoryToLocal(finalMemory);
 
-      if (_isSupabaseAvailable) {
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
         await _saveMemoryToSupabase(finalMemory);
       }
 
@@ -514,16 +510,15 @@ class MemoryService {
       }
 
       // 2. Actualizar en Supabase
-      if (_isSupabaseAvailable) {
-        final userId = _supabase.auth.currentUser?.id;
-        if (userId != null) {
-          await _supabase
-              .from('nayeka memories') 
-              .update({'isFavorite': isFavorite})
-              .eq('id', memoryId)
-              .eq('user_id', userId);
-          print('Favorito actualizado en Supabase: $memoryId -> $isFavorite');
-        }
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        final userId = user.id;
+        await _supabase
+            .from('nayeka memories') 
+            .update({'isFavorite': isFavorite})
+            .eq('id', memoryId)
+            .eq('user_id', userId);
+        print('Favorito actualizado en Supabase: $memoryId -> $isFavorite');
       }
     } catch (e) {
       print('Error actualizando estado de favorito: $e');
@@ -555,7 +550,7 @@ class MemoryService {
           print('El bucket "$_storageBucket" no existe');
           print('Ve a Supabase Dashboard > Storage y:');
           print('1. Click en "Create a new bucket"');
-          print('2. Nombre: "$_storageBucket" (con espacio)');
+          print('2. Nombre: "$_storageBucket"');
           print('3. Marca "Make it public"');
           print('4. Click "Create bucket"');
         } else {
@@ -581,11 +576,12 @@ class MemoryService {
       print('Usuario autenticado: ${user.id}');
 
       // 1. Verificar tabla
-      print('\n verificamos la table "nayeka memories"...');
+      print('\nVerificamos la tabla "nayeka memories"...');
       try {
         final response = await _supabase
             .from('nayeka memories') 
             .select('id')
+            .eq('user_id', user.id)
             .limit(1);
 
         if (response != null) {
@@ -593,30 +589,30 @@ class MemoryService {
         }
       } catch (e) {
         print('Error accediendo a tabla: $e');
-        print('   Crea la tabla en Supabase Dashboard > SQL Editor:');
         print('''
           CREATE TABLE "nayeka memories" (  
             id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            user_id UUID NOT NULL,
+            user_id TEXT NOT NULL,
             title TEXT NOT NULL,
             description TEXT,
             date TEXT NOT NULL,
-            latitude DOUBLE PRECISION,
-            longitude DOUBLE PRECISION,
+            latitude TEXT,
+            longitude TEXT,
             imageAsset TEXT,
             category TEXT,
             isFavorite BOOLEAN DEFAULT FALSE,
+            cookies_accepted BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
           );
         ''');
       }
 
       // 2. Verificar Storage
-      print('\n verificando storage...');
+      print('\nVerificando storage...');
       await verifyStorageBucket();
 
       print('\n' + '=' * 50);
-      print('prueba completa');
+      print('Prueba completa');
     } catch (e) {
       print('Error en testSupabaseConnection: $e');
     }
@@ -628,7 +624,8 @@ class MemoryService {
       print('Eliminando recuerdo: $id');
       await _deleteMemoryFromLocal(id);
 
-      if (_isSupabaseAvailable) {
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
         await _deleteMemoryFromSupabase(id);
       }
     } catch (e) {
@@ -654,12 +651,15 @@ class MemoryService {
 
   Future<void> _deleteMemoryFromSupabase(String id) async {
     try {
-      await _supabase
-          .from('nayeka memories') 
-          .delete()
-          .eq('id', id);
-
-      print('Recuerdo eliminado de Supabase: $id');
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId != null) {
+        await _supabase
+            .from('nayeka memories') 
+            .delete()
+            .eq('id', id)
+            .eq('user_id', userId);
+        print('Recuerdo eliminado de Supabase: $id');
+      }
     } catch (e) {
       print('Error eliminando de Supabase: $e');
     }
@@ -671,7 +671,8 @@ class MemoryService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_memoriesKey);
 
-      if (_isSupabaseAvailable) {
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
         await _clearAllMemoriesFromSupabase();
       }
 
@@ -695,11 +696,6 @@ class MemoryService {
     } catch (e) {
       print('Error limpiando Supabase: $e');
     }
-  }
-
-  // Verificamos la conexión a Supabase
-  bool isSupabaseConnected() {
-    return _isSupabaseAvailable;
   }
 }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_auth_provider.dart';
 import '../constants/colors.dart';
 import 'home_screen.dart';
 
@@ -12,16 +14,12 @@ class TermsScreen extends StatefulWidget {
 
 class _TermsScreenState extends State<TermsScreen> {
   bool _hasAccepted = false;
-  bool _vieneDelRegistro = false; // Para saber si viene del enlace o no
+  bool _vieneDelRegistro = false;
 
   @override
   void initState() {
     super.initState();
-    // Verificamos si hay algo en el stack de navegación
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Si la pantalla anterior es RegisterScreen, entonces viene del registro
-      // pero como no podemos acceder directamente, usamos un truco simple:
-      // Si hay más de una pantalla en el stack, probablemente viene del registro
       setState(() {
         _vieneDelRegistro = Navigator.canPop(context);
       });
@@ -29,21 +27,33 @@ class _TermsScreenState extends State<TermsScreen> {
   }
 
   Future<void> _acceptAndContinue() async {
-    if (_hasAccepted) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('cookies_accepted', true);
-      if (!mounted) return;
-      
-      // Si venía del GestorAutenticacion, va al Home
-      // Si venía del registro, vuelve atrás
-      if (_vieneDelRegistro) {
-        Navigator.pop(context); // Vuelve al registro
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
-      }
+    if (!_hasAccepted) return;
+
+    print('🟡 Aceptando cookies...');
+
+    // 1. Guardar en SharedPreferences (local)
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('cookies_accepted', true);
+    print('✅ Guardado en local');
+
+    // 2. Guardar en Supabase
+    final auth = Provider.of<AppAuthProvider>(context, listen: false);
+    if (auth.userId != null) {
+      print('🟡 Enviando a Supabase para usuario: ${auth.userId}');
+      final resultado = await auth.actualizarAceptacionCookies(auth.userId!);
+      print('📝 Resultado de Supabase: $resultado');
+    }
+
+    if (!mounted) return;
+
+    // 3. Navegar según el caso
+    if (_vieneDelRegistro) {
+      Navigator.pop(context); // Vuelve al registro
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
     }
   }
   
@@ -166,7 +176,6 @@ class _TermsScreenState extends State<TermsScreen> {
             const SizedBox(height: 30),
             
             // Solo mostramos el checkbox si NO viene del registro
-            // (o sea, si es un usuario antiguo que necesita aceptar)
             if (!_vieneDelRegistro) ...[
               const Divider(),
               const SizedBox(height: 20),
