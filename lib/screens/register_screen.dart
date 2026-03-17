@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/gestures.dart'; // IMPORTANTE: necesario para TapGestureRecognizer
 import '../providers/app_auth_provider.dart';
 import '../providers/theme_provider.dart';
 import 'home_screen.dart';
+import 'terms_screen.dart'; // IMPORTANTE: importar la pantalla de términos
 import '../constants/colors.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -22,9 +25,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Clave global para manejar y validar el estado del formulario
   final formKey = GlobalKey<FormState>();
-  // Variables para alternar la visibilidad de las contraseñas en los campos
+  
+  // Variables para alternar la visibilidad de las contraseñas
   bool ocultarPassword = true;
   bool ocultarConfirmar = true;
+  
+  // Variable para el checkbox de cookies
+  bool aceptaCookies = false;
 
   @override
   void dispose() {
@@ -34,34 +41,45 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  // Metodo que maneja el proceso de registro del usuario
+  // Método que maneja el proceso de registro del usuario
   Future<void> registrar(BuildContext context) async {
-    // Si el formulario no pasa las validaciones, no continua
+    // Validar que el formulario sea correcto
     if (!formKey.currentState!.validate()) return;
+    
+    // Validar que haya aceptado las cookies
+    if (!aceptaCookies) {
+      mostrarError(context, 'Debes aceptar las cookies para registrarte');
+      return;
+    }
 
     // Obtener el proveedor de autenticación
     final auth = Provider.of<AppAuthProvider>(context, listen: false);
 
-    // Intentar registrar al usuario con el correo y la contraseña proporcionados
+    // Intentar registrar al usuario
     final exito = await auth.register(
       emailController.text.trim(),
       passwordController.text,
     );
 
-    // Si el registro es exitoso, navega a la pantalla principal
+    // Si el registro es exitoso
     if (exito && context.mounted) {
+      // Guardar que aceptó las cookies
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('cookies_accepted', true);
+      
+      // Navegar a la pantalla principal
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
     }
-    // Si falla, muestra un mensaje de error al usuario
+    // Si falla, muestra un mensaje de error
     else if (!exito && context.mounted) {
       mostrarError(context, 'No se pudo crear la cuenta');
     }
   }
 
-  // Muestra un mensaje de error temporal en la parte inferior de la pantalla
+  // Muestra un mensaje de error temporal
   void mostrarError(BuildContext context, String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -73,10 +91,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Obtiene el estado actual del proveedor de autenticación
+    // Obtiene los providers
     final auth = Provider.of<AppAuthProvider>(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
 
+    // Colores según el tema
     Color backgroundColor = themeProvider.isDarkMode ? backgroundDark : textLight;
     Color textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
     Color iconColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
@@ -103,7 +122,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               const SizedBox(height: 30),
 
-              // Icono decorativo que representa el registro
+              // Icono decorativo
               Icon(
                 Icons.person_add,
                 size: 80,
@@ -112,7 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
               const SizedBox(height: 20),
 
-              // Título principal de la pantalla de registro
+              // Título
               Text(
                 'Crear Nueva Cuenta',
                 style: TextStyle(
@@ -124,7 +143,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
               const SizedBox(height: 10),
 
-              // Texto descriptivo que guía al usuario
+              // Texto descriptivo
               Text(
                 'Completa el formulario para registrarte',
                 style: TextStyle(
@@ -135,7 +154,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
               const SizedBox(height: 30),
 
-              // Si hay un mensaje de error, mostrarlo en un contenedor estilizado
+              // Mensaje de error si existe
               if (auth.errorMessage != null)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -184,12 +203,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
 
-              // Formulario de registro con validaciones
+              // Formulario de registro
               Form(
                 key: formKey,
                 child: Column(
                   children: [
-                    // Campo para ingresar el correo electrónico
+                    // Campo email
                     TextFormField(
                       controller: emailController,
                       style: TextStyle(color: textColor),
@@ -210,7 +229,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
                       ),
                       keyboardType: TextInputType.emailAddress,
-                      // Validador para el campo de correo
                       validator: (valor) {
                         if (valor == null || valor.isEmpty) {
                           return 'Ingresa tu correo';
@@ -224,7 +242,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     const SizedBox(height: 15),
 
-                    // Campo para ingresar la contraseña
+                    // Campo contraseña
                     TextFormField(
                       controller: passwordController,
                       style: TextStyle(color: textColor),
@@ -232,7 +250,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Contraseña',
                         labelStyle: TextStyle(color: iconColor),
                         prefixIcon: Icon(Icons.lock, color: iconColor),
-                        // Botón para alternar la visibilidad de la contraseña
                         suffixIcon: IconButton(
                           icon: Icon(
                             ocultarPassword
@@ -259,7 +276,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
                       ),
                       obscureText: ocultarPassword,
-                      // Validador para el campo de contraseña
                       validator: (valor) {
                         if (valor == null || valor.isEmpty) {
                           return 'Crea una contraseña';
@@ -273,7 +289,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     const SizedBox(height: 15),
 
-                    // Campo para confirmar la contraseña
+                    // Campo confirmar contraseña
                     TextFormField(
                       controller: confirmarController,
                       style: TextStyle(color: textColor),
@@ -281,7 +297,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Confirmar Contraseña',
                         labelStyle: TextStyle(color: iconColor),
                         prefixIcon: Icon(Icons.lock_outline, color: iconColor),
-                        // Botón para alternar la visibilidad de la confirmación
                         suffixIcon: IconButton(
                           icon: Icon(
                             ocultarConfirmar
@@ -308,7 +323,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
                       ),
                       obscureText: ocultarConfirmar,
-                      // Validador para confirmar que las contraseñas coincidan
                       validator: (valor) {
                         if (valor == null || valor.isEmpty) {
                           return 'Confirma tu contraseña';
@@ -319,32 +333,83 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return null;
                       },
                     ),
+
+                    const SizedBox(height: 20),
+
+                    // para aceptar las cookies y puedas ver los terminos con un enlace
+                    CheckboxListTile(
+                      value: aceptaCookies,
+                      activeColor: pinkPrimary,
+                      onChanged: (bool? valor) {
+                        setState(() {
+                          aceptaCookies = valor ?? false;
+                        });
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      title: RichText(
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontSize: 14, 
+                            color: themeProvider.isDarkMode ? Colors.white : Colors.black87,
+                            fontFamily: 'Roboto',
+                          ),
+                          children: [
+                            const TextSpan(text: "Acepto las "),
+                            TextSpan(
+                              text: "cookies y los términos y condiciones",
+                              style: const TextStyle(
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              // Hace que el texto sea clickeable y lleve a la pantalla de términos
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const TermsScreen()),
+                                  );
+                                },
+                            ),
+                            const TextSpan(text: " para poder crear mi cuenta."),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 15),
+
+
+                    // boton de registro (se deshabilita si no acepta cookies)
+                    // Se deshabilita si: está cargando O no aceptó cookies
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: (auth.isLoading || !aceptaCookies) 
+                            ? null 
+                            : () => registrar(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: pinkPrimary,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.grey[400],
+                        ),
+                        child: auth.isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              )
+                            : const Text(
+                                'Crear Cuenta',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
                   ],
-                ),
-              ),
-
-              const SizedBox(height: 25),
-
-              // Botón para enviar el formulario de registro
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  // Deshabilita el botón si está cargando, si no, ejecutae el registro
-                  onPressed: auth.isLoading ? null : () {
-                    registrar(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: pinkPrimary,
-                    foregroundColor: Colors.white,
-                  ),
-                  // Muestra el indicador de carga si está procesando, si no, muestra el texto
-                  child: auth.isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                    'Crear Cuenta',
-                    style: TextStyle(fontSize: 16),
-                  ),
                 ),
               ),
 

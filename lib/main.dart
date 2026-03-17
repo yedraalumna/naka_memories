@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/terms_screen.dart';
 import 'providers/app_auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/favorite_provider.dart';
-import 'constants/colors.dart';
 import 'providers/category_provider.dart';
+import 'constants/colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,20 +80,61 @@ class MiApp extends StatelessWidget {
   }
 }
 
-class GestorAutenticacion extends StatelessWidget {
+class GestorAutenticacion extends StatefulWidget {
   const GestorAutenticacion({super.key});
+
+  @override
+  State<GestorAutenticacion> createState() => _GestorAutenticacionState();
+}
+
+class _GestorAutenticacionState extends State<GestorAutenticacion> {
+  bool? _cookiesAccepted;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCookieStatus();
+  }
+
+  Future<void> _checkCookieStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _cookiesAccepted = prefs.getBool('cookies_accepted') ?? false;
+        });
+      }
+    } catch (e) {
+      print('Error al verificar cookies: $e');
+      if (mounted) {
+        setState(() {
+          _cookiesAccepted = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AppAuthProvider>(context);
 
-    // Muestra carga inicial
-    if (auth.isLoading && auth.user == null) {
+    // 1. Mientras carga
+    if (auth.isLoading || _cookiesAccepted == null) {
       return const PantallaCarga();
     }
 
-    // Decide qué pantalla mostrar
-    return auth.isAuthenticated ? const HomeScreen() : const LoginScreen();
+    // 2. Si NO está autenticado, va al Login
+    if (!auth.isAuthenticated) {
+      return const LoginScreen();
+    }
+
+    // 3. Si está autenticado pero NO ha aceptado cookies (usuarios antiguos)
+    if (!_cookiesAccepted!) {
+      return const TermsScreen(); // Esta pantalla ya no se usará para usuarios nuevos
+    }
+
+    // 4. Si está autenticado Y aceptó cookies, entra a la app
+    return const HomeScreen();
   }
 }
 
@@ -107,7 +150,7 @@ class PantallaCarga extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(
-              color: pinkPrimary,
+              valueColor: AlwaysStoppedAnimation<Color>(pinkPrimary),
             ),
             SizedBox(height: 20),
             Text(

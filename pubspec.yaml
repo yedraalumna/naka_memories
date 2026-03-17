@@ -40,6 +40,9 @@ dependencies:
   #para la geolocalizacion
   geolocator: ^10.1.0
 
+  #para la barra de porcentaje
+  percent_indicator: ^4.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
