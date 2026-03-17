@@ -9,9 +9,6 @@ class TermsScreen extends StatefulWidget {
 }
 
 class _TermsScreenState extends State<TermsScreen> {
-  
-  // ============ MÉTODOS PARA EL CONTENIDO LEGAL ============
-  
   Widget _buildLegalContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
