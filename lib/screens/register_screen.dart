@@ -7,6 +7,7 @@ import '../providers/theme_provider.dart';
 import 'home_screen.dart';
 import 'terms_screen.dart';
 import '../constants/colors.dart';
+import 'email_verification_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -60,6 +61,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final success = await auth.register(
       emailController.text.trim(),
       passwordController.text,
+      redirectTo: 'io.nayekamemories.app://callback',
     );
 
     if (success && context.mounted) {

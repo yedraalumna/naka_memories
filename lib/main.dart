@@ -11,15 +11,18 @@ import 'providers/favorite_provider.dart';
 import 'providers/category_provider.dart';
 import 'constants/colors.dart';
 import 'providers/memory_provider.dart';
+import 'package:flutter/services.dart';
+import 'package:app_links/app_links.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializamos la Supabase
   await Supabase.initialize(
     url: 'https://bbpqvckqycllhklqxjis.supabase.co',
     anonKey: 'sb_publishable_B2UiEGYTG1-OfhVcuTMBzg_5SPe__-a',
   );
+
+  DeepLinkService.initDeepLinks();
 
   runApp(const MiApp());
 }
@@ -92,64 +95,64 @@ class GestorAutenticacion extends StatefulWidget {
 class _GestorAutenticacionState extends State<GestorAutenticacion> {
   bool? _cookiesAccepted;
   bool _verificandoCookies = true;
+  AppAuthProvider? _authProvider; // CORRECCION 1: Guardar referencia
 
   @override
   void initState() {
     super.initState();
     _checkCookieStatus();
     
-    // Escuchar cambios en la autenticación
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = Provider.of<AppAuthProvider>(context, listen: false);
-      auth.addListener(_onAuthChange);
+      _authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+      _authProvider!.addListener(_onAuthChange);
     });
   }
 
   @override
   void dispose() {
-    // Limpiar el listener
-    final auth = Provider.of<AppAuthProvider>(context, listen: false);
-    auth.removeListener(_onAuthChange);
+    // CORRECCION 2: Usar la referencia guardada con null check
+    try {
+      _authProvider?.removeListener(_onAuthChange);
+    } catch (e) {
+      // Ignorar errores en dispose
+    }
     super.dispose();
   }
 
   void _onAuthChange() {
-    // Cuando cambia la autenticación (login/logout), volvemos a verificar cookies
-    print('🔄 Cambio en autenticación, reverificando cookies...');
+    print('Cambio en autenticacion, reverificando cookies...');
     _checkCookieStatus();
   }
 
   Future<void> _checkCookieStatus() async {
+    if (!mounted) return; // CORRECCION 3: Verificar mounted al inicio
+    
     setState(() => _verificandoCookies = true);
     
     try {
       final prefs = await SharedPreferences.getInstance();
-      final auth = Provider.of<AppAuthProvider>(context, listen: false);
+      // CORRECCION 4: Usar referencia guardada o provider
+      final auth = _authProvider ?? Provider.of<AppAuthProvider>(context, listen: false);
 
       bool aceptoCookies = false;
 
-      // SIEMPRE preguntar a Supabase si el usuario está autenticado
       if (auth.isAuthenticated && auth.userId != null) {
         aceptoCookies = await auth.usuarioAceptoCookies(auth.userId!);
-        print('📊 Supabase dice: cookies_accepted = $aceptoCookies');
-        
-        // Actualizar local
+        print('Supabase dice: cookies_accepted = $aceptoCookies');
         await prefs.setBool('cookies_accepted', aceptoCookies);
       } else {
-        // Usuario no autenticado, usamos local
         aceptoCookies = prefs.getBool('cookies_accepted') ?? false;
-        print('📊 Usuario no autenticado, cookies locales: $aceptoCookies');
+        print('Usuario no autenticado, cookies locales: $aceptoCookies');
       }
 
-      // Actualizar el estado SOLO si el widget sigue montado
-      if (mounted) {
+      if (mounted) { // CORRECCION 5: Verificar mounted antes de setState
         setState(() {
           _cookiesAccepted = aceptoCookies;
         });
       }
       
     } catch (e) {
-      print('❌ Error al verificar cookies: $e');
+      print('Error al verificar cookies: $e');
       if (mounted) {
         final prefs = await SharedPreferences.getInstance();
         setState(() {
@@ -167,24 +170,20 @@ class _GestorAutenticacionState extends State<GestorAutenticacion> {
   Widget build(BuildContext context) {
     final auth = Provider.of<AppAuthProvider>(context);
 
-    // Mostrar carga mientras verificamos
     if (_verificandoCookies || _cookiesAccepted == null) {
       return const PantallaCarga();
     }
 
-    // Si no está autenticado, va al Login
     if (!auth.isAuthenticated) {
       return const LoginScreen();
     }
 
-    // Si está autenticado pero NO ha aceptado cookies (según Supabase)
     if (!_cookiesAccepted!) {
-      print('🟡 Mostrando TermsScreen porque cookies_accepted = false');
+      print('Mostrando TermsScreen porque cookies_accepted = false');
       return const TermsScreen();
     }
 
-    // Todo bien, va al Home
-    print('🟢 Entrando a Home porque cookies_accepted = true');
+    print('Entrando a Home porque cookies_accepted = true');
     return const HomeScreen();
   }
 }
@@ -216,5 +215,37 @@ class PantallaCarga extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class DeepLinkService {
+  static final _appLinks = AppLinks();
+
+  static Future<void> initDeepLinks() async {
+    try {
+      final initialLink = await _appLinks.getInitialLink();
+      if (initialLink != null) {
+        _handleLink(initialLink);
+      }
+
+      _appLinks.uriLinkStream.listen((Uri? uri) {
+        if (uri != null) {
+          _handleLink(uri);
+        }
+      }, onError: (err) {
+        print('Error en deep links: $err');
+      });
+    } catch (e) {
+      print('Error inicializando deep links: $e');
+    }
+  }
+
+  static void _handleLink(Uri uri) {
+    print('Deep link recibido: $uri');
+    
+    final tokenHash = uri.queryParameters['token_hash'];
+    final type = uri.queryParameters['type'];
+    
+    print('Token: $tokenHash, Type: $type');
   }
 }
