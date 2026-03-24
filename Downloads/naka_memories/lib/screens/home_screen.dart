@@ -293,11 +293,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _widgetOptions = <Widget>[
-    const MemoryGalleryScreen(),
-    MapScreen(isLibrary: true),
-    const ProfileScreen(),
-  ];
+  // ❌ ELIMINA la lista _widgetOptions de aquí arriba
 
   void _onItemTapped(int index) {
     setState(() {
@@ -310,19 +306,28 @@ class _HomeScreenState extends State<HomeScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
-      body: _widgetOptions.elementAt(_selectedIndex),
+      // Usamos IndexedStack para mantener el estado (ej. la posición del mapa)
+      // al cambiar entre pestañas.
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: const [
+          MemoryGalleryScreen(),
+          MapScreen(isLibrary: true),
+          ProfileScreen(),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
+            icon: Icon(Icons.home, size: 30),
             label: 'Inicio',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Biblioteca',
+            icon: Icon(Icons.map, size: 30),
+            label: 'Mapa',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: Icon(Icons.person, size: 30),
             label: 'Cuenta',
           ),
         ],

@@ -6,7 +6,7 @@ import '../models/Memory.dart';
 import 'package:uuid/uuid.dart';
 
 class MemoryService {
-  static const String _memoriesKey = 'nayeka memories';  
+  static const String _memoriesKey = 'nayeka memories';
   static const String _storageBucket = 'nayeka memories';
   final SupabaseClient _supabase = Supabase.instance.client;
   final Uuid _uuid = const Uuid();
@@ -68,19 +68,19 @@ class MemoryService {
   Future<List<Memory>> getMemories() async {
     try {
       final user = _supabase.auth.currentUser;
-      
+
       // Si hay usuario autenticado, SIEMPRE intentamos con Supabase primero
       if (user != null) {
         try {
           print('Intentando obtener de Supabase para usuario: ${user.id}');
           final supabaseMemories = await _getMemoriesFromSupabase();
-          
+
           if (supabaseMemories.isNotEmpty) {
             print('${supabaseMemories.length} recuerdos cargados de Supabase');
-            
+
             // Sincronizar locales con los de Supabase
             await _syncLocalWithSupabase(supabaseMemories);
-            
+
             return supabaseMemories;
           }
         } catch (e) {
@@ -88,11 +88,10 @@ class MemoryService {
           // Si falla Supabase, intentamos con local
         }
       }
-      
+
       // Si no hay usuario o falló Supabase, cargamos de local
       print('Cargando desde almacenamiento local...');
       return await _getMemoriesFromLocal();
-      
     } catch (e) {
       print('Error general obteniendo recuerdos: $e');
       return [];
@@ -104,16 +103,19 @@ class MemoryService {
     try {
       final localMemories = await _getMemoriesFromLocal();
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Crear mapa de memorias de Supabase por ID
       final Map<String, Memory> supabaseMap = {
         for (var m in supabaseMemories) m.id: m
       };
-      
+
       // Combinar memorias
-      final Set<String> allIds = {...supabaseMap.keys, ...localMemories.map((m) => m.id)};
+      final Set<String> allIds = {
+        ...supabaseMap.keys,
+        ...localMemories.map((m) => m.id)
+      };
       final List<Memory> mergedMemories = [];
-      
+
       for (final id in allIds) {
         if (supabaseMap.containsKey(id)) {
           mergedMemories.add(supabaseMap[id]!);
@@ -122,58 +124,55 @@ class MemoryService {
           mergedMemories.add(localMemory);
         }
       }
-      
+
       // Guardar versión sincronizada localmente
-      final memoriesJson = mergedMemories.map((m) => jsonEncode(m.toMap())).toList();
+      final memoriesJson =
+          mergedMemories.map((m) => jsonEncode(m.toMap())).toList();
       await prefs.setStringList(_memoriesKey, memoriesJson);
-      
-      print('Sincronización local completada: ${mergedMemories.length} recuerdos');
+
+      print(
+          'Sincronización local completada: ${mergedMemories.length} recuerdos');
     } catch (e) {
       print('Error sincronizando con local: $e');
     }
   }
 
-  // Obtener recuerdos de Supabase con manejo de tipos y errores robusto
+  // Obtener recuerdos de Supabase (Propios y Compartidos)
   Future<List<Memory>> _getMemoriesFromSupabase() async {
     try {
-      final userId = _supabase.auth.currentUser?.id;
+      final user = _supabase.auth.currentUser;
+      final userId = user?.id;
+      final userEmail = user
+          ?.email; // Necesitamos el correo para saber qué nos han compartido
+
       if (userId == null) {
         print('Usuario no autenticado en Supabase');
         return [];
       }
 
-      print('Buscando recuerdos para usuario: $userId');
+      print(
+          'Buscando recuerdos para usuario: $userId o compartidos con: $userEmail');
 
+      //Usamos .or() para obtener de Supabase los registros donde el propio usuario por ID lo ha creado o por su correo
       final response = await _supabase
-          .from('nayeka memories') 
+          .from('nayeka memories')
           .select()
-          .eq('user_id', userId)
+          .or('user_id.eq.$userId,shared_with.cs.{"$userEmail"}')
           .order('date', ascending: false);
 
       final List<Memory> memories = [];
 
-      if (response is List) {
-        print('${response.length} registros encontrados en Supabase');
+      print('${response.length} registros encontrados en Supabase');
 
-        for (var item in response) {
-          try {
-            final memory = Memory.fromMap({
-              'id': item['id']?.toString() ?? '',
-              'title': item['title']?.toString() ?? 'Sin título',
-              'description': item['description']?.toString() ?? '',
-              'date': item['date']?.toString() ?? DateTime.now().toIso8601String(),
-              'latitude': _parseDouble(item['latitude']),
-              'longitude': _parseDouble(item['longitude']),
-              'imageAsset': item['imageAsset']?.toString(),
-              'category': item['category']?.toString() ?? 'General',
-              'isFavorite': item['isFavorite'] ?? false,
-            });
-            memories.add(memory);
-          } catch (e) {
-            print('Error procesando item: $e');
-          }
+      for (var item in response) {
+        try {
+          final memory = Memory.fromMap(item);
+          memories.add(memory);
+        } catch (e) {
+          print('Error procesando item: $e');
         }
       }
+
       return memories;
     } catch (e) {
       print('Error en _getMemoriesFromSupabase: $e');
@@ -193,6 +192,54 @@ class MemoryService {
       }
     }
     return 0.0;
+  }
+
+  // Compartir todos los recuerdos de una categoría con un correo
+  Future<void> shareCategory(String category, String emailToShare) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null || emailToShare.isEmpty) return;
+
+      // Llamamos a la función SQL que verifica si el correo existe en Supabase
+      final bool userExists = await _supabase.rpc(
+        'check_user_exists',
+        params: {'search_email': emailToShare},
+      );
+
+      // Si no existe, cortamos el proceso y lanzamos un mensaje limpio
+      if (!userExists) {
+        throw 'No hay ninguna cuenta registrada con el correo:\n$emailToShare';
+      }
+
+      // 2. Si existe, obtenemos solo los recuerdos de ESA carpeta que sean del propio usuario
+      final response = await _supabase
+          .from('nayeka memories')
+          .select()
+          .eq('user_id', user.id)
+          .eq('category', category);
+
+      // Iteramos para añadir el correo
+      for (var item in response) {
+        List<String> currentShared = [];
+        if (item['shared_with'] != null) {
+          currentShared =
+              List<String>.from(item['shared_with'].map((e) => e.toString()));
+        }
+
+        // Si el email no está ya en la lista, lo añadimos y actualizamos
+        if (!currentShared.contains(emailToShare)) {
+          currentShared.add(emailToShare);
+
+          await _supabase
+              .from('nayeka memories')
+              .update({'shared_with': currentShared}).eq('id', item['id']);
+        }
+      }
+    } catch (e) {
+      print('Error compartiendo carpeta internamente: $e');
+      // Lanzamos el error exacto (limpiando la palabra Exception si aparece)
+      throw e.toString().replaceAll('Exception: ', '');
+    }
   }
 
   // Obtener recuerdos de almacenamiento local
@@ -290,7 +337,7 @@ class MemoryService {
 
       String? imageUrl;
       final user = _supabase.auth.currentUser;
-      
+
       if (user != null) {
         print('Intentando subir imagen a Supabase');
         imageUrl = await uploadImage(imageBytes);
@@ -375,7 +422,7 @@ class MemoryService {
       String? videoUrl;
 
       final user = _supabase.auth.currentUser;
-      
+
       if (user != null) {
         videoUrl = await uploadVideo(videoBytes);
       }
@@ -404,7 +451,7 @@ class MemoryService {
     }
   }
 
-  // Guardar recuerdo en Supabase 
+  // Guardar recuerdo en Supabase
   Future<void> _saveMemoryToSupabase(Memory memory) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -429,6 +476,7 @@ class MemoryService {
         'imageAsset': memory.imageAsset,
         'category': memory.category,
         'isFavorite': memory.isFavorite,
+        'shared_with': memory.sharedWith,
       };
 
       print('Datos a guardar: $memoryData');
@@ -504,7 +552,8 @@ class MemoryService {
       final index = memories.indexWhere((m) => m.id == memoryId);
       if (index >= 0) {
         memories[index] = memories[index].copyWith(isFavorite: isFavorite);
-        final memoriesJson = memories.map((m) => jsonEncode(m.toMap())).toList();
+        final memoriesJson =
+            memories.map((m) => jsonEncode(m.toMap())).toList();
         await prefs.setStringList(_memoriesKey, memoriesJson);
         print('Estado de favorito actualizado localmente: $isFavorite');
       }
@@ -514,7 +563,7 @@ class MemoryService {
       if (user != null) {
         final userId = user.id;
         await _supabase
-            .from('nayeka memories') 
+            .from('nayeka memories')
             .update({'isFavorite': isFavorite})
             .eq('id', memoryId)
             .eq('user_id', userId);
@@ -539,10 +588,12 @@ class MemoryService {
         final folders = ['avatars', 'memories', 'videos'];
         for (final folder in folders) {
           try {
-            final contents = await _supabase.storage.from(_storageBucket).list(path: folder);
+            final contents =
+                await _supabase.storage.from(_storageBucket).list(path: folder);
             print('Carpeta $folder encontrada: ${contents.length} archivos');
           } catch (e) {
-            print('La carpeta "$folder" se creará automáticamente al subir archivos');
+            print(
+                'La carpeta "$folder" se creará automáticamente al subir archivos');
           }
         }
       } catch (e) {
@@ -579,7 +630,7 @@ class MemoryService {
       print('\nVerificamos la tabla "nayeka memories"...');
       try {
         final response = await _supabase
-            .from('nayeka memories') 
+            .from('nayeka memories')
             .select('id')
             .eq('user_id', user.id)
             .limit(1);
@@ -639,7 +690,8 @@ class MemoryService {
       final memories = await _getMemoriesFromLocal();
 
       final updatedMemories = memories.where((m) => m.id != id).toList();
-      final memoriesJson = updatedMemories.map((m) => jsonEncode(m.toMap())).toList();
+      final memoriesJson =
+          updatedMemories.map((m) => jsonEncode(m.toMap())).toList();
 
       await prefs.setStringList(_memoriesKey, memoriesJson);
       print('Recuerdo eliminado localmente: $id');
@@ -654,7 +706,7 @@ class MemoryService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId != null) {
         await _supabase
-            .from('nayeka memories') 
+            .from('nayeka memories')
             .delete()
             .eq('id', id)
             .eq('user_id', userId);
@@ -686,10 +738,7 @@ class MemoryService {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId != null) {
-        await _supabase
-            .from('nayeka memories') 
-            .delete()
-            .eq('user_id', userId);
+        await _supabase.from('nayeka memories').delete().eq('user_id', userId);
 
         print('Todos los recuerdos eliminados de Supabase');
       }
@@ -710,6 +759,7 @@ extension MemoryCopyWith on Memory {
     String? imageAsset,
     String? category,
     bool? isFavorite,
+    List<String>? sharedWith,
   }) {
     return Memory(
       id: id ?? this.id,
@@ -720,6 +770,7 @@ extension MemoryCopyWith on Memory {
       imageAsset: imageAsset ?? this.imageAsset,
       category: category ?? this.category,
       isFavorite: isFavorite ?? this.isFavorite,
+      sharedWith: sharedWith ?? this.sharedWith,
     );
   }
 }

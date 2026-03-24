@@ -9,6 +9,9 @@ import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 class MemoryDetailScreen extends StatefulWidget {
   // Antes era StatelessWidget, se cambia pq es necesario para video
@@ -99,6 +102,102 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     } catch (e) {
       print("Error video: $e");
       if (mounted) setState(() => _isInitVideoError = true);
+    }
+  }
+
+  Future<void> _shareMemory() async {
+    // 1. Enlace limpio y oficial de Google Maps
+    final String googleMapsLink =
+        'https://www.google.com/maps/search/?api=1&query=${widget.memory.latitude},${widget.memory.longitude}';
+
+    // 2. Texto del mensaje
+    final String shareText = '''
+Nayeka Memories - Recuerdo compartido
+
+Título: ${widget.memory.title}
+Descripción: ${widget.memory.description}
+Fecha: ${widget.memory.date.split('T')[0]}
+
+Ver ubicación en Maps: $googleMapsLink
+
+Creado con Nayeka Memories: 
+https://nayeka-memories.com
+''';
+
+    final mediaPath = widget.memory.imageAsset?.trim();
+
+    try {
+      // Si no hay imagen ni video, solo mandamos texto
+      if (mediaPath == null || mediaPath.isEmpty) {
+        await SharePlus.instance.share(ShareParams(text: shareText));
+        return;
+      }
+
+      // LÓGICA PARA CHROME / WEB
+      if (kIsWeb) {
+        final mediaIcon = widget.memory.isVideo ? 'Video' : 'Imagen';
+        // En web compartimos el enlace directamente
+        await SharePlus.instance.share(
+          ShareParams(text: '$shareText\n\n$mediaIcon: $mediaPath'),
+        );
+        return;
+      }
+
+      // LÓGICA PARA MÓVILES (Android/iOS)
+      if (mediaPath.startsWith('http')) {
+        // Aviso visual amplio y legible
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Preparando archivo...',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+            duration: Duration(seconds: 1),
+            padding: EdgeInsets.all(20),
+          ),
+        );
+
+        // Descarga y creación de archivo temporal
+        final response = await http.get(Uri.parse(mediaPath));
+        final tempDir = await getTemporaryDirectory();
+
+        final extension = widget.memory.isVideo ? '.mp4' : '.jpg';
+        final tempFile = File(
+            '${tempDir.path}/recuerdo_${DateTime.now().millisecondsSinceEpoch}$extension');
+
+        await tempFile.writeAsBytes(response.bodyBytes);
+
+        // Enviamos el archivo físico nativo (Sintaxis moderna)
+        await SharePlus.instance.share(
+          ShareParams(
+            text: shareText,
+            files: [XFile(tempFile.path)],
+          ),
+        );
+      } else if (!mediaPath.startsWith('assets/')) {
+        // Archivo físico local preexistente (Sintaxis moderna)
+        await SharePlus.instance.share(
+          ShareParams(
+            text: shareText,
+            files: [XFile(mediaPath)],
+          ),
+        );
+      } else {
+        // Asset interno (Sintaxis moderna)
+        await SharePlus.instance.share(ShareParams(text: shareText));
+      }
+    } catch (e) {
+      print('Error al compartir: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error al compartir: $e',
+              style: const TextStyle(fontSize: 18),
+            ),
+            backgroundColor: Colors.red,
+            padding: const EdgeInsets.all(20),
+          ),
+        );
+      }
     }
   }
 
@@ -472,6 +571,34 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
   Widget _buildActionButtons(BuildContext context, bool isDarkMode) {
     return Column(
       children: [
+        // Botón de Compartir Externamente
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _shareMemory,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: pinkLighter,
+              foregroundColor: pinkPrimary,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              elevation: 3,
+            ),
+            icon: const Icon(Icons.share, size: 28),
+            label: const Text(
+              'Compartir',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 15),
+
+        // Botón de editar
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(

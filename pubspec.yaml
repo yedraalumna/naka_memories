@@ -24,7 +24,7 @@ dependencies:
   chewie: ^1.7.1
   video_thumbnail: ^0.5.3
   shared_preferences: ^2.2.0
-  path_provider: ^2.1.1
+  path_provider: ^2.1.5
   
   uuid: ^4.3.1
 
@@ -35,7 +35,7 @@ dependencies:
   #para la funciones del pdf
   pdf: ^3.11.3
   printing: ^5.10.0
-  http: ^1.1.0 
+  http: ^1.6.0 
 
   #para la geolocalizacion
   geolocator: ^10.1.0
@@ -43,6 +43,7 @@ dependencies:
   #para la barra de porcentaje
   percent_indicator: ^4.0.0
   app_links: ^6.4.1
+  share_plus: ^12.0.1
 
 dev_dependencies:
   flutter_test:

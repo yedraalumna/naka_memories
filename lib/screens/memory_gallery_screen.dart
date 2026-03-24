@@ -9,6 +9,7 @@ import '../providers/theme_provider.dart';
 import '../providers/favorite_provider.dart';
 import 'favorite_screen.dart';
 import '../widget/MemoryThumbnail.dart';
+import '../providers/category_provider.dart';
 
 class MemoryGalleryScreen extends StatefulWidget {
   const MemoryGalleryScreen({super.key});
@@ -34,7 +35,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     try {
       final memories = await _memoryService.getMemories();
       if (mounted) {
-        Provider.of<FavoriteProvider>(context, listen: false).loadFavorites(memories);
+        Provider.of<FavoriteProvider>(context, listen: false)
+            .loadFavorites(memories);
         setState(() {
           _memories = memories;
           _isLoading = false;
@@ -61,7 +63,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   }
 
   // Obtiene el último recuerdo de una categoría para usarlo de miniatura
-  Memory? _getLastMemoryForCategory(String category, Map<String, List<Memory>> grouped) {
+  Memory? _getLastMemoryForCategory(
+      String category, Map<String, List<Memory>> grouped) {
     final memories = grouped[category];
     if (memories == null || memories.isEmpty) return null;
     return memories.last;
@@ -72,6 +75,223 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       context,
       MaterialPageRoute(builder: (context) => const CoordinateInputScreen()),
     ).then((_) => _loadMemories());
+  }
+
+  void _navigateToCreateMemoryInCategory() {
+    if (_selectedCategory == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CoordinateInputScreen(
+          initialCategory: _selectedCategory,
+        ),
+      ),
+    ).then((_) => _loadMemories());
+  }
+
+  // Mostrar diálogo para crear nueva carpeta
+  void _showNewCategoryDialog() {
+    final TextEditingController controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.all(24),
+          title: const Text('Nueva Carpeta',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Ingresa el nombre de la nueva carpeta:',
+                style: TextStyle(fontSize: 18),
+              ),
+              const SizedBox(height: 24),
+              TextField(
+                controller: controller,
+                style: const TextStyle(fontSize: 18),
+                decoration: InputDecoration(
+                  hintText: 'Ej: Vacaciones 2024',
+                  // Relleno amplio para hacer el campo de texto alto y fácil de tocar
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.folder, size: 32),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 30),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                      ),
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('Cancelar',
+                          style: TextStyle(fontSize: 18)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: pinkPrimary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        final newCategory = controller.text.trim();
+                        if (newCategory.isNotEmpty) {
+                          Provider.of<CategoryProvider>(context, listen: false)
+                              .addCategoryLocally(newCategory);
+
+                          Navigator.pop(dialogContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Carpeta "$newCategory" creada'),
+                              backgroundColor: pinkPrimary,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      child:
+                          const Text('Crear', style: TextStyle(fontSize: 18)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Mostrar diálogo para compartir carpeta
+  void _showShareCategoryDialog(String categoryToShare) {
+    final TextEditingController emailController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.all(24),
+          title: Text(
+            'Compartir "$categoryToShare"',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Ingresa el correo electrónico del usuario con el que deseas compartir esta carpeta:',
+                style: TextStyle(fontSize: 18),
+              ),
+              const SizedBox(height: 24),
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                style: const TextStyle(fontSize: 18),
+                decoration: InputDecoration(
+                  hintText: 'amigo@correo.com',
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.email, size: 32),
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                    ),
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child:
+                        const Text('Cancelar', style: TextStyle(fontSize: 18)),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: pinkPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () async {
+                      final email = emailController.text.trim();
+                      if (email.isNotEmpty) {
+                        Navigator.pop(dialogContext);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Compartiendo carpeta con $email...'),
+                            backgroundColor: Colors.blueGrey,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+
+                        try {
+                          await _memoryService.shareCategory(
+                              categoryToShare, email);
+
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('¡Carpeta compartida con éxito!'),
+                                backgroundColor: pinkPrimary,
+                                duration: Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                                duration: const Duration(seconds: 4),
+                              ),
+                            );
+                          }
+                        }
+                      }
+                    },
+                    child:
+                        const Text('Compartir', style: TextStyle(fontSize: 18)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showMemoryDetails(BuildContext context, Memory memory) {
@@ -120,6 +340,20 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     Map<String, List<Memory>> grouped,
     ThemeProvider themeProvider,
   ) {
+    if (categories.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.folder_open, size: 80, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            const Text('No hay carpetas',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
+    }
+
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -169,7 +403,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(color: Colors.white, width: 1.5),
-                            boxShadow: [
+                            boxShadow: const [
                               BoxShadow(color: Colors.black26, blurRadius: 2)
                             ],
                           ),
@@ -189,16 +423,20 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
-                    color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
+                    color: themeProvider.isDarkMode
+                        ? textDarkMode
+                        : Colors.black87,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '${grouped[cat]!.length} recuerdos',
+                  '${grouped[cat]?.length ?? 0} recuerdos',
                   style: TextStyle(
                     fontSize: 12,
-                    color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                    color: themeProvider.isDarkMode
+                        ? Colors.grey[400]
+                        : Colors.grey[600],
                   ),
                 ),
               ],
@@ -231,13 +469,15 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           child: Card(
             elevation: 3,
             color: themeProvider.isDarkMode ? cardDark : Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(12)),
                     child: MemoryThumbnail(
                       imagePath: memory.imageAsset,
                       width: double.infinity,
@@ -260,12 +500,15 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
+                                color: themeProvider.isDarkMode
+                                    ? textDarkMode
+                                    : Colors.black87,
                               ),
                             ),
                             Text(
                               memory.date.split('T')[0],
-                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -300,35 +543,77 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final groupedMemories = _groupMemoriesByCategory();
-    final categories = groupedMemories.keys.toList();
+
+    // Leemos categorías del provider (evitamos problemas si no hay memorias aún)
+    final categoryProvider = Provider.of<CategoryProvider>(context);
+    final categories = categoryProvider.categories;
 
     return Scaffold(
       backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
       appBar: AppBar(
         title: Text(
           _selectedCategory ?? 'Mis Carpetas',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: pinkPrimary,
         // Si hay categoría seleccionada, mostramos botón de volver
         leading: _selectedCategory != null
             ? IconButton(
+                iconSize: 32,
+                padding: const EdgeInsets.all(12),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => setState(() => _selectedCategory = null),
               )
             : null,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.favorite, color: Colors.white),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const FavoriteScreen()),
+          // Botón de COMPARTIR (Solo visible dentro de una carpeta)
+          if (_selectedCategory != null)
+            IconButton(
+              iconSize: 32, // Mantenemos el tamaño amplio
+              padding: const EdgeInsets.all(12), // Área de contacto generosa
+              icon: const Icon(Icons.folder_shared,
+                  color: Colors.white), // ¡Icono actualizado!
+              tooltip: 'Compartir esta carpeta con un usuario',
+              onPressed: () {
+                _showShareCategoryDialog(_selectedCategory!);
+              },
             ),
-          ),
+
+          // Botón + para crear recuerdo (solo visible dentro de una carpeta)
+          if (_selectedCategory != null)
+            IconButton(
+              iconSize: 32,
+              padding: const EdgeInsets.all(12),
+              icon: const Icon(Icons.add, color: Colors.white),
+              tooltip: 'Agregar recuerdo a esta carpeta',
+              onPressed: _navigateToCreateMemoryInCategory,
+            ),
+
+          // Botón para crear nueva carpeta (visible solo en la raíz)
+          if (_selectedCategory == null)
+            IconButton(
+              iconSize: 32,
+              padding: const EdgeInsets.all(12),
+              icon: const Icon(Icons.create_new_folder, color: Colors.white),
+              tooltip: 'Crear nueva carpeta',
+              onPressed: _showNewCategoryDialog,
+            ),
+
+          // Botón de favoritos (siempre visible)
           IconButton(
-            icon: const Icon(Icons.add, color: Colors.white),
-            onPressed: _navigateToCreateMemory,
+            iconSize: 32,
+            padding: const EdgeInsets.all(12),
+            icon: const Icon(Icons.favorite, color: Colors.white),
+            tooltip: 'Ver favoritos',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FavoriteScreen()),
+              );
+            },
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
@@ -336,8 +621,10 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           : _memories.isEmpty
               ? _buildEmptyState(themeProvider)
               : _selectedCategory == null
-                  ? _buildFolderGrid(context, categories, groupedMemories, themeProvider)
-                  : _buildMemoryList(context, groupedMemories[_selectedCategory]!, themeProvider),
+                  ? _buildFolderGrid(
+                      context, categories, groupedMemories, themeProvider)
+                  : _buildMemoryList(context,
+                      groupedMemories[_selectedCategory] ?? [], themeProvider),
     );
   }
 
@@ -348,12 +635,14 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
         children: [
           Icon(Icons.folder_open, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
-          const Text('No hay recuerdos aún', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text('No hay recuerdos aún',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _navigateToCreateMemory,
             style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
-            child: const Text('Crear mi primer recuerdo', style: TextStyle(color: Colors.white)),
+            child: const Text('Crear mi primer recuerdo',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

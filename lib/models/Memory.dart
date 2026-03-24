@@ -9,6 +9,7 @@ class Memory {
   final String? imageAsset;
   final String category;
   final bool isFavorite;
+  final List<String> sharedWith;
 
   // Lista de las categorias
   static const List<String> categoriesList = [
@@ -29,6 +30,7 @@ class Memory {
     this.imageAsset,
     this.category = 'Sin categoría',
     this.isFavorite = false,
+    this.sharedWith = const [],
   });
 
   // getters SEGUROS
@@ -81,6 +83,7 @@ class Memory {
       'imageAsset': imageAsset,
       'category': category,
       'isFavorite': isFavorite,
+      'shared_with': sharedWith,
     };
   }
 
@@ -116,6 +119,13 @@ class Memory {
       final isFavorite =
           (map['isFavorite'] == true) || (map['is_favorite'] == true);
 
+      // sharedRaw -Extraemos la lista de compartidos de forma segura
+      final sharedRaw = map['shared_with'] ?? map['sharedWith'];
+      List<String> parsedSharedWith = [];
+      if (sharedRaw is List) {
+        parsedSharedWith = sharedRaw.map((e) => e.toString()).toList();
+      }    
+
       return Memory(
         id: id,
         title: title,
@@ -128,6 +138,7 @@ class Memory {
         imageAsset: imageAsset,
         category: category,
         isFavorite: isFavorite,
+        sharedWith: parsedSharedWith,
       );
     } catch (e) {
       print('ERROR en Memory.fromMap: $e');
@@ -140,6 +151,7 @@ class Memory {
         imageAsset: null,
         category: 'General',
         isFavorite: false,
+        sharedWith: [],
       );
     }
   }
@@ -176,6 +188,7 @@ class Memory {
     String? imageAsset,
     String? category,
     bool? isFavorite,
+    List<String>? sharedWith,
   }) {
     return Memory(
       id: id ?? this.id,
@@ -186,13 +199,14 @@ class Memory {
       imageAsset: imageAsset ?? this.imageAsset,
       category: category ?? this.category,
       isFavorite: isFavorite ?? this.isFavorite,
+      sharedWith: sharedWith ?? this.sharedWith,
     );
   }
 
   // Método opcional para debug
   @override
   String toString() {
-    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category, isFavorite: $isFavorite, mediaType: $mediaType}';
+    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category, isFavorite: $isFavorite, mediaType: $mediaType, sharedWith: $sharedWith}';
   }
 
   // Método para comparar dos memorias
