@@ -21,6 +21,9 @@ import '../screens/coordinate_input_screen.dart';
 import '../providers/theme_provider.dart';
 import 'package:video_thumbnail/video_thumbnail.dart'; // pa la miniatura del video
 import '../providers/favorite_provider.dart';
+import '../services/pdfService.dart';
+import '../providers/app_auth_provider.dart'; 
+import '../widget/pin_dialog.dart';
 
 class MapScreen extends StatefulWidget {
   final bool isLibrary;
@@ -521,9 +524,103 @@ class _MapScreenState extends State<MapScreen> {
           onClearAllMemories: _confirmClearAllMemories,
           onShowMemoryDetails: _showMemoryDetails,
           onCenterList: _centerMapOnList,
+          onGenerarPdf: _gestionarPdf,
         );
       },
     );
+  }
+
+  Future<void> _gestionarPdf() async {
+    final List<Memory> listaCopia = List.from(_memories);
+    final auth = Provider.of<AppAuthProvider>(context, listen: false);
+    final userName = auth.userMetadata?['full_name'] ?? auth.user?.email ?? 'Usuario';
+
+    if (listaCopia.isEmpty) {
+      _showSnackbar('No hay recuerdos para exportar', isError: true);
+      return;
+    }
+
+    final bool tienePrivados = listaCopia.any((m) => m.hasPassword);
+
+    if (!tienePrivados) {
+      PdfService().generarPdf(listaCopia, userName);
+      return;
+    }
+
+    // Preguntamos si incluir privados
+    final bool? incluirPrivados = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Contenido Protegido'),
+        content: const Text('¿Deseas incluir los recuerdos de tus carpetas protegidas en el PDF?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No, omitirlos'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sí, incluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || incluirPrivados == null) return;
+
+    if (!incluirPrivados) {
+      final soloPublicos = listaCopia.where((m) => !m.hasPassword).toList();
+      if (soloPublicos.isEmpty) {
+        _showSnackbar('No hay recuerdos públicos para exportar', isError: true);
+      } else {
+        PdfService().generarPdf(soloPublicos, userName);
+      }
+      return;
+    }
+
+    // Incluir privados: pedimos PIN por cada carpeta única
+    final hashes = listaCopia
+        .where((m) => m.hasPassword && m.passwordHash != null)
+        .map((m) => m.passwordHash!)
+        .toSet()
+        .toList();
+
+    final List<Memory> memoriasVerificadas = listaCopia.where((m) => !m.hasPassword).toList();
+
+    for (int i = 0; i < hashes.length; i++) {
+      if (!mounted) return;
+
+      final hashActual = hashes[i];
+      // Buscamos el nombre de la categoría para mostrarlo en el diálogo
+      final memoriaEjemplo = listaCopia.firstWhere((m) => m.passwordHash == hashActual);
+      final nombreCarpeta = memoriaEjemplo.category;
+
+      final bool? pinCorrecto = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => PinDialog(
+          correctHash: hashActual,
+          titulo: 'PIN de: $nombreCarpeta (${i + 1}/${hashes.length})',
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (pinCorrecto == true) {
+        memoriasVerificadas.addAll(
+          listaCopia.where((m) => m.passwordHash == hashActual),
+        );
+      }
+    }
+
+    if (memoriasVerificadas.isEmpty) {
+      _showSnackbar('No se verificó ninguna carpeta', isError: true);
+    } else {
+      // Ordenar por fecha antes de generar (opcional pero recomendado)
+      memoriasVerificadas.sort((a, b) => b.date.compareTo(a.date));
+      PdfService().generarPdf(memoriasVerificadas, userName);
+    }
   }
 
   void _onMapLongPress(LatLng position) {

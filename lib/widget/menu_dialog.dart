@@ -7,8 +7,9 @@ import 'MemoryThumbnail.dart';
 import '../services/pdfService.dart';
 import '../providers/app_auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../widget/pin_dialog.dart';
 
-class MenuDialog extends StatelessWidget {
+class MenuDialog extends StatefulWidget {
   final List<Memory> memories;
   final LatLng currentPosition;
 
@@ -18,6 +19,7 @@ class MenuDialog extends StatelessWidget {
   final VoidCallback onClearAllMemories;
   final Function(Memory) onShowMemoryDetails;
   final Function(List<Memory>) onCenterList;
+  final VoidCallback onGenerarPdf;
 
   const MenuDialog({
     super.key,
@@ -29,20 +31,26 @@ class MenuDialog extends StatelessWidget {
     required this.onClearAllMemories,
     required this.onShowMemoryDetails,
     required this.onCenterList,
+    required this.onGenerarPdf,
   });
 
-  void _showMemoryListModal(BuildContext context, List<Memory> list,
-      String title, ThemeData theme, bool isDarkMode) {
+  @override
+  State<MenuDialog> createState() => _MenuDialogState();
+}
+
+class _MenuDialogState extends State<MenuDialog> {
+
+  void _showMemoryListModal(List<Memory> list, String title, ThemeData theme, bool isDarkMode) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (ctx) {
         return DraggableScrollableSheet(
           initialChildSize: 0.8,
           maxChildSize: 0.95,
           minChildSize: 0.5,
-          builder: (context, scrollController) {
+          builder: (ctx2, scrollController) {
             Color backgroundColor = isDarkMode ? backgroundDark : Colors.white;
             Color textColor = isDarkMode ? Colors.white : Colors.black;
             Color primaryColor =
@@ -79,7 +87,7 @@ class MenuDialog extends StatelessWidget {
                         : ListView.builder(
                             controller: scrollController,
                             itemCount: list.length,
-                            itemBuilder: (context, index) {
+                            itemBuilder: (ctx3, index) {
                               final memory = list[index];
                               return ListTile(
                                 leading: MemoryThumbnail(
@@ -99,9 +107,8 @@ class MenuDialog extends StatelessWidget {
                                           : Colors.grey[700]),
                                 ),
                                 onTap: () {
-                                  // Cierra el modal de la lista y llama al callback de MapScreen
-                                  Navigator.pop(context);
-                                  onShowMemoryDetails(memory);
+                                  Navigator.pop(ctx3);
+                                  widget.onShowMemoryDetails(memory);
                                 },
                                 tileColor: theme.brightness == Brightness.dark
                                     ? cardDark.withOpacity(0.5)
@@ -119,30 +126,23 @@ class MenuDialog extends StatelessWidget {
     );
   }
 
-  // ordenamos por fecha de la mas reciente a la mas antigua
-  void _showSortedByDate(
-      BuildContext context, ThemeData theme, bool isDarkMode) {
+  void _showSortedByDate(ThemeData theme, bool isDarkMode) {
     Navigator.pop(context);
-    final sortedMemories = List<Memory>.from(memories)
-      ..sort((a, b) =>
-          b.date.compareTo(a.date)); // Del más reciente al más antiguo
-    _showMemoryListModal(context, sortedMemories,
-        'Recuerdos por Fecha (Recientes)', theme, isDarkMode);
+    final sortedMemories = List<Memory>.from(widget.memories)
+      ..sort((a, b) => b.date.compareTo(a.date));
+    _showMemoryListModal(
+        sortedMemories, 'Recuerdos por Fecha (Recientes)', theme, isDarkMode);
   }
 
   @override
   Widget build(BuildContext context) {
-    // 1. En lugar de preguntar al "context" general, preguntamos a tu Provider
     final themeProvider = Provider.of<ThemeProvider>(context);
     final theme = Theme.of(context);
 
-    // 2. Determinamos si es oscuro basándonos en tu configuración real
     bool isDarkMode;
     if (themeProvider.themeMode == ThemeMode.system) {
-      // Si es sistema, miramos el brillo del sistema
       isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
     } else {
-      // Si no, miramos si el modo elegido es Dark
       isDarkMode = themeProvider.themeMode == ThemeMode.dark;
     }
 
@@ -168,42 +168,35 @@ class MenuDialog extends StatelessWidget {
           ),
           const SizedBox(height: 25),
 
-          // Guardamos un nuevo recuerdo
           _buildMenuItem(
             icon: Icons.add_location_alt,
             title: 'Guardar nuevo recuerdo',
             color: pinkAccent,
             onTap: () {
-              Navigator.pop(context); // Cierra el menú
-              onCreateNewMemory(); // Llama directamente al formulario
+              Navigator.pop(context);
+              widget.onCreateNewMemory();
             },
             isDarkMode: isDarkMode,
           ),
 
           Divider(color: dividerColor),
 
-          // centramos el mapa en todos los recuerdos
           _buildMenuItem(
             icon: Icons.zoom_out_map,
             title: 'Centrar en todos los recuerdos',
             color: pinkPrimary,
-            onTap: onShowAllMemories,
+            onTap: widget.onShowAllMemories,
             isDarkMode: isDarkMode,
           ),
 
-          // Centrar favoritos
           _buildMenuItem(
             icon: Icons.filter_center_focus,
             title: 'Centrar favoritos',
             color: pinkPrimary,
             onTap: () {
               Navigator.pop(context);
-              final favs = memories.where((m) => m.isFavorite).toList();
-              if (favs.isNotEmpty) {
-                onCenterList(favs); // Necesitamos crear este nuevo método
-              } else {
-                // Opcional: mostrar un mensaje si no hay favoritos
-              }
+              final favs = widget.memories.where((m) => m.isFavorite).toList();
+              if (favs.isNotEmpty) widget.onCenterList(favs);
             },
             isDarkMode: isDarkMode,
           ),
@@ -215,21 +208,19 @@ class MenuDialog extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               _showMemoryListModal(
-                  context, memories, 'Todos los Recuerdos', theme, isDarkMode);
+                  widget.memories, 'Todos los Recuerdos', theme, isDarkMode);
             },
             isDarkMode: isDarkMode,
           ),
 
-          //Listar Favoritos
           _buildMenuItem(
             icon: Icons.favorite,
             title: 'Listar favoritos',
             color: pinkPrimary,
             onTap: () {
               Navigator.pop(context);
-              final favs = memories.where((m) => m.isFavorite).toList();
-              _showMemoryListModal(
-                  context, favs, 'Mis Favoritos', theme, isDarkMode);
+              final favs = widget.memories.where((m) => m.isFavorite).toList();
+              _showMemoryListModal(favs, 'Mis Favoritos', theme, isDarkMode);
             },
             isDarkMode: isDarkMode,
           ),
@@ -238,44 +229,30 @@ class MenuDialog extends StatelessWidget {
             icon: Icons.date_range,
             title: 'Listar por fecha (Recientes)',
             color: pinkPrimary,
-            onTap: () => _showSortedByDate(context, theme, isDarkMode),
+            onTap: () => _showSortedByDate(theme, isDarkMode),
             isDarkMode: isDarkMode,
           ),
 
           Divider(color: dividerColor),
 
-          // Nuevo elemento: Exportar a PDF
           _buildMenuItem(
             icon: Icons.picture_as_pdf,
-            title: 'Exportar recuerdos a PDF',
-            color: pinkPrimary,
-            onTap: () async {
-              // Cerrar el menú primero
-              Navigator.pop(context);
-
-              final authProvider =
-                  Provider.of<AppAuthProvider>(context, listen: false);
-              final userName = authProvider.user?.email ?? 'Usuario';
-
-              // Mostrar un indicador de carga
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Generando PDF... por favor espera')),
-              );
-
-              await PdfService().generarPdf(memories, userName);
+            title: 'Generar PDF de recuerdos',
+            color: Colors.pink,
+            onTap: () {
+              Navigator.pop(context); // Cerramos el menú
+              widget.onGenerarPdf(); 
             },
             isDarkMode: isDarkMode,
           ),
 
           Divider(color: dividerColor),
 
-          // eliminamos todos los recuerdos
           _buildMenuItem(
             icon: Icons.delete_sweep,
             title: 'Eliminar todos los recuerdos',
             color: Colors.pink,
-            onTap: onClearAllMemories,
+            onTap: widget.onClearAllMemories,
             isDarkMode: isDarkMode,
           ),
         ],

@@ -186,40 +186,33 @@ Future<bool> register(String email, String password) async {
   }
 }
 
-  // Reenviar email de verificación (CORREGIDO)
-  Future<bool> resendVerificationEmail() async {
+  // Reenviar email de verificación
+  Future<bool> resendVerificationEmail({String? unverifiedEmail}) async {
     try {
       _isLoading = true;
       notifyListeners();
 
-      // Obtener el usuario actual directamente de Supabase
-      final currentUser = _supabase.auth.currentUser;
-      
-      if (currentUser == null) {
+      final correo = _supabase.auth.currentUser?.email ?? unverifiedEmail;
+
+      if (correo == null) {
         _errorMessage = 'No hay usuario autenticado';
-        print('Error: No hay usuario autenticado');
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
-      print('Reenviando email de verificación a: ${currentUser.email}');
-
       await _supabase.auth.resend(
         type: OtpType.signup,
-        email: currentUser.email!,
+        email: correo,
       );
 
-      print('Email reenviado correctamente');
       _isLoading = false;
       notifyListeners();
       return true;
     } on AuthException catch (e) {
-      print('AuthException al reenviar: ${e.message}');
       _handleSupabaseError(e);
       return false;
     } catch (e) {
-      print('Error al reenviar: $e');
       _errorMessage = 'Error al reenviar verificación';
       _isLoading = false;
       notifyListeners();
@@ -380,9 +373,6 @@ Future<bool> register(String email, String password) async {
         } else {
           _errorMessage = 'Datos inválidos';
         }
-        break;
-      case '429':
-        _errorMessage = 'Demasiados intentos. Intenta más tarde';
         break;
       default:
         _errorMessage = 'Error de autenticación';

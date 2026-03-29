@@ -54,7 +54,8 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
     setState(() => cargando = true);
 
     final auth = Provider.of<AppAuthProvider>(context, listen: false);
-    final exito = await auth.resendVerificationEmail();
+    final exito = await auth.resendVerificationEmail(unverifiedEmail: widget.email);
+    
 
     setState(() => cargando = false);
 

@@ -7,14 +7,12 @@ import '../constants/colors.dart';
 
 class PinDialog extends StatefulWidget {
   final String correctHash;
-  final Function() onSuccess;
-  final Function()? onCancel; // Opcional: callback para cuando se cancela
+  final String? titulo;
 
   const PinDialog({
-    super.key, 
-    required this.correctHash, 
-    required this.onSuccess,
-    this.onCancel,
+    super.key,
+    required this.correctHash,
+    this.titulo,
   });
 
   @override
@@ -34,24 +32,22 @@ class _PinDialogState extends State<PinDialog> {
 
   void _verifyPin(String pin) async {
     if (isVerifying) return;
-    
+
     setState(() {
       isVerifying = true;
     });
 
-    // Pequeña pausa para evitar verificaciones múltiples
     await Future.delayed(const Duration(milliseconds: 100));
-    
+
     final hashInput = sha256.convert(utf8.encode(pin)).toString();
-    
+
     if (hashInput == widget.correctHash) {
-      // PIN correcto
+      // ✅ PIN correcto: cerramos devolviendo TRUE
       if (mounted) {
-        Navigator.pop(context);
-        widget.onSuccess();
+        Navigator.pop(context, true);
       }
     } else {
-      // PIN incorrecto
+      // ❌ PIN incorrecto: mostramos error, NO cerramos
       if (mounted) {
         setState(() {
           errorMessage = "PIN incorrecto";
@@ -70,11 +66,11 @@ class _PinDialogState extends State<PinDialog> {
         children: [
           Icon(Icons.lock, color: pinkPrimary, size: 28),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              "Carpeta Protegida",
+              widget.titulo ?? "Carpeta Protegida",
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -131,12 +127,12 @@ class _PinDialogState extends State<PinDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: isVerifying ? null : () {
-            Navigator.pop(context);
-            if (widget.onCancel != null) {
-              widget.onCancel!();
-            }
-          },
+          onPressed: isVerifying
+              ? null
+              : () {
+                  // ✅ Cancelar: cerramos devolviendo FALSE
+                  Navigator.pop(context, false);
+                },
           child: const Text(
             "Cancelar",
             style: TextStyle(color: Colors.grey, fontSize: 16),
