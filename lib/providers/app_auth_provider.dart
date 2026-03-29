@@ -517,17 +517,22 @@ Future<bool> register(String email, String password) async {
   }
 
     // Verificar codigo OTP de 6 digitos
+  // Verificar codigo OTP de 6 u 8 digitos
   Future<bool> verifyOTP(String email, String token) async {
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
+      print('Verificando OTP para email: $email con token: $token');
+
       final response = await _supabase.auth.verifyOTP(
         email: email,
         token: token,
         type: OtpType.signup,
       );
+
+      print('Respuesta de verificacion: ${response.user?.email}');
 
       if (response.user != null) {
         _user = response.user;
@@ -541,9 +546,13 @@ Future<bool> register(String email, String password) async {
         return false;
       }
     } on AuthException catch (e) {
-      _handleSupabaseError(e);
+      print('AuthException en verifyOTP: ${e.message}');
+      _errorMessage = 'Error al verificar: ${e.message}';
+      _isLoading = false;
+      notifyListeners();
       return false;
     } catch (e) {
+      print('Error en verifyOTP: $e');
       _errorMessage = 'Error al verificar codigo';
       _isLoading = false;
       notifyListeners();

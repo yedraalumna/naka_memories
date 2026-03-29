@@ -105,7 +105,7 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Te enviamos un codigo de verificación a',
+              'Te enviamos un codigo de verificacion a',
               style: TextStyle(
                 fontSize: 16,
                 color: theme.isDarkMode ? Colors.grey[400] : Colors.grey[700],
