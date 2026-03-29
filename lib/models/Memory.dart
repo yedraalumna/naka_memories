@@ -10,6 +10,8 @@ class Memory {
   final String category;
   final bool isFavorite;
   final List<String> sharedWith;
+  final bool hasPassword;    
+  final String? passwordHash; 
 
   // Lista de las categorias
   static const List<String> categoriesList = [
@@ -31,6 +33,8 @@ class Memory {
     this.category = 'Sin categoría',
     this.isFavorite = false,
     this.sharedWith = const [],
+    this.hasPassword = false,    
+    this.passwordHash,
   });
 
   // getters SEGUROS
@@ -84,6 +88,8 @@ class Memory {
       'category': category,
       'isFavorite': isFavorite,
       'shared_with': sharedWith,
+      'has_password': hasPassword,      
+      'password_hash': passwordHash,
     };
   }
 
@@ -126,6 +132,10 @@ class Memory {
         parsedSharedWith = sharedRaw.map((e) => e.toString()).toList();
       }    
 
+      // hasPassword y passwordHash, con valor por defecto
+      final hasPassword = (map['has_password'] == true) || (map['hasPassword'] == true);
+      final passwordHash = map['password_hash']?.toString() ?? map['passwordHash']?.toString();
+
       return Memory(
         id: id,
         title: title,
@@ -139,6 +149,8 @@ class Memory {
         category: category,
         isFavorite: isFavorite,
         sharedWith: parsedSharedWith,
+        hasPassword: hasPassword,          
+        passwordHash: passwordHash?.isEmpty == true ? null : passwordHash,
       );
     } catch (e) {
       print('ERROR en Memory.fromMap: $e');
@@ -152,6 +164,8 @@ class Memory {
         category: 'General',
         isFavorite: false,
         sharedWith: [],
+        hasPassword: false,  
+        passwordHash: null,
       );
     }
   }
@@ -189,6 +203,8 @@ class Memory {
     String? category,
     bool? isFavorite,
     List<String>? sharedWith,
+    bool? hasPassword,     
+    String? passwordHash,
   }) {
     return Memory(
       id: id ?? this.id,
@@ -200,6 +216,8 @@ class Memory {
       category: category ?? this.category,
       isFavorite: isFavorite ?? this.isFavorite,
       sharedWith: sharedWith ?? this.sharedWith,
+      hasPassword: hasPassword ?? this.hasPassword,   
+      passwordHash: passwordHash ?? this.passwordHash,
     );
   }
 

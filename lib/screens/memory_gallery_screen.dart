@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 import '../services/MemoryService.dart';
 import '../models/Memory.dart';
 import '../widget/MemoryDetailScreen.dart';
@@ -10,6 +11,11 @@ import '../providers/favorite_provider.dart';
 import 'favorite_screen.dart';
 import '../widget/MemoryThumbnail.dart';
 import '../providers/category_provider.dart';
+import '../widget/pin_dialog.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
+import 'package:pin_code_fields/pin_code_fields.dart';
+
 
 class MemoryGalleryScreen extends StatefulWidget {
   const MemoryGalleryScreen({super.key});
@@ -70,6 +76,104 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     return memories.last;
   }
 
+  //Manejar el tap en una carpeta (con verificación de PIN)
+  void _onFolderTap(String category, Map<String, List<Memory>> grouped) {
+    final memoriesInCategory = grouped[category] ?? [];
+
+    // Verificar si la carpeta tiene contraseña
+    final folderHasPassword = memoriesInCategory.any((memory) => memory.hasPassword);
+    final passwordHash = folderHasPassword 
+        ? memoriesInCategory.firstWhere((m) => m.hasPassword).passwordHash 
+        : null;
+
+    if (folderHasPassword && passwordHash != null && passwordHash.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => PinDialog(
+          correctHash: passwordHash,
+          onSuccess: () {
+            setState(() => _selectedCategory = category);
+          },
+        ),
+      );
+    } else {
+      setState(() => _selectedCategory = category);
+    }
+  }
+
+  //Mostrar diálogo para proteger una carpeta
+  void _showProtectFolderDialog(String category) {
+    final TextEditingController pinController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Proteger Carpeta'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Ingresa un PIN de 6 dígitos para proteger esta carpeta:'),
+            const SizedBox(height: 20),
+            PinCodeTextField(
+              appContext: context,
+              controller: pinController,
+              length: 6,
+              obscureText: true,
+              animationType: AnimationType.fade,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              pinTheme: PinTheme(
+                shape: PinCodeFieldShape.box,
+                borderRadius: BorderRadius.circular(8),
+                fieldHeight: 45,
+                fieldWidth: 35,
+                activeFillColor: pinkLighter,
+                activeColor: pinkPrimary,
+              ),
+              onChanged: (_) {},
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
+            onPressed: () async {
+              final pin = pinController.text;
+              if (pin.length == 6) {
+                final hash = sha256.convert(utf8.encode(pin)).toString();
+                
+                // Actualizar todos los recuerdos de esta categoría
+                for (var memory in _memories.where((m) => m.category == category)) {
+                  final updatedMemory = memory.copyWith(
+                    hasPassword: true,
+                    passwordHash: hash,
+                  );
+                  await _memoryService.saveMemory(updatedMemory);
+                }
+                
+                _loadMemories();
+                Navigator.pop(context);
+                
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Carpeta protegida con éxito')),
+                  );
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('El PIN debe tener 6 dígitos')),
+                );
+              }
+            },
+            child: const Text('Proteger'),
+          ),
+        ],
+      ),
+    );
+  }
   void _navigateToCreateMemory() {
     Navigator.push(
       context,
@@ -333,119 +437,148 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  // Cuadrícula de Carpetas
-  Widget _buildFolderGrid(
-    BuildContext context,
-    List<String> categories,
-    Map<String, List<Memory>> grouped,
-    ThemeProvider themeProvider,
-  ) {
-    if (categories.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.folder_open, size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            const Text('No hay carpetas',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      );
-    }
-
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.9,
+ // Cuadrícula de Carpetas
+Widget _buildFolderGrid(
+  BuildContext context,
+  List<String> categories,
+  Map<String, List<Memory>> grouped,
+  ThemeProvider themeProvider,
+) {
+  if (categories.isEmpty) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.folder_open, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          const Text('No hay carpetas',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ],
       ),
-      itemCount: categories.length,
-      itemBuilder: (context, index) {
-        final cat = categories[index];
-        final lastMemory = _getLastMemoryForCategory(cat, grouped);
-
-        return GestureDetector(
-          onTap: () => setState(() => _selectedCategory = cat),
-          child: Container(
-            decoration: BoxDecoration(
-              color: themeProvider.isDarkMode ? cardDark : pinkLighter,
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 5,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Icono de carpeta de fondo
-                    Icon(
-                      Icons.folder,
-                      size: 90,
-                      color: pinkPrimary.withOpacity(0.8),
-                    ),
-                    // Imagen miniatura superpuesta "dentro" de la carpeta
-                    if (lastMemory != null && lastMemory.imageAsset != null)
-                      Positioned(
-                        top: 30,
-                        child: Container(
-                          width: 45,
-                          height: 35,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.white, width: 1.5),
-                            boxShadow: const [
-                              BoxShadow(color: Colors.black26, blurRadius: 2)
-                            ],
-                          ),
-                          child: MemoryThumbnail(
-                            imagePath: lastMemory.imageAsset,
-                            width: 45,
-                            height: 35,
-                            borderRadius: 4,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  cat,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: themeProvider.isDarkMode
-                        ? textDarkMode
-                        : Colors.black87,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '${grouped[cat]?.length ?? 0} recuerdos',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: themeProvider.isDarkMode
-                        ? Colors.grey[400]
-                        : Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
+
+  return GridView.builder(
+    padding: const EdgeInsets.all(16),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 0.9,
+    ),
+    itemCount: categories.length,
+    itemBuilder: (context, index) {
+      final cat = categories[index];
+      final lastMemory = _getLastMemoryForCategory(cat, grouped);
+      
+      // Verificar si la carpeta está protegida
+      final isProtected = grouped[cat]?.any((m) => m.hasPassword == true && m.passwordHash != null) ?? false;
+
+      return GestureDetector(
+        onTap: () => _onFolderTap(cat, grouped),
+        child: Container(
+          decoration: BoxDecoration(
+            color: themeProvider.isDarkMode ? cardDark : pinkLighter,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Icono de carpeta de fondo
+                  Icon(
+                    Icons.folder,
+                    size: 90,
+                    color: pinkPrimary.withOpacity(0.8),
+                  ),
+                  // Imagen miniatura superpuesta "dentro" de la carpeta
+                  if (lastMemory != null && lastMemory.imageAsset != null)
+                    Positioned(
+                      top: 30,
+                      child: Container(
+                        width: 45,
+                        height: 35,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black26, blurRadius: 2)
+                          ],
+                        ),
+                        child: MemoryThumbnail(
+                          imagePath: lastMemory.imageAsset,
+                          width: 45,
+                          height: 35,
+                          borderRadius: 4,
+                        ),
+                      ),
+                    ),
+                  // 🔒 INDICADOR DE CARPETA PROTEGIDA - CÍRCULO ROSA 🔒
+                  if (isProtected)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: pinkPrimary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.lock,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                cat,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: themeProvider.isDarkMode
+                      ? textDarkMode
+                      : Colors.black87,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                '${grouped[cat]?.length ?? 0} recuerdos',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: themeProvider.isDarkMode
+                      ? Colors.grey[400]
+                      : Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
   //Listado de recuerdos de una carpeta específica
   Widget _buildMemoryList(
@@ -539,7 +672,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final groupedMemories = _groupMemoriesByCategory();
@@ -567,13 +700,22 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               )
             : null,
         actions: [
+          // Botón para PROTEGER carpeta (NUEVO - Solo visible dentro de una carpeta)
+          if (_selectedCategory != null)
+            IconButton(
+              iconSize: 32,
+              padding: const EdgeInsets.all(12),
+              icon: const Icon(Icons.lock_outline, color: Colors.white),
+              tooltip: 'Proteger esta carpeta con PIN',
+              onPressed: () => _showProtectFolderDialog(_selectedCategory!),
+            ),
+
           // Botón de COMPARTIR (Solo visible dentro de una carpeta)
           if (_selectedCategory != null)
             IconButton(
-              iconSize: 32, // Mantenemos el tamaño amplio
-              padding: const EdgeInsets.all(12), // Área de contacto generosa
-              icon: const Icon(Icons.folder_shared,
-                  color: Colors.white), // ¡Icono actualizado!
+              iconSize: 32,
+              padding: const EdgeInsets.all(12),
+              icon: const Icon(Icons.folder_shared, color: Colors.white),
               tooltip: 'Compartir esta carpeta con un usuario',
               onPressed: () {
                 _showShareCategoryDialog(_selectedCategory!);

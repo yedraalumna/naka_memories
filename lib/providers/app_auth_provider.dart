@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 
 class AppAuthProvider with ChangeNotifier {
   User? _user;
@@ -142,66 +143,83 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
+Future<bool> register(String email, String password) async {
+  try {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
 
-  Future<bool> register(String email, String password, {String? redirectTo}) async {
-    try {
-      _isLoading = true;
-      _errorMessage = null;
-      notifyListeners();
+    // URL diferente según la plataforma (Web o Android/iOS)
+    final redirectUrl = kIsWeb
+        ? 'https://nayekamemories.cloud-ip.cc/callback'
+        : 'io.nayekamemories.app://callback';
 
-      final response = await _supabase.auth.signUp(
-        email: email,
-        password: password,
-        data: {
-          'avatar_url': null,
-          'registered_at': DateTime.now().toIso8601String(),
-        },
-      );
+    final response = await _supabase.auth.signUp(
+      email: email,
+      password: password,
+      emailRedirectTo: redirectUrl,
+      data: {
+        'avatar_url': null,
+        'registered_at': DateTime.now().toIso8601String(),
+      },
+    );
 
-      _user = response.user;
-      
-      // Guardar cookies_accepted = true
-      if (_user != null && _user!.id.isNotEmpty) {
-        await _guardarCookiesEnSupabase(_user!.id);
-      }
-      
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } on AuthException catch (e) {
-      _handleSupabaseError(e);
-      return false;
-    } catch (e) {
-      _errorMessage = 'Error inesperado';
-      _isLoading = false;
-      notifyListeners();
-      return false;
+    _user = response.user;
+
+    // Guardar cookies_accepted = true
+    if (_user != null && _user!.id.isNotEmpty) {
+      await _guardarCookiesEnSupabase(_user!.id);
     }
-  }
 
-  //  Reenviar email de verificación
+    _isLoading = false;
+    notifyListeners();
+    return true;
+
+  } on AuthException catch (e) {
+    _handleSupabaseError(e);
+    return false;
+  } catch (e) {
+    _errorMessage = 'Error inesperado';
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+}
+
+  // Reenviar email de verificación (CORREGIDO)
   Future<bool> resendVerificationEmail() async {
     try {
       _isLoading = true;
       notifyListeners();
 
-      if (_user == null) {
+      // Obtener el usuario actual directamente de Supabase
+      final currentUser = _supabase.auth.currentUser;
+      
+      if (currentUser == null) {
         _errorMessage = 'No hay usuario autenticado';
+        print('Error: No hay usuario autenticado');
+        _isLoading = false;
+        notifyListeners();
         return false;
       }
 
+      print('Reenviando email de verificación a: ${currentUser.email}');
+
       await _supabase.auth.resend(
         type: OtpType.signup,
-        email: _user!.email!,
+        email: currentUser.email!,
       );
 
+      print('Email reenviado correctamente');
       _isLoading = false;
       notifyListeners();
       return true;
     } on AuthException catch (e) {
+      print('AuthException al reenviar: ${e.message}');
       _handleSupabaseError(e);
       return false;
     } catch (e) {
+      print('Error al reenviar: $e');
       _errorMessage = 'Error al reenviar verificación';
       _isLoading = false;
       notifyListeners();
@@ -484,4 +502,52 @@ class AppAuthProvider with ChangeNotifier {
   Map<String, dynamic>? get userMetadata => _user?.userMetadata;
   bool get hasAvatar => avatarUrl != null && avatarUrl!.isNotEmpty;
   String? get registeredAt => _user?.userMetadata?['registered_at'];
+
+  // Método para verificar si hay un deep link pendiente
+  Future<void> handleDeepLink(Uri uri) async {
+    final tokenHash = uri.queryParameters['token_hash'];
+    final type = uri.queryParameters['type'];
+    
+    if (tokenHash != null && type == 'email') {
+      print('Procesando verificación de email desde deep link');
+      // Supabase ya maneja la verificación automáticamente
+      // Solo refrescamos los datos del usuario
+      await refreshUserData();
+    }
+  }
+
+    // Verificar codigo OTP de 6 digitos
+  Future<bool> verifyOTP(String email, String token) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      final response = await _supabase.auth.verifyOTP(
+        email: email,
+        token: token,
+        type: OtpType.signup,
+      );
+
+      if (response.user != null) {
+        _user = response.user;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = 'Codigo invalido';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } on AuthException catch (e) {
+      _handleSupabaseError(e);
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error al verificar codigo';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
 }

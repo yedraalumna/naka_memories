@@ -22,7 +22,7 @@ void main() async {
     anonKey: 'sb_publishable_B2UiEGYTG1-OfhVcuTMBzg_5SPe__-a',
   );
 
-  DeepLinkService.initDeepLinks();
+  await DeepLinkService.initDeepLinks();
 
   runApp(const MiApp());
 }
@@ -223,11 +223,13 @@ class DeepLinkService {
 
   static Future<void> initDeepLinks() async {
     try {
+      // Link inicial (cuando la app se abre desde un enlace)
       final initialLink = await _appLinks.getInitialLink();
       if (initialLink != null) {
         _handleLink(initialLink);
       }
 
+      // Escuchar links cuando la app ya está abierta
       _appLinks.uriLinkStream.listen((Uri? uri) {
         if (uri != null) {
           _handleLink(uri);
@@ -247,5 +249,6 @@ class DeepLinkService {
     final type = uri.queryParameters['type'];
     
     print('Token: $tokenHash, Type: $type');
+    
   }
 }

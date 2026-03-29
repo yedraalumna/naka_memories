@@ -477,6 +477,8 @@ class MemoryService {
         'category': memory.category,
         'isFavorite': memory.isFavorite,
         'shared_with': memory.sharedWith,
+        'has_password': memory.hasPassword,     
+        'password_hash': memory.passwordHash,
       };
 
       print('Datos a guardar: $memoryData');
@@ -760,6 +762,8 @@ extension MemoryCopyWith on Memory {
     String? category,
     bool? isFavorite,
     List<String>? sharedWith,
+    bool? hasPassword,     
+    String? passwordHash, 
   }) {
     return Memory(
       id: id ?? this.id,
@@ -771,6 +775,8 @@ extension MemoryCopyWith on Memory {
       category: category ?? this.category,
       isFavorite: isFavorite ?? this.isFavorite,
       sharedWith: sharedWith ?? this.sharedWith,
+      hasPassword: hasPassword ?? this.hasPassword,      
+      passwordHash: passwordHash ?? this.passwordHash, 
     );
   }
 }

@@ -8,6 +8,7 @@ import 'home_screen.dart';
 import 'terms_screen.dart';
 import '../constants/colors.dart';
 import 'email_verification_screen.dart';
+import 'verify_code_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -42,54 +43,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  // ============ FUNCIONES SENCILLAS ============
-
-  // Función para registrar al usuario
-  Future<void> registrar(BuildContext context) async {
-    // Validar que el checkbox esté marcado
-    if (!aceptaCookies) {
-      mostrarMensaje('Debes aceptar los términos para registrarte');
-      return;
-    }
-
-    // Validar que el formulario sea correcto
-    if (!formKey.currentState!.validate()) return;
-    
-    final auth = Provider.of<AppAuthProvider>(context, listen: false);
-
-    // Intentar registrar en Supabase (CORREGIDO: register en lugar de signUp)
-    final success = await auth.register(
-      emailController.text.trim(),
-      passwordController.text,
-      redirectTo: 'io.nayekamemories.app://callback',
-    );
-
-    if (success && context.mounted) {
-      // Guardar en el dispositivo que el usuario ya aceptó las cookies
-      await guardarCookiesAceptadas();
-      
-      // Navegar al Home y limpiar el historial
-      irAlHome();
-    } else if (context.mounted) {
-      // Si falla, mostramos el error
-      mostrarMensaje(auth.errorMessage ?? 'Error al registrar');
-    }
-  }
-
   // Función para guardar que aceptó cookies
   Future<void> guardarCookiesAceptadas() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('cookies_accepted', true);
-    print('✅ Cookies aceptadas guardadas en SharedPreferences');
-  }
-
-  // Función para ir al Home
-  void irAlHome() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-      (route) => false,
-    );
+    print('Cookies aceptadas guardadas en SharedPreferences');
   }
 
   // Función para mostrar mensajes
@@ -109,6 +67,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
       context,
       MaterialPageRoute(builder: (context) => const TermsScreen()),
     );
+  }
+
+  // Función para registrar al usuario
+  Future<void> registrar(BuildContext context) async {
+    // Validar que el checkbox esté marcado
+    if (!aceptaCookies) {
+      mostrarMensaje('Debes aceptar los términos para registrarte');
+      return;
+    }
+
+    // Validar que el formulario sea correcto
+    if (!formKey.currentState!.validate()) return;
+    
+    final auth = Provider.of<AppAuthProvider>(context, listen: false);
+
+    // Intentar registrar en Supabase
+    final success = await auth.register(
+      emailController.text.trim(),
+      passwordController.text,
+    );
+
+    if (success && context.mounted) {
+      // Verificar que el usuario existe antes de continuar
+      if (auth.user == null) {
+        mostrarMensaje('Error: No se pudo crear el usuario');
+        return;
+      }
+    }
+      
+      await guardarCookiesAceptadas();
+
+  // Redirigir a la pantalla de codigo de verificacion
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (context) => VerifyCodeScreen(
+        email: emailController.text.trim(),
+      ),
+    ),
+  );
   }
 
   @override

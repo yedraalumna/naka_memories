@@ -45,6 +45,13 @@ dependencies:
   app_links: ^6.4.1
   share_plus: ^12.0.1
 
+  #para poner codigo PIN en las carpetas
+  pin_code_fields: ^8.0.1
+
+  #para dar mejor privacidad a las contraseñas
+  crypto: ^3.0.3
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
