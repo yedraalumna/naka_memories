@@ -37,6 +37,15 @@ class Memory {
     this.passwordHash,
   });
 
+  static const List<String> defaultCategories = [
+    'General',
+    'Viajes',
+    'Amigos',
+    'Familia',
+    'Comida',
+    'Estudio',
+  ];
+
   // getters SEGUROS
   double get latitude => location['latitude'] ?? 0.0;
   double get longitude => location['longitude'] ?? 0.0;

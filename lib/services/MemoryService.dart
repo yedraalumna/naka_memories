@@ -748,6 +748,228 @@ class MemoryService {
       print('Error limpiando Supabase: $e');
     }
   }
+
+// ============ NUEVOS MÉTODOS PARA GESTIÓN DE CARPETAS ============
+
+  /// Obtiene todas las categorías únicas de los recuerdos
+  Future<List<String>> getAllCategories() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      
+      // Si hay usuario autenticado, obtener de Supabase
+      if (user != null) {
+        try {
+          final response = await _supabase
+              .from('nayeka memories')
+              .select('category')
+              .eq('user_id', user.id);
+          
+          // Extraer categorías únicas
+          final Set<String> uniqueCategories = {};
+          for (var item in response) {
+            final category = item['category'] as String?;
+            if (category != null && category.isNotEmpty) {
+              uniqueCategories.add(category);
+            }
+          }
+          
+          // Asegurar que "General" siempre exista
+          if (uniqueCategories.isEmpty || !uniqueCategories.contains('General')) {
+            uniqueCategories.add('General');
+          }
+          
+          // Ordenar alfabéticamente
+          List<String> sorted = uniqueCategories.toList();
+          sorted.sort();
+          
+          print('✅ Categorías obtenidas de Supabase: ${sorted.length}');
+          return sorted;
+        } catch (e) {
+          print('Error obteniendo categorías de Supabase: $e');
+          // Fallback a local
+        }
+      }
+      
+      // Fallback: obtener de almacenamiento local
+      final localMemories = await _getMemoriesFromLocal();
+      final Set<String> uniqueCategories = {};
+      
+      for (var memory in localMemories) {
+        if (memory.category.isNotEmpty) {
+          uniqueCategories.add(memory.category);
+        }
+      }
+      
+      if (uniqueCategories.isEmpty || !uniqueCategories.contains('General')) {
+        uniqueCategories.add('General');
+      }
+      
+      List<String> sorted = uniqueCategories.toList();
+      sorted.sort();
+      
+      print('✅ Categorías obtenidas de local: ${sorted.length}');
+      return sorted;
+    } catch (e) {
+      print('❌ Error en getAllCategories: $e');
+      return ['General'];
+    }
+  }
+
+  /// Crear una nueva categoría (opcionalmente asignada a un recuerdo)
+  Future<void> createCategory(String categoryName, {String? memoryId}) async {
+    if (categoryName.isEmpty) return;
+    
+    try {
+      if (memoryId != null) {
+        // Si se proporciona un memoryId, actualizar ese recuerdo
+        final memory = await _getMemoryById(memoryId);
+        if (memory != null) {
+          final updatedMemory = memory.copyWith(category: categoryName);
+          await saveMemory(updatedMemory);
+          print('✅ Categoría "$categoryName" asignada al recuerdo $memoryId');
+        }
+      } else {
+        // Si no hay memoryId, creamos un recuerdo "fantasma" solo para registrar la categoría
+        // Esto asegura que la categoría aparezca en getAllCategories()
+        final dummyMemory = Memory(
+          id: _generateId(),
+          title: '_category_placeholder_$categoryName',
+          description: 'Categoría creada: $categoryName',
+          date: DateTime.now().toIso8601String(),
+          location: {'latitude': 0.0, 'longitude': 0.0},
+          imageAsset: null,
+          category: categoryName,
+          isFavorite: false,
+          sharedWith: [],
+          hasPassword: false,
+          passwordHash: null,
+        );
+        await saveMemory(dummyMemory);
+        print('✅ Categoría creada (con placeholder): $categoryName');
+      }
+    } catch (e) {
+      print('❌ Error creando categoría: $e');
+      throw Exception('No se pudo crear la categoría: $e');
+    }
+  }
+
+  /// Renombrar una categoría (actualiza todos los recuerdos que la usan)
+  Future<void> renameCategory(String oldName, String newName) async {
+    if (oldName == newName) return;
+    if (oldName.isEmpty || newName.isEmpty) return;
+    
+    try {
+      final user = _supabase.auth.currentUser;
+      
+      // Verificar si la nueva categoría ya existe para evitar duplicados
+      final existingCategories = await getAllCategories();
+      if (existingCategories.contains(newName) && newName != oldName) {
+        throw Exception('Ya existe una carpeta con el nombre "$newName"');
+      }
+      
+      // Obtener todos los recuerdos
+      final allMemories = await getMemories();
+      int updatedCount = 0;
+      
+      // Actualizar cada recuerdo que tenga la categoría antigua
+      for (var memory in allMemories) {
+        if (memory.category == oldName) {
+          final updatedMemory = memory.copyWith(category: newName);
+          await saveMemory(updatedMemory);
+          updatedCount++;
+        }
+      }
+      
+      print('✅ Categoría renombrada: $oldName → $newName ($updatedCount recuerdos actualizados)');
+    } catch (e) {
+      print('❌ Error renombrando categoría: $e');
+      throw Exception('No se pudo renombrar la categoría: $e');
+    }
+  }
+
+  /// Eliminar una categoría (mueve todos los recuerdos a "General")
+  Future<void> deleteCategory(String categoryName) async {
+    if (categoryName == 'General') {
+      throw Exception('No se puede eliminar la categoría "General"');
+    }
+    
+    try {
+      // Obtener todos los recuerdos
+      final allMemories = await getMemories();
+      int movedCount = 0;
+      
+      // Mover cada recuerdo de esta categoría a "General"
+      for (var memory in allMemories) {
+        if (memory.category == categoryName) {
+          final updatedMemory = memory.copyWith(category: 'General');
+          await saveMemory(updatedMemory);
+          movedCount++;
+        }
+      }
+      
+      print('✅ Categoría eliminada: $categoryName ($movedCount recuerdos movidos a General)');
+    } catch (e) {
+      print('❌ Error eliminando categoría: $e');
+      throw Exception('No se pudo eliminar la categoría: $e');
+    }
+  }
+
+  /// Restaurar categorías predeterminadas (opcional)
+  Future<void> restoreDefaultCategories() async {
+    try {
+      final currentCategories = await getAllCategories();
+      int restoredCount = 0;
+      
+      // Nota: Memory.defaultCategories debe estar definido en Memory.dart
+      // Si no lo tienes, puedes usar esta lista:
+      final List<String> defaultCategories = [
+        'General',
+        'Viajes',
+        'Amigos',
+        'Familia',
+        'Comida',
+        'Estudio',
+      ];
+      
+      for (var defaultCat in defaultCategories) {
+        if (!currentCategories.contains(defaultCat) && defaultCat != 'General') {
+          // Crear la categoría (no asigna a ningún recuerdo, solo la hace disponible)
+          await createCategory(defaultCat);
+          restoredCount++;
+        }
+      }
+      
+      print('✅ Categorías restauradas: $restoredCount');
+    } catch (e) {
+      print('❌ Error restaurando categorías: $e');
+      throw Exception('No se pudieron restaurar las categorías: $e');
+    }
+  }
+
+  /// Helper: Obtener un recuerdo por ID
+  Future<Memory?> _getMemoryById(String id) async {
+    try {
+      final allMemories = await getMemories();
+      try {
+        return allMemories.firstWhere((m) => m.id == id);
+      } catch (e) {
+        return null;
+      }
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Obtener el número de recuerdos por categoría
+  Future<int> getMemoryCountByCategory(String category) async {
+    try {
+      final allMemories = await getMemories();
+      return allMemories.where((m) => m.category == category).length;
+    } catch (e) {
+      print('Error contando recuerdos para $category: $e');
+      return 0;
+    }
+  }
 }
 
 // Extensión para copiar Memory

@@ -24,6 +24,7 @@ import '../providers/favorite_provider.dart';
 import '../services/pdfService.dart';
 import '../providers/app_auth_provider.dart'; 
 import '../widget/pin_dialog.dart';
+import '../widget/CategoryManager.dart';
 
 class MapScreen extends StatefulWidget {
   final bool isLibrary;
@@ -69,6 +70,187 @@ class _MapScreenState extends State<MapScreen> {
             .loadFavorites(_memories);
       }
     });
+  }
+
+  void _openCategoryManager() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const CategoryManager(),
+    ),
+  ).then((_) {
+    // Cuando vuelva del gestor, recargar los recuerdos y categorías
+    _loadMemories();
+  });
+}
+
+  void _showCategoryOptions(String categoryName) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDarkMode ? cardDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Opciones de: $categoryName',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: pinkPrimary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Opción Renombrar
+              ListTile(
+                leading: const Icon(Icons.drive_file_rename_outline, color: Colors.blue),
+                title: const Text('Renombrar carpeta'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showRenameCategoryDialog(categoryName);
+                },
+              ),
+              
+              // Opción Eliminar (excepto para "General")
+              if (categoryName != 'General')
+                ListTile(
+                  leading: const Icon(Icons.delete_sweep, color: Colors.red),
+                  title: const Text('Eliminar esta carpeta'),
+                  subtitle: const Text('Los recuerdos se moverán a "General"'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _confirmDeleteCategory(categoryName);
+                  },
+                ),
+              
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showRenameCategoryDialog(String oldName) async {
+    final TextEditingController controller = TextEditingController(text: oldName);
+    final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? cardDark : Colors.white,
+        title: const Text('Renombrar Carpeta'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: TextStyle(
+            color: isDarkMode ? textDarkMode : Colors.black87,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Nuevo nombre',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: pinkPrimary, width: 2),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newName = controller.text.trim();
+              if (newName.isNotEmpty && newName != oldName) {
+                Navigator.pop(context, newName);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: pinkPrimary,
+            ),
+            child: const Text('Renombrar'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      setState(() => _isLoading = true);
+      try {
+        await _memoryService.renameCategory(oldName, result);
+        setState(() {
+          _selectedCategory = result;
+        });
+        await _loadMemories();
+        _showSnackbar('Carpeta renombrada: $oldName → $result');
+      } catch (e) {
+        _showSnackbar('Error al renombrar: $e', isError: true);
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteCategory(String categoryName) async {
+    if (categoryName == 'General') {
+      _showSnackbar('No se puede eliminar la carpeta "General"', isError: true);
+      return;
+    }
+
+    final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? cardDark : Colors.white,
+        title: const Text('Eliminar Carpeta'),
+        content: Text(
+          '¿Estás seguro de eliminar la carpeta "$categoryName"?\n\n'
+          'Todos los recuerdos de esta carpeta se moverán a "General".',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() => _isLoading = true);
+      try {
+        await _memoryService.deleteCategory(categoryName);
+        setState(() {
+          _selectedCategory = 'Todas';
+        });
+        await _loadMemories();
+        _showSnackbar('Carpeta "$categoryName" eliminada');
+      } catch (e) {
+        _showSnackbar('Error al eliminar: $e', isError: true);
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   // crea marcador cuadrado con bordes redondeados
@@ -905,7 +1087,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // Widget principal
+    // Widget principal
   @override
   Widget build(BuildContext context) {
     // Obtenemos el estado del tema para configurar colores
@@ -923,7 +1105,7 @@ class _MapScreenState extends State<MapScreen> {
       return Scaffold(
         appBar: AppBar(
           title: Text(
-            'Memory Places',
+            _selectedCategory == 'Todas' ? 'Memory Places' : _selectedCategory,
             style: TextStyle(color: titleColor, fontWeight: FontWeight.bold),
           ),
           backgroundColor: appBarBg,
@@ -934,14 +1116,24 @@ class _MapScreenState extends State<MapScreen> {
                 padding: const EdgeInsets.all(12.0),
                 child: CircularProgressIndicator(color: progressColor),
               ),
+            if (_selectedCategory != 'Todas')
+              IconButton(
+                icon: const Icon(Icons.edit, color: pinkPrimary),
+                onPressed: () => _showCategoryOptions(_selectedCategory),
+                tooltip: 'Opciones de carpeta',
+              ),
+            IconButton(
+              icon: Icon(Icons.folder, color: iconColor),
+              onPressed: _openCategoryManager,
+              tooltip: 'Gestionar carpetas',
+            ),
             IconButton(
               icon: Icon(Icons.menu, color: iconColor),
               onPressed: _showMenuDialog,
             ),
           ],
         ),
-        body:
-            _buildWebMap(), // Nota: Si quieres filtros en web, deberías pasarlos a este método o poner el Stack aquí.
+        body: _buildWebMap(),
       );
     }
 
@@ -955,7 +1147,7 @@ class _MapScreenState extends State<MapScreen> {
       return Scaffold(
         appBar: AppBar(
           title: Text(
-            'Memory Places',
+            _selectedCategory == 'Todas' ? 'Memory Places' : _selectedCategory,
             style: TextStyle(color: titleColor, fontWeight: FontWeight.bold),
           ),
           backgroundColor: appBarBg,
@@ -966,6 +1158,17 @@ class _MapScreenState extends State<MapScreen> {
                 padding: const EdgeInsets.all(12.0),
                 child: CircularProgressIndicator(color: pinkPrimary),
               ),
+            if (_selectedCategory != 'Todas')
+              IconButton(
+                icon: const Icon(Icons.edit, color: pinkPrimary),
+                onPressed: () => _showCategoryOptions(_selectedCategory),
+                tooltip: 'Opciones de carpeta',
+              ),
+            IconButton(
+              icon: Icon(Icons.folder, color: iconColor),
+              onPressed: _openCategoryManager,
+              tooltip: 'Gestionar carpetas',
+            ),
             IconButton(
               icon: Icon(Icons.menu, color: iconColor),
               onPressed: _showMenuDialog,
@@ -974,7 +1177,6 @@ class _MapScreenState extends State<MapScreen> {
         ),
         body: Stack(
           children: [
-            // Mapa
             GoogleMap(
               initialCameraPosition: const CameraPosition(
                 target: LatLng(40.4168, -3.7038),
@@ -986,7 +1188,7 @@ class _MapScreenState extends State<MapScreen> {
                 if (widget.onMapCreatedCallback != null) {
                   widget.onMapCreatedCallback!(controller);
                 }
-                _loadMemories(); // Carga inicial con filtros
+                _loadMemories();
               },
               onCameraMove: (position) {
                 _currentCameraPosition = position.target;
@@ -994,7 +1196,6 @@ class _MapScreenState extends State<MapScreen> {
                   widget.onCameraMoveCallback!(position.target);
                 }
               },
-              // Usamos _markers (que ya vienen filtrados por _loadMemories)
               markers: _markers,
               onLongPress: (position) {
                 if (widget.onLongPressCallback != null) {
@@ -1012,11 +1213,7 @@ class _MapScreenState extends State<MapScreen> {
               zoomGesturesEnabled: true,
               tiltGesturesEnabled: true,
             ),
-
-            // Filtros
             _buildFiltersOverlay(),
-
-            // Indicador de carga
             if (_isLoading)
               const Center(
                 child: CircularProgressIndicator(color: pinkPrimary),
@@ -1055,5 +1252,6 @@ class _MapScreenState extends State<MapScreen> {
       zoomControlsEnabled: false,
       myLocationButtonEnabled: false,
     );
-  }
-}
+  } // ← CIERRA EL MÉTODO build
+
+} // ← CIERRA LA CLASE _MapScreenState

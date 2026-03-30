@@ -5,6 +5,7 @@ import '../providers/theme_provider.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
 import '../constants/colors.dart';
+import 'change_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -94,8 +95,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.all(8.0),
                   child: formulario(themeProvider),
                 ),
+
+                const SizedBox(height: 15), //MIRAR SI SE HA CAMBIADO BIEN EL ESPACIO
+
                 botonLogin(),
                 const SizedBox(height: 20),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton(
+                      onPressed: _isLoading ? null : () {
+                        authProvider.clearError(); // Limpiar errores antes de navegar
+                        //Navigator.push(
+                       //context,
+                       //   MaterialPageRoute(
+                         //   builder: (context) => change_password_screen(),
+                        //  ),
+                      //  );
+                      },
+                      child: const Text(
+                        '¿Olvidaste tu contraseña?',
+                        style: TextStyle(color: pinkAccent, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -228,6 +254,18 @@ class _LoginScreenState extends State<LoginScreen> {
       },
     );
   }
+
+
+
+
+
+
+
+
+
+
+
+
 
   Widget botonLogin() {
     return FractionallySizedBox(

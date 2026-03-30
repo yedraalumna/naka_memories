@@ -19,6 +19,7 @@ class MemoryForm extends StatefulWidget {
   final Memory? existingMemory;
   final Function(Memory) onSave;
   final Function() onCancel;
+  final Function()? onCategoriesChanged;
 
   const MemoryForm({
     super.key,
@@ -26,6 +27,7 @@ class MemoryForm extends StatefulWidget {
     this.existingMemory,
     required this.onSave,
     required this.onCancel,
+    this.onCategoriesChanged,
   });
 
   @override
@@ -54,6 +56,9 @@ class _MemoryFormState extends State<MemoryForm> {
 
   late LatLng _currentFormLocation; // Para poder actualizar la ubicación
 
+  List<String> _categories = [];
+  bool _isLoadingCategories = true;
+
   final List<String> _availableAssets = [
     'assets/images/gato.jpg',
     'assets/images/perro.jpg',
@@ -64,36 +69,18 @@ class _MemoryFormState extends State<MemoryForm> {
   @override
   void initState() {
     super.initState();
+    _currentFormLocation = widget.location;
+    _loadCategories(); // Esto cargará las categorías y luego llamará a _initializeFormData
+  }
 
-    _currentFormLocation = widget.location; // Guardamos la ubicación inicial
-
-    // 1. Obtenemos la lista de categorías del Provider (listen: false es obligatorio en initState)
-    final categoryProvider =
-        Provider.of<CategoryProvider>(context, listen: false);
-    final currentCategories = categoryProvider.categories;
-
-    // 2. Inicializamos un valor por defecto seguro por si es un nuevo recuerdo
-    if (currentCategories.isNotEmpty) {
-      _selectedCategory = currentCategories.first;
-    } else {
-      _selectedCategory =
-          'General'; // Respaldo en caso de que la lista esté vacía
-    }
-
+    void _initializeFormData() {
     if (widget.existingMemory != null) {
       _titleController.text = widget.existingMemory!.title;
       _descriptionController.text = widget.existingMemory!.description;
       _dateController.text = widget.existingMemory!.date;
       _selectedAsset = widget.existingMemory!.imageAsset;
-
-      // 3. Verificamos contra la lista dinámica del Provider
-      if (currentCategories.contains(widget.existingMemory!.category)) {
-        _selectedCategory = widget.existingMemory!.category;
-        _isCustomCategory = false;
-      } else {
-        _isCustomCategory = true;
-        _customCategoryController.text = widget.existingMemory!.category;
-      }
+      _selectedCategory = widget.existingMemory!.category;
+      _isCustomCategory = false;
 
       if (_selectedAsset != null && _selectedAsset!.endsWith('.mp4')) {
         _isVideo = true;
@@ -101,6 +88,30 @@ class _MemoryFormState extends State<MemoryForm> {
     } else {
       _dateController.text = DateTime.now().toString().split(' ')[0];
       _selectedAsset = _availableAssets[0];
+      if (_categories.isNotEmpty) {
+        _selectedCategory = _categories.first;
+      }
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    setState(() => _isLoadingCategories = true);
+    try {
+      final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+      await categoryProvider.loadCategories();
+      
+      setState(() {
+        _categories = List.from(categoryProvider.categories);
+        _isLoadingCategories = false;
+        _initializeFormData();
+      });
+    } catch (e) {
+      print('Error cargando categorías: $e');
+      setState(() {
+        _categories = ['General'];
+        _isLoadingCategories = false;
+        _initializeFormData();
+      });
     }
   }
 
@@ -718,9 +729,18 @@ class _MemoryFormState extends State<MemoryForm> {
       }
       finalCategory = customText;
 
-      // ¡NUEVO! Añadimos la categoría localmente al provider para que aparezca la próxima vez
-      Provider.of<CategoryProvider>(context, listen: false)
-          .addCategoryLocally(finalCategory);
+       // Crear la nueva categoría usando el Provider
+      try {
+        final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+        await categoryProvider.createCategory(finalCategory);
+        await _loadCategories(); // Recargar categorías
+        widget.onCategoriesChanged?.call();
+      } catch (e) {
+        print('Error creando categoría: $e');
+        // Si falla, al menos añadirla localmente
+        Provider.of<CategoryProvider>(context, listen: false)
+            .addCategoryLocally(finalCategory);
+      }
     }
 
     setState(() => _isSaving = true);
@@ -826,9 +846,6 @@ class _MemoryFormState extends State<MemoryForm> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
-
-    // Escuchamos los cambios en las categorías
-    final categoryProvider = Provider.of<CategoryProvider>(context);
 
     return Dialog(
       backgroundColor: isDarkMode ? backgroundDark : Colors.white,
@@ -1040,10 +1057,8 @@ class _MemoryFormState extends State<MemoryForm> {
                           onPressed: () {
                             setState(() {
                               _isCustomCategory = false;
-                              // Volvemos a la primera opción de la lista dinámica
-                              if (categoryProvider.categories.isNotEmpty) {
-                                _selectedCategory =
-                                    categoryProvider.categories[0];
+                              if (_categories.isNotEmpty) {
+                                _selectedCategory = _categories.first;
                               } else {
                                 _selectedCategory = 'General';
                               }
@@ -1068,21 +1083,18 @@ class _MemoryFormState extends State<MemoryForm> {
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         // Aseguramos que el valor seleccionado exista en la lista actual
-                        value: categoryProvider.categories
-                                .contains(_selectedCategory)
+                          value: _categories.contains(_selectedCategory)
                             ? _selectedCategory
-                            : (categoryProvider.categories.isNotEmpty
-                                ? categoryProvider.categories.first
-                                : null),
-                        isExpanded: true,
-                        itemHeight:
+                            : (_categories.isNotEmpty ? _categories.first : null),
+                            isExpanded: true,
+                            itemHeight:
                             60, // Altura ampliada para facilitar el toque
                         dropdownColor: isDarkMode ? cardDark : Colors.white,
                         icon: const Icon(Icons.arrow_drop_down,
                             color: pinkPrimary, size: 30),
                         items: [
                           // Las categorías desde el Provider
-                          ...categoryProvider.categories.map((String category) {
+                          ..._categories.map((String category) {
                             return DropdownMenuItem<String>(
                               value: category,
                               child: Row(
