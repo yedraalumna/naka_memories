@@ -695,152 +695,156 @@ class _MemoryFormState extends State<MemoryForm> {
   }
 
   Future<void> _saveMemory() async {
-    if (_isSaving) return;
+  if (_isSaving) return;
 
-    final title = _titleController.text.trim();
-    final description = _descriptionController.text.trim();
-    final date = _dateController.text.trim();
+  final title = _titleController.text.trim();
+  final description = _descriptionController.text.trim();
+  final date = _dateController.text.trim();
 
-    // Validaciones básicas
-    if (title.isEmpty || date.isEmpty) {
+  // Validaciones básicas
+  if (title.isEmpty || date.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Por favor, completa los campos obligatorios'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
+  }
+
+  // LÓGICA DE CATEGORÍA: Determinar cuál usar
+  String finalCategory = _selectedCategory;
+  bool isProtected = false;
+  String? passwordHash = null;
+
+  if (_isCustomCategory) {
+    final customText = _customCategoryController.text.trim();
+    if (customText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Por favor, completa los campos obligatorios'),
+          content: Text('Por favor, escribe un nombre para la nueva categoría'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
+  
+    finalCategory = customText;
+    isProtected = false; // Las nuevas categorías no tienen PIN por defecto
+    passwordHash = null;
 
-    // LÓGICA DE CATEGORÍA: Determinar cuál usar
-    String finalCategory = _selectedCategory;
-
-    if (_isCustomCategory) {
-      final customText = _customCategoryController.text.trim();
-      if (customText.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Por favor, escribe un nombre para la nueva categoría'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-      finalCategory = customText;
-
-       // Crear la nueva categoría usando el Provider
-      try {
-        final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
-        await categoryProvider.createCategory(finalCategory);
-        await _loadCategories(); // Recargar categorías
-        widget.onCategoriesChanged?.call();
-      } catch (e) {
-        print('Error creando categoría: $e');
-        // Si falla, al menos añadirla localmente
-        Provider.of<CategoryProvider>(context, listen: false)
-            .addCategoryLocally(finalCategory);
-      }
-    }
-
-    setState(() => _isSaving = true);
-
+    // Crear la nueva categoría usando el Provider
     try {
-      // Determinar qué ubicación usar
-      double latitude, longitude;
-
-      // Verificar si el usuario ha modificado la ubicación manualmente
-      bool ubicacionModificada =
-          _currentFormLocation.latitude != widget.location.latitude ||
-              _currentFormLocation.longitude != widget.location.longitude;
-
-      if (ubicacionModificada) {
-        // El usuario cambió la ubicación manualmente - PRIORIDAD MÁXIMA
-        latitude = _currentFormLocation.latitude;
-        longitude = _currentFormLocation.longitude;
-        print('Usando ubicación manual: $latitude, $longitude');
-      } else if (_usePhotoLocation &&
-          _photoLatitude != null &&
-          _photoLongitude != null) {
-        // Usar ubicación de la foto
-        latitude = _photoLatitude!;
-        longitude = _photoLongitude!;
-        print('Usando ubicación actual: $latitude, $longitude');
-      } else {
-        // Usar ubicación del formulario
-        latitude = _currentFormLocation.latitude;
-        longitude = _currentFormLocation.longitude;
-        print('Usando ubicación del formulario: $latitude, $longitude');
-      }
-
-      // 3. Crear el objeto Memory con la categoría correcta
-      Memory memoryToSave = Memory(
-        id: widget.existingMemory?.id ?? '',
-        title: title,
-        description: description,
-        date: date,
-        location: {
-          'latitude': latitude,
-          'longitude': longitude,
-        },
-        imageAsset: _selectedAsset,
-        category: finalCategory,
-      );
-
-      Memory finalMemory; // Aquí se guarda la ver final sincronizada
-
-      // Lógica de guardado según el tipo de archivo (Imagen/Video/Nada)
-      if (_selectedBytes != null && _selectedBytes!.isNotEmpty) {
-        if (_isVideo) {
-          print('Subiendo video...');
-          finalMemory = await _memoryService.saveMemoryWithVideo(
-            memory: memoryToSave,
-            videoBytes: _selectedBytes!,
-          );
-        } else {
-          print('Subiendo imagen...');
-          // Guardamos y obtenemos el ID
-          final savedId = await _memoryService.saveMemoryWithImage(
-            memory: memoryToSave,
-            imageBytes: _selectedBytes!,
-          );
-
-          // Recuperamos el objeto actualizado (con la URL de Supabase) usando el ID
-          final memories = await _memoryService.getMemories();
-          finalMemory = memories.firstWhere((m) => m.id == savedId);
-        }
-      } else {
-        // Guardado simple (sin cambio de archivo multimedia)
-        await _memoryService.saveMemory(memoryToSave);
-        finalMemory = memoryToSave;
-      }
-
-      // Notificar éxito y cerrar
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Recuerdo guardado correctamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Devolvemos el recuerdo final al padre (MapScreen) para actualizar la UI
-        widget.onSave(finalMemory);
-      }
+      final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+      await categoryProvider.createCategory(finalCategory);
+      await _loadCategories(); // Recargar categorías
+      widget.onCategoriesChanged?.call();
     } catch (e) {
-      print('Error guardando recuerdo: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al guardar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+      print('Error creando categoría: $e');
+      // Si falla, al menos añadirla localmente
+      Provider.of<CategoryProvider>(context, listen: false)
+          .addCategoryLocally(finalCategory);
     }
+  } else {
+    // Verificar si la categoría seleccionada está protegida
+    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+    isProtected = categoryProvider.isCategoryProtected(finalCategory);
+    passwordHash = isProtected ? categoryProvider.getPasswordHash(finalCategory) : null;
+
+      print('🔒 Categoría: $finalCategory');
+      print('🔒 ¿Está protegida? $isProtected');
+      print('🔒 Hash: $passwordHash');
   }
+
+  setState(() => _isSaving = true);
+
+  try {
+    // Determinar qué ubicación usar
+    double latitude, longitude;
+
+    bool ubicacionModificada =
+        _currentFormLocation.latitude != widget.location.latitude ||
+            _currentFormLocation.longitude != widget.location.longitude;
+
+    if (ubicacionModificada) {
+      latitude = _currentFormLocation.latitude;
+      longitude = _currentFormLocation.longitude;
+      print('Usando ubicación manual: $latitude, $longitude');
+    } else if (_usePhotoLocation &&
+        _photoLatitude != null &&
+        _photoLongitude != null) {
+      latitude = _photoLatitude!;
+      longitude = _photoLongitude!;
+      print('Usando ubicación actual: $latitude, $longitude');
+    } else {
+      latitude = _currentFormLocation.latitude;
+      longitude = _currentFormLocation.longitude;
+      print('Usando ubicación del formulario: $latitude, $longitude');
+    }
+
+    // 3. Crear el objeto Memory con la categoría correcta
+    Memory memoryToSave = Memory(
+      id: widget.existingMemory?.id ?? '',
+      title: title,
+      description: description,
+      date: date,
+      location: {
+        'latitude': latitude,
+        'longitude': longitude,
+      },
+      imageAsset: _selectedAsset,
+      category: finalCategory,
+      hasPassword: isProtected,  // ← CORRECTO
+      passwordHash: passwordHash, // ← CORRECTO
+    );
+
+    Memory finalMemory;
+
+    // Lógica de guardado según el tipo de archivo
+    if (_selectedBytes != null && _selectedBytes!.isNotEmpty) {
+      if (_isVideo) {
+        print('Subiendo video...');
+        finalMemory = await _memoryService.saveMemoryWithVideo(
+          memory: memoryToSave,
+          videoBytes: _selectedBytes!,
+        );
+      } else {
+        print('Subiendo imagen...');
+        final savedId = await _memoryService.saveMemoryWithImage(
+          memory: memoryToSave,
+          imageBytes: _selectedBytes!,
+        );
+        final memories = await _memoryService.getMemories();
+        finalMemory = memories.firstWhere((m) => m.id == savedId);
+      }
+    } else {
+      await _memoryService.saveMemory(memoryToSave);
+      finalMemory = memoryToSave;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Recuerdo guardado correctamente'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      widget.onSave(finalMemory);
+    }
+  } catch (e) {
+    print('Error guardando recuerdo: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al guardar: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  } finally {
+    if (mounted) setState(() => _isSaving = false);
+  }
+}
 
   @override
   Widget build(BuildContext context) {

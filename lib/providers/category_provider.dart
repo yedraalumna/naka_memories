@@ -1,99 +1,159 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/Memory.dart';
 import '../services/MemoryService.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CategoryProvider with ChangeNotifier {
   final MemoryService _memoryService = MemoryService();
   
-  List<String> _categories = [];
+  List<String> _categories = ['General'];
   bool _isLoading = false;
+  
+  // Almacena los hashes de las categorías protegidas
+  Map<String, String?> _categoryPasswords = {};
+  
+  // Clave para SharedPreferences
+  static const String _passwordsKey = 'category_passwords';
 
   List<String> get categories => _categories;
   bool get isLoading => _isLoading;
 
-  // Categorías predeterminadas
-  static const List<String> defaultCategories = [
-    'General',
-    'Viajes',
-    'Amigos',
-    'Familia',
-    'Comida',
-    'Estudio',
-  ];
-
   // Constructor
   CategoryProvider() {
+    _loadPasswords(); // Cargar los PINs guardados
     loadCategories();
   }
 
-  // Cargar categorías desde MemoryService
+  // Cargar los PINs desde SharedPreferences
+  Future<void> _loadPasswords() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final passwordsJson = prefs.getString(_passwordsKey);
+      if (passwordsJson != null) {
+        final Map<String, dynamic> decoded = Map<String, dynamic>.from(
+          jsonDecode(passwordsJson) as Map
+        );
+        _categoryPasswords = decoded.map((key, value) => MapEntry(key, value as String?));
+      }
+    } catch (e) {
+      print('Error cargando contraseñas: $e');
+    }
+  }
+
+  // Guardar los PINs en SharedPreferences
+  Future<void> _savePasswords() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final passwordsJson = jsonEncode(_categoryPasswords);
+      await prefs.setString(_passwordsKey, passwordsJson);
+    } catch (e) {
+      print('Error guardando contraseñas: $e');
+    }
+  }
+
+  /// Verifica si una categoría está protegida con PIN
+  bool isCategoryProtected(String categoryName) {
+    return _categoryPasswords.containsKey(categoryName) && 
+           _categoryPasswords[categoryName] != null &&
+           _categoryPasswords[categoryName]!.isNotEmpty;
+  }
+
+  /// Obtiene el hash de la contraseña de una categoría
+  String? getPasswordHash(String categoryName) {
+    return _categoryPasswords[categoryName];
+  }
+
+  /// Establece o elimina la protección de una categoría
+  Future<void> setCategoryPassword(String categoryName, String? passwordHash) async {
+    if (passwordHash == null || passwordHash.isEmpty) {
+      _categoryPasswords.remove(categoryName);
+    } else {
+      _categoryPasswords[categoryName] = passwordHash;
+    }
+    await _savePasswords();
+    notifyListeners();
+  }
+
+  /// CARGAR CATEGORÍAS: Solo trae las que existen en la base de datos
   Future<void> loadCategories() async {
     _isLoading = true;
     notifyListeners();
-
+    
     try {
-      // Obtener categorías existentes de los recuerdos
-      final categoriesFromDb = await _memoryService.getAllCategories();
+      final dbCategories = await _memoryService.getAllCategories();
+      final Set<String> allCategories = {'General'};
+      allCategories.addAll(dbCategories);
       
-      // Asegurar que las categorías predeterminadas estén presentes
-      final Set<String> uniqueCategories = Set<String>.from(categoriesFromDb);
+      List<String> result = allCategories.toList();
+      result.sort();
+      result.remove('General');
+      result.insert(0, 'General');
       
-      for (var defaultCat in defaultCategories) {
-        if (!uniqueCategories.contains(defaultCat)) {
-          uniqueCategories.add(defaultCat);
-        }
-      }
-      
-      _categories = uniqueCategories.toList();
-      _categories.sort();
-      
-      // Asegurar que "General" sea la primera
-      _categories.remove('General');
-      _categories.insert(0, 'General');
-      
+      _categories = result;
     } catch (e) {
       print('Error cargando categorías: $e');
-      _categories = List.from(defaultCategories);
+      _categories = ['General'];
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Crear nueva categoría
+  /// CREAR CATEGORÍA
   Future<void> createCategory(String categoryName, {String? memoryId}) async {
     if (categoryName.isEmpty) return;
-    if (_categories.contains(categoryName)) return;
     
     try {
+      if (!_categories.contains(categoryName)) {
+        _categories.add(categoryName);
+        _categories.sort();
+        _categories.remove('General');
+        _categories.insert(0, 'General');
+        notifyListeners();
+      }
+      
       await _memoryService.createCategory(categoryName, memoryId: memoryId);
-      await loadCategories(); // Recargar después de crear
+      await loadCategories(); 
     } catch (e) {
       print('Error creando categoría: $e');
-      // Fallback: añadir localmente
-      addCategoryLocally(categoryName);
-      rethrow;
     }
   }
 
-  // Renombrar categoría
+  /// RENOMBRAR CATEGORÍA
   Future<void> renameCategory(String oldName, String newName) async {
-    if (oldName == newName) return;
-    if (oldName.isEmpty || newName.isEmpty) return;
-    if (oldName == 'General') {
-      throw Exception('No se puede renombrar la categoría "General"');
-    }
+    if (oldName == 'General' || oldName == newName) return;
     
     try {
       await _memoryService.renameCategory(oldName, newName);
-      await loadCategories(); // Recargar después de renombrar
+      
+      // Actualizar el hash si existe
+      if (_categoryPasswords.containsKey(oldName)) {
+        final hash = _categoryPasswords[oldName];
+        _categoryPasswords.remove(oldName);
+        if (hash != null) {
+          _categoryPasswords[newName] = hash;
+        }
+        await _savePasswords();
+      }
+      
+      final index = _categories.indexOf(oldName);
+      if (index != -1) {
+        _categories[index] = newName;
+        _categories.sort();
+        _categories.remove('General');
+        _categories.insert(0, 'General');
+        notifyListeners();
+      }
+      
+      await loadCategories();
     } catch (e) {
-      print('Error renombrando categoría: $e');
+      print("Error al renombrar: $e");
       rethrow;
     }
   }
 
-  // Eliminar categoría
+  /// ELIMINAR CATEGORÍA
   Future<void> deleteCategory(String categoryName) async {
     if (categoryName == 'General') {
       throw Exception('No se puede eliminar la categoría "General"');
@@ -101,37 +161,39 @@ class CategoryProvider with ChangeNotifier {
     
     try {
       await _memoryService.deleteCategory(categoryName);
-      await loadCategories(); // Recargar después de eliminar
-    } catch (e) {
-      print('Error eliminando categoría: $e');
-      rethrow;
-    }
-  }
-
-  // Restaurar categorías predeterminadas
-  Future<void> restoreDefaultCategories() async {
-    try {
-      await _memoryService.restoreDefaultCategories();
+      
+      // Eliminar el hash si existe
+      _categoryPasswords.remove(categoryName);
+      await _savePasswords();
+      
+      _categories.remove(categoryName);
+      notifyListeners();
       await loadCategories();
     } catch (e) {
-      print('Error restaurando categorías: $e');
+      print("Error al borrar categoría: $e");
       rethrow;
     }
   }
 
-  // Añadir categoría localmente (para UI rápida)
+  /// RESTAURAR CATEGORÍAS
+  Future<void> restoreDefaultCategories() async {
+    print("Las categorías predeterminadas fijas han sido desactivadas.");
+    await loadCategories();
+  }
+
+  /// AÑADIR LOCALMENTE
   void addCategoryLocally(String newCategory) {
+    if (newCategory.isEmpty) return;
     if (!_categories.contains(newCategory)) {
       _categories.add(newCategory);
       _categories.sort();
-      // Asegurar que "General" sea la primera
       _categories.remove('General');
       _categories.insert(0, 'General');
       notifyListeners();
     }
   }
 
-  // Sincronizar con cambios externos
+  // sincronizar categorías
   Future<void> syncCategories() async {
     await loadCategories();
   }

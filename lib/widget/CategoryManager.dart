@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../constants/colors.dart';
-import '../models/Memory.dart';
-import '../services/MemoryService.dart';
+import '../providers/category_provider.dart';
 import '../providers/theme_provider.dart';
 
 class CategoryManager extends StatefulWidget {
@@ -13,8 +12,6 @@ class CategoryManager extends StatefulWidget {
 }
 
 class _CategoryManagerState extends State<CategoryManager> {
-  final MemoryService _memoryService = MemoryService();
-  List<String> _categories = [];
   bool _isLoading = true;
   bool _showDefaultHint = true;
 
@@ -27,11 +24,9 @@ class _CategoryManagerState extends State<CategoryManager> {
   Future<void> _loadCategories() async {
     setState(() => _isLoading = true);
     try {
-      final categories = await _memoryService.getAllCategories();
-      setState(() {
-        _categories = categories;
-        _isLoading = false;
-      });
+      final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+      await categoryProvider.loadCategories();
+      setState(() => _isLoading = false);
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('Error al cargar carpetas: $e');
@@ -89,7 +84,8 @@ class _CategoryManagerState extends State<CategoryManager> {
     if (result != null) {
       setState(() => _isLoading = true);
       try {
-        await _memoryService.createCategory(result);
+        final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+        await categoryProvider.createCategory(result);
         await _loadCategories();
         _showSuccess('Carpeta "$result" creada');
       } catch (e) {
@@ -100,65 +96,66 @@ class _CategoryManagerState extends State<CategoryManager> {
   }
 
   Future<void> _renameCategory(String oldName) async {
-    final TextEditingController controller = TextEditingController(text: oldName);
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final isDarkMode = themeProvider.isDarkMode;
+  final TextEditingController controller = TextEditingController(text: oldName);
+  final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+  final isDarkMode = themeProvider.isDarkMode;
 
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDarkMode ? cardDark : Colors.white,
-        title: const Text('Renombrar Carpeta'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: TextStyle(
-            color: isDarkMode ? textDarkMode : Colors.black87,
+  final result = await showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: isDarkMode ? cardDark : Colors.white,
+      title: const Text('Renombrar Carpeta'),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        style: TextStyle(
+          color: isDarkMode ? textDarkMode : Colors.black87,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Nuevo nombre',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
           ),
-          decoration: InputDecoration(
-            hintText: 'Nuevo nombre',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: pinkPrimary, width: 2),
-            ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: pinkPrimary, width: 2),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final newName = controller.text.trim();
-              if (newName.isNotEmpty && newName != oldName) {
-                Navigator.pop(context, newName);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: pinkPrimary,
-            ),
-            child: const Text('Renombrar'),
-          ),
-        ],
       ),
-    );
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final newName = controller.text.trim();
+            if (newName.isNotEmpty && newName != oldName) {
+              Navigator.pop(context, newName);
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: pinkPrimary,
+          ),
+          child: const Text('Renombrar'),
+        ),
+      ],
+    ),
+  );
 
-    if (result != null) {
-      setState(() => _isLoading = true);
-      try {
-        await _memoryService.renameCategory(oldName, result);
-        await _loadCategories();
-        _showSuccess('Carpeta renombrada: $oldName → $result');
-      } catch (e) {
-        _showError('Error al renombrar: $e');
-        setState(() => _isLoading = false);
-      }
+  if (result != null) {
+    setState(() => _isLoading = true);
+    try {
+      final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+      await categoryProvider.renameCategory(oldName, result);
+      _showSuccess('Carpeta renombrada: $oldName → $result');
+    } catch (e) {
+      _showError('Error al renombrar: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
+}
 
   Future<void> _deleteCategory(String categoryName) async {
     if (categoryName == 'General') {
@@ -168,12 +165,6 @@ class _CategoryManagerState extends State<CategoryManager> {
 
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDarkMode = themeProvider.isDarkMode;
-    
-    // Verificar si es una categoría predeterminada
-    final isDefault = false;
-    final warningMessage = isDefault
-        ? '⚠️ Esta es una carpeta predeterminada.\n\n'
-        : '';
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -181,7 +172,7 @@ class _CategoryManagerState extends State<CategoryManager> {
         backgroundColor: isDarkMode ? cardDark : Colors.white,
         title: const Text('Eliminar Carpeta'),
         content: Text(
-          '${warningMessage}¿Estás seguro de eliminar la carpeta "$categoryName"?\n\n'
+          '¿Estás seguro de eliminar la carpeta "$categoryName"?\n\n'
           'Todos los recuerdos de esta carpeta se moverán a "General".',
         ),
         actions: [
@@ -203,7 +194,8 @@ class _CategoryManagerState extends State<CategoryManager> {
     if (confirm == true) {
       setState(() => _isLoading = true);
       try {
-        await _memoryService.deleteCategory(categoryName);
+        final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+        await categoryProvider.deleteCategory(categoryName);
         await _loadCategories();
         _showSuccess('Carpeta "$categoryName" eliminada');
       } catch (e) {
@@ -237,6 +229,7 @@ class _CategoryManagerState extends State<CategoryManager> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
+    final categoryProvider = Provider.of<CategoryProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -248,7 +241,6 @@ class _CategoryManagerState extends State<CategoryManager> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          // Botón opcional para restaurar categorías predeterminadas
           IconButton(
             icon: Icon(Icons.restore, color: pinkPrimary),
             onPressed: () => _showRestoreDialog(),
@@ -256,7 +248,7 @@ class _CategoryManagerState extends State<CategoryManager> {
           ),
         ],
       ),
-      body: _isLoading
+      body: categoryProvider.isLoading || _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: pinkPrimary),
             )
@@ -277,8 +269,8 @@ class _CategoryManagerState extends State<CategoryManager> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Las carpetas predeterminadas también se pueden editar o eliminar. '
-                            'Puedes restaurarlas desde el menú superior.',
+                            'Puedes crear, editar o eliminar carpetas.\n'
+                            'Las carpetas predeterminadas también se pueden eliminar.',
                             style: TextStyle(
                               fontSize: 12,
                               color: isDarkMode ? textDarkMode : Colors.black87,
@@ -293,7 +285,7 @@ class _CategoryManagerState extends State<CategoryManager> {
                     ),
                   ),
                 Expanded(
-                  child: _categories.isEmpty
+                  child: categoryProvider.categories.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -324,11 +316,10 @@ class _CategoryManagerState extends State<CategoryManager> {
                         )
                       : ListView.builder(
                           padding: const EdgeInsets.all(16),
-                          itemCount: _categories.length,
+                          itemCount: categoryProvider.categories.length,
                           itemBuilder: (context, index) {
-                            final category = _categories[index];
+                            final category = categoryProvider.categories[index];
                             final isGeneral = category == 'General';
-                            final isDefault = false;
                             
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -354,53 +345,23 @@ class _CategoryManagerState extends State<CategoryManager> {
                                     size: 24,
                                   ),
                                 ),
-                                title: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        category,
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                          color: isDarkMode ? textDarkMode : Colors.black87,
-                                        ),
-                                      ),
-                                    ),
-                                    if (isDefault)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: Colors.orange.withOpacity(0.5),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'Predeterminada',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.orange[700],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                                title: Text(
+                                  category,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDarkMode ? textDarkMode : Colors.black87,
+                                  ),
                                 ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // Botón Renombrar (excepto para General)
                                     if (!isGeneral)
                                       IconButton(
                                         icon: const Icon(Icons.edit, color: Colors.blue),
                                         onPressed: () => _renameCategory(category),
                                         tooltip: 'Renombrar',
                                       ),
-                                    // Botón Eliminar (excepto para General)
                                     if (!isGeneral)
                                       IconButton(
                                         icon: const Icon(Icons.delete, color: Colors.red),
@@ -434,11 +395,10 @@ class _CategoryManagerState extends State<CategoryManager> {
       builder: (context) => AlertDialog(
         backgroundColor: isDarkMode ? cardDark : Colors.white,
         title: const Text('Restaurar Carpetas Predeterminadas'),
-        content: Text(
+        content: const Text(
           '¿Quieres restaurar las carpetas predeterminadas?\n\n'
-          'Carpetas a restaurar:\nGeneral\nViajes\nAmigos\nFamilia\nComida\nEstudio\n\n'
-          'Nota: Esto NO eliminará tus carpetas personalizadas, '
-          'solo añadirá las que falten.',
+          'Esto añadirá: Viajes, Amigos, Familia, Comida, Estudio\n\n'
+          'Nota: NO se eliminarán tus carpetas personalizadas.',
         ),
         actions: [
           TextButton(
@@ -459,11 +419,12 @@ class _CategoryManagerState extends State<CategoryManager> {
     if (confirm == true) {
       setState(() => _isLoading = true);
       try {
-        await _memoryService.restoreDefaultCategories();
-        await _loadCategories();
+        final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+        await categoryProvider.restoreDefaultCategories();
         _showSuccess('Carpetas predeterminadas restauradas');
       } catch (e) {
         _showError('Error al restaurar: $e');
+      } finally {
         setState(() => _isLoading = false);
       }
     }

@@ -25,6 +25,7 @@ import '../services/pdfService.dart';
 import '../providers/app_auth_provider.dart'; 
 import '../widget/pin_dialog.dart';
 import '../widget/CategoryManager.dart';
+import '../providers/category_provider.dart';
 
 class MapScreen extends StatefulWidget {
   final bool isLibrary;
@@ -191,14 +192,19 @@ class _MapScreenState extends State<MapScreen> {
     if (result != null) {
       setState(() => _isLoading = true);
       try {
-        await _memoryService.renameCategory(oldName, result);
+        // LLAMA AL PROVIDER, NO AL SERVICE DIRECTAMENTE
+        final catProvider = Provider.of<CategoryProvider>(context, listen: false);
+        await catProvider.renameCategory(oldName, result);
+        
         setState(() {
-          _selectedCategory = result;
+          _selectedCategory = result; // Actualizamos la selección al nuevo nombre
         });
-        await _loadMemories();
-        _showSnackbar('Carpeta renombrada: $oldName → $result');
+        
+        await _loadMemories(); // Esto ahora cargará las categorías correctas
+        _showSnackbar('Carpeta actualizada con éxito');
       } catch (e) {
-        _showSnackbar('Error al renombrar: $e', isError: true);
+        _showSnackbar('Error: $e', isError: true);
+      } finally {
         setState(() => _isLoading = false);
       }
     }
@@ -453,43 +459,31 @@ class _MapScreenState extends State<MapScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // 1. Cargamos las categorías reales desde el Provider
+      final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+      await categoryProvider.loadCategories(); 
+
+      // 2. Cargamos todos los recuerdos desde el Service
       final allMemories = await _memoryService.getMemories();
 
-      // Logica de categorias
-      // Las predefinidias
-      Set<String> uniqueCategories = Set.from(Memory.categoriesList);
-
-      // Se añaden las que vengan de los recuerdos
-      for (var m in allMemories) {
-        if (m.category.isNotEmpty) {
-          uniqueCategories.add(m.category);
-        }
-      }
-
-      // Se guardan en la lista
-      _dynamicCategories = uniqueCategories.toList();
-
+      // 3. Filtramos la lista según la categoría seleccionada
       final filteredList = _selectedCategory == 'Todas'
           ? allMemories
           : allMemories.where((m) => m.category == _selectedCategory).toList();
 
-      // Creamos los marcadores SOLO para la lista filtrada
+      // 4. Creamos los marcadores para la lista filtrada
       Set<Marker> newMarkers = {};
-
       for (var memory in filteredList) {
         try {
-          // Generamos el icono personalizado (foto o default)
           final icon = await _getMarkerIconSquare(memory.imageAsset);
-
           newMarkers.add(
             Marker(
               markerId: MarkerId(memory.id),
               position: memory.toLatLng,
               icon: icon,
-              anchor: const Offset(0.5, 0.5), // Centramos el icono
+              anchor: const Offset(0.5, 0.5),
               infoWindow: InfoWindow(
                 title: memory.title,
-                // Mostramos la categoría en el subtítulo del marcador
                 snippet: memory.category,
                 onTap: () => _showMemoryDetails(memory),
               ),
@@ -497,20 +491,18 @@ class _MapScreenState extends State<MapScreen> {
             ),
           );
         } catch (e) {
-          debugPrint(
-              "Error creando marcador individual para ${memory.title}: $e");
-          // Si falla un marcador específico, el bucle continúa con los demás
+          debugPrint("Error marcador: $e");
         }
       }
 
-      // Actualizamos el estado
+      // 5. Actualizamos el estado con los datos del Provider
       setState(() {
         _memories = allMemories;
         _markers = newMarkers;
+        _dynamicCategories = categoryProvider.categories; // <--- USA LAS DEL PROVIDER
         _isLoading = false;
       });
     } catch (e) {
-      // Manejo de errores general
       setState(() => _isLoading = false);
       _showErrorDialog('Error al cargar recuerdos: $e');
     }
@@ -713,97 +705,109 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _gestionarPdf() async {
-    final List<Memory> listaCopia = List.from(_memories);
-    final auth = Provider.of<AppAuthProvider>(context, listen: false);
-    final userName = auth.userMetadata?['full_name'] ?? auth.user?.email ?? 'Usuario';
+  final List<Memory> listaCopia = List.from(_memories);
+  final auth = Provider.of<AppAuthProvider>(context, listen: false);
+  final userName = auth.userMetadata?['full_name'] ?? auth.user?.email ?? 'Usuario';
 
-    if (listaCopia.isEmpty) {
-      _showSnackbar('No hay recuerdos para exportar', isError: true);
-      return;
+  if (listaCopia.isEmpty) {
+    _showSnackbar('No hay recuerdos para exportar', isError: true);
+    return;
+  }
+
+  final bool tienePrivados = listaCopia.any((m) => m.hasPassword);
+
+  if (!tienePrivados) {
+    PdfService().generarPdf(listaCopia, userName);
+    return;
+  }
+
+  // Preguntamos si incluir privados
+  final bool? incluirPrivados = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Contenido Protegido'),
+      content: const Text('¿Deseas incluir los recuerdos de tus carpetas protegidas en el PDF?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('No, omitirlos'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Sí, incluir'),
+        ),
+      ],
+    ),
+  );
+
+  if (!mounted || incluirPrivados == null) return;
+
+  if (!incluirPrivados) {
+  final soloPublicos = listaCopia.where((m) => !m.hasPassword).toList();
+  
+  print('📊 ==== DEPURACIÓN PDF ====');
+  print('Total recuerdos: ${listaCopia.length}');
+  print('Privados (hasPassword=true): ${listaCopia.where((m) => m.hasPassword).length}');
+  print('Públicos: ${soloPublicos.length}');
+  
+  for (var m in listaCopia) {
+    if (m.isVideo) {
+      print('🎬 VIDEO: ${m.title} - Carpeta: ${m.category} - hasPassword: ${m.hasPassword}');
     }
+  }
+  
+  if (soloPublicos.isEmpty) {
+    _showSnackbar('No hay recuerdos públicos para exportar', isError: true);
+  } else {
+    PdfService().generarPdf(soloPublicos, userName);
+  }
+  return;
+}
 
-    final bool tienePrivados = listaCopia.any((m) => m.hasPassword);
+  // Incluir privados: pedimos PIN por cada carpeta única
+  final hashes = listaCopia
+      .where((m) => m.hasPassword && m.passwordHash != null)
+      .map((m) => m.passwordHash!)
+      .toSet()
+      .toList();
 
-    if (!tienePrivados) {
-      PdfService().generarPdf(listaCopia, userName);
-      return;
-    }
+  final List<Memory> memoriasVerificadas = listaCopia.where((m) => !m.hasPassword).toList();
 
-    // Preguntamos si incluir privados
-    final bool? incluirPrivados = await showDialog<bool>(
+  for (int i = 0; i < hashes.length; i++) {
+    if (!mounted) return;
+
+    final hashActual = hashes[i];
+    // Buscamos el nombre de la categoría para mostrarlo en el diálogo
+    final memoriaEjemplo = listaCopia.firstWhere((m) => m.passwordHash == hashActual);
+    final nombreCarpeta = memoriaEjemplo.category;
+
+    final bool? pinCorrecto = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Contenido Protegido'),
-        content: const Text('¿Deseas incluir los recuerdos de tus carpetas protegidas en el PDF?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('No, omitirlos'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sí, incluir'),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (ctx) => PinDialog(
+        correctHash: hashActual,
+        titulo: 'PIN de: $nombreCarpeta (${i + 1}/${hashes.length})',
       ),
     );
 
-    if (!mounted || incluirPrivados == null) return;
+    if (!mounted) return;
 
-    if (!incluirPrivados) {
-      final soloPublicos = listaCopia.where((m) => !m.hasPassword).toList();
-      if (soloPublicos.isEmpty) {
-        _showSnackbar('No hay recuerdos públicos para exportar', isError: true);
-      } else {
-        PdfService().generarPdf(soloPublicos, userName);
-      }
-      return;
-    }
-
-    // Incluir privados: pedimos PIN por cada carpeta única
-    final hashes = listaCopia
-        .where((m) => m.hasPassword && m.passwordHash != null)
-        .map((m) => m.passwordHash!)
-        .toSet()
-        .toList();
-
-    final List<Memory> memoriasVerificadas = listaCopia.where((m) => !m.hasPassword).toList();
-
-    for (int i = 0; i < hashes.length; i++) {
-      if (!mounted) return;
-
-      final hashActual = hashes[i];
-      // Buscamos el nombre de la categoría para mostrarlo en el diálogo
-      final memoriaEjemplo = listaCopia.firstWhere((m) => m.passwordHash == hashActual);
-      final nombreCarpeta = memoriaEjemplo.category;
-
-      final bool? pinCorrecto = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => PinDialog(
-          correctHash: hashActual,
-          titulo: 'PIN de: $nombreCarpeta (${i + 1}/${hashes.length})',
-        ),
-      );
-
-      if (!mounted) return;
-
-      if (pinCorrecto == true) {
-        memoriasVerificadas.addAll(
-          listaCopia.where((m) => m.passwordHash == hashActual),
-        );
-      }
-    }
-
-    if (memoriasVerificadas.isEmpty) {
-      _showSnackbar('No se verificó ninguna carpeta', isError: true);
-    } else {
-      // Ordenar por fecha antes de generar (opcional pero recomendado)
-      memoriasVerificadas.sort((a, b) => b.date.compareTo(a.date));
-      PdfService().generarPdf(memoriasVerificadas, userName);
+    if (pinCorrecto == true) {
+      // Añadir TODOS los recuerdos de esta carpeta (incluyendo videos)
+      final recuerdosDeEstaCarpeta = listaCopia.where((m) => m.passwordHash == hashActual).toList();
+      memoriasVerificadas.addAll(recuerdosDeEstaCarpeta);
     }
   }
+
+  if (memoriasVerificadas.isEmpty) {
+    _showSnackbar('No se verificó ninguna carpeta', isError: true);
+  } else {
+    // Ordenar por fecha antes de generar
+    memoriasVerificadas.sort((a, b) => b.date.compareTo(a.date));
+    PdfService().generarPdf(memoriasVerificadas, userName);
+  }
+}
 
   void _onMapLongPress(LatLng position) {
     if (!_isWeb) {
@@ -1098,41 +1102,49 @@ class _MapScreenState extends State<MapScreen> {
     final Color appBarBg = isDarkMode ? backgroundDark : backgroundLight;
     final Color titleColor = isDarkMode ? textDarkMode : textDark;
     final Color iconColor = pinkPrimary;
-    final Color progressColor = pinkPrimary;
+
+    // Función compartida para el AppBar (evita duplicar código)
+    AppBar _buildAppBar() {
+      return AppBar(
+        title: Text(
+          _selectedCategory == 'Todas' ? 'Memory Places' : _selectedCategory,
+          style: TextStyle(color: titleColor, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: appBarBg,
+        elevation: 1,
+        actions: [
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(12.0),
+              child: CircularProgressIndicator(color: pinkPrimary, strokeWidth: 2),
+            ),
+          // Botón de editar (solo si hay categoría seleccionada)
+          if (_selectedCategory != 'Todas')
+            IconButton(
+              icon: const Icon(Icons.edit, color: pinkPrimary),
+              onPressed: () => _showCategoryOptions(_selectedCategory),
+              tooltip: 'Opciones de carpeta',
+            ),
+          // Botón gestor de carpetas
+          IconButton(
+            icon: Icon(Icons.folder, color: iconColor),
+            onPressed: _openCategoryManager,
+            tooltip: 'Gestionar carpetas',
+          ),
+          // Botón menú
+          IconButton(
+            icon: Icon(Icons.menu, color: iconColor),
+            onPressed: _showMenuDialog,
+            tooltip: 'Menú principal',
+          ),
+        ],
+      );
+    }
 
     // Si es web y estamos en modo biblioteca
     if (_isWeb && widget.isLibrary) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text(
-            _selectedCategory == 'Todas' ? 'Memory Places' : _selectedCategory,
-            style: TextStyle(color: titleColor, fontWeight: FontWeight.bold),
-          ),
-          backgroundColor: appBarBg,
-          elevation: 1,
-          actions: [
-            if (_isLoading)
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: CircularProgressIndicator(color: progressColor),
-              ),
-            if (_selectedCategory != 'Todas')
-              IconButton(
-                icon: const Icon(Icons.edit, color: pinkPrimary),
-                onPressed: () => _showCategoryOptions(_selectedCategory),
-                tooltip: 'Opciones de carpeta',
-              ),
-            IconButton(
-              icon: Icon(Icons.folder, color: iconColor),
-              onPressed: _openCategoryManager,
-              tooltip: 'Gestionar carpetas',
-            ),
-            IconButton(
-              icon: Icon(Icons.menu, color: iconColor),
-              onPressed: _showMenuDialog,
-            ),
-          ],
-        ),
+        appBar: _buildAppBar(),
         body: _buildWebMap(),
       );
     }
@@ -1145,36 +1157,7 @@ class _MapScreenState extends State<MapScreen> {
     // Para móvil - Modo biblioteca
     if (widget.isLibrary) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text(
-            _selectedCategory == 'Todas' ? 'Memory Places' : _selectedCategory,
-            style: TextStyle(color: titleColor, fontWeight: FontWeight.bold),
-          ),
-          backgroundColor: appBarBg,
-          elevation: 1,
-          actions: [
-            if (_isLoading)
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: CircularProgressIndicator(color: pinkPrimary),
-              ),
-            if (_selectedCategory != 'Todas')
-              IconButton(
-                icon: const Icon(Icons.edit, color: pinkPrimary),
-                onPressed: () => _showCategoryOptions(_selectedCategory),
-                tooltip: 'Opciones de carpeta',
-              ),
-            IconButton(
-              icon: Icon(Icons.folder, color: iconColor),
-              onPressed: _openCategoryManager,
-              tooltip: 'Gestionar carpetas',
-            ),
-            IconButton(
-              icon: Icon(Icons.menu, color: iconColor),
-              onPressed: _showMenuDialog,
-            ),
-          ],
-        ),
+        appBar: _buildAppBar(),
         body: Stack(
           children: [
             GoogleMap(
@@ -1252,6 +1235,5 @@ class _MapScreenState extends State<MapScreen> {
       zoomControlsEnabled: false,
       myLocationButtonEnabled: false,
     );
-  } // ← CIERRA EL MÉTODO build
-
-} // ← CIERRA LA CLASE _MapScreenState
+  }
+}
