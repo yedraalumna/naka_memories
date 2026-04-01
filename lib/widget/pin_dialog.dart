@@ -90,11 +90,12 @@ class _PinDialogState extends State<PinDialog> {
             obscureText: true,
             animationType: AnimationType.fade,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             pinTheme: PinTheme(
               shape: PinCodeFieldShape.box,
               borderRadius: BorderRadius.circular(8),
               fieldHeight: 50,
-              fieldWidth: 40,
+              fieldWidth: 35,
               activeFillColor: pinkLighter,
               selectedFillColor: Colors.white,
               inactiveFillColor: Colors.grey.shade100,

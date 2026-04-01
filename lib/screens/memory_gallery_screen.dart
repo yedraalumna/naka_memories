@@ -19,7 +19,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../widget/MemoryForm.dart';
 
-
 class MemoryGalleryScreen extends StatefulWidget {
   const MemoryGalleryScreen({super.key});
 
@@ -78,7 +77,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   }
 
   // ✅ CORREGIDO: usa el nuevo PinDialog que devuelve true/false
-  Future<void> _onFolderTap(String category, Map<String, List<Memory>> grouped) async {
+  Future<void> _onFolderTap(
+      String category, Map<String, List<Memory>> grouped) async {
     final memoriesInCategory = grouped[category] ?? [];
 
     final folderHasPassword = memoriesInCategory.any((m) => m.hasPassword);
@@ -110,29 +110,32 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Proteger Carpeta'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Ingresa un PIN de 6 dígitos para proteger esta carpeta:'),
-            const SizedBox(height: 20),
-            PinCodeTextField(
-              appContext: context,
-              controller: pinController,
-              length: 6,
-              obscureText: true,
-              animationType: AnimationType.fade,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              pinTheme: PinTheme(
-                shape: PinCodeFieldShape.box,
-                borderRadius: BorderRadius.circular(8),
-                fieldHeight: 45,
-                fieldWidth: 35,
-                activeFillColor: pinkLighter,
-                activeColor: pinkPrimary,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                  'Ingresa un PIN de 6 dígitos para proteger esta carpeta:'),
+              const SizedBox(height: 20),
+              PinCodeTextField(
+                appContext: context,
+                controller: pinController,
+                length: 6,
+                obscureText: true,
+                animationType: AnimationType.fade,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                pinTheme: PinTheme(
+                  shape: PinCodeFieldShape.box,
+                  borderRadius: BorderRadius.circular(8),
+                  fieldHeight: 45,
+                  fieldWidth: 35,
+                  activeFillColor: pinkLighter,
+                  activeColor: pinkPrimary,
+                ),
+                onChanged: (_) {},
               ),
-              onChanged: (_) {},
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -146,7 +149,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               if (pin.length == 6) {
                 final hash = sha256.convert(utf8.encode(pin)).toString();
 
-                for (var memory in _memories.where((m) => m.category == category)) {
+                for (var memory
+                    in _memories.where((m) => m.category == category)) {
                   final updatedMemory = memory.copyWith(
                     hasPassword: true,
                     passwordHash: hash,
@@ -159,7 +163,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Carpeta protegida con éxito')),
+                    const SnackBar(
+                        content: Text('Carpeta protegida con éxito')),
                   );
                 }
               } else {
@@ -214,77 +219,82 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           contentPadding: const EdgeInsets.all(24),
           title: const Text('Nueva Carpeta',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Ingresa el nombre de la nueva carpeta:',
-                style: TextStyle(fontSize: 18),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: controller,
-                style: const TextStyle(fontSize: 18),
-                decoration: InputDecoration(
-                  hintText: 'Ej: Vacaciones 2024',
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  prefixIcon: const Icon(Icons.folder, size: 32),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Ingresa el nombre de la nueva carpeta:',
+                  style: TextStyle(fontSize: 18),
                 ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 30),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                      ),
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Cancelar',
-                          style: TextStyle(fontSize: 18)),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: controller,
+                  style: const TextStyle(fontSize: 18),
+                  decoration: InputDecoration(
+                    hintText: 'Ej: Vacaciones 2024',
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 20, horizontal: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
+                    prefixIcon: const Icon(Icons.folder, size: 32),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: pinkPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 30),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 18),
                         ),
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: const Text('Cancelar',
+                            style: TextStyle(fontSize: 18)),
                       ),
-                      onPressed: () {
-                        final newCategory = controller.text.trim();
-                        if (newCategory.isNotEmpty) {
-                          Provider.of<CategoryProvider>(context, listen: false)
-                              .addCategoryLocally(newCategory);
-                          Navigator.pop(dialogContext);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Carpeta "$newCategory" creada'),
-                              backgroundColor: pinkPrimary,
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
-                      child: const Text('Crear', style: TextStyle(fontSize: 18)),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: pinkPrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          final newCategory = controller.text.trim();
+                          if (newCategory.isNotEmpty) {
+                            Provider.of<CategoryProvider>(context,
+                                    listen: false)
+                                .addCategoryLocally(newCategory);
+                            Navigator.pop(dialogContext);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Carpeta "$newCategory" creada'),
+                                backgroundColor: pinkPrimary,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        child:
+                            const Text('Crear', style: TextStyle(fontSize: 18)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -298,36 +308,39 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           contentPadding: const EdgeInsets.all(24),
           title: Text(
             'Compartir "$categoryToShare"',
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Ingresa el correo electrónico del usuario con el que deseas compartir esta carpeta:',
-                style: TextStyle(fontSize: 18),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                style: const TextStyle(fontSize: 18),
-                decoration: InputDecoration(
-                  hintText: 'amigo@correo.com',
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  prefixIcon: const Icon(Icons.email, size: 32),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Ingresa el correo electrónico del usuario con el que deseas compartir esta carpeta:',
+                  style: TextStyle(fontSize: 18),
                 ),
-                autofocus: true,
-              ),
-            ],
+                const SizedBox(height: 24),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(fontSize: 18),
+                  decoration: InputDecoration(
+                    hintText: 'amigo@correo.com',
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 20, horizontal: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.email, size: 32),
+                  ),
+                  autofocus: true,
+                ),
+              ],
+            ),
           ),
           actions: [
             Row(
@@ -338,7 +351,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 18),
                     ),
                     onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text('Cancelar', style: TextStyle(fontSize: 18)),
+                    child:
+                        const Text('Cancelar', style: TextStyle(fontSize: 18)),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -388,7 +402,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                         }
                       }
                     },
-                    child: const Text('Compartir', style: TextStyle(fontSize: 18)),
+                    child:
+                        const Text('Compartir', style: TextStyle(fontSize: 18)),
                   ),
                 ),
               ],
@@ -426,8 +441,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             _loadMemories();
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text('Error: $e'), backgroundColor: Colors.red),
+              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
             );
           }
         },
@@ -508,8 +522,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                           height: 35,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
-                            border:
-                                Border.all(color: Colors.white, width: 1.5),
+                            border: Border.all(color: Colors.white, width: 1.5),
                             boxShadow: const [
                               BoxShadow(color: Colors.black26, blurRadius: 2)
                             ],
@@ -600,15 +613,15 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           child: Card(
             elevation: 3,
             color: themeProvider.isDarkMode ? cardDark : Colors.white,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(12)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(12)),
                     child: MemoryThumbnail(
                       imagePath: memory.imageAsset,
                       width: double.infinity,
@@ -678,13 +691,12 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     final categories = categoryProvider.categories;
 
     return Scaffold(
-      backgroundColor:
-          themeProvider.isDarkMode ? backgroundDark : Colors.white,
+      backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
       appBar: AppBar(
         title: Text(
           _selectedCategory ?? 'Mis Carpetas',
-          style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold),
+          style:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: pinkPrimary,
         leading: _selectedCategory != null
@@ -736,8 +748,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (context) => const FavoriteScreen()),
+                MaterialPageRoute(builder: (context) => const FavoriteScreen()),
               );
             },
           ),
@@ -745,17 +756,14 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: pinkPrimary))
+          ? const Center(child: CircularProgressIndicator(color: pinkPrimary))
           : _memories.isEmpty
               ? _buildEmptyState(themeProvider)
               : _selectedCategory == null
                   ? _buildFolderGrid(
                       context, categories, groupedMemories, themeProvider)
-                  : _buildMemoryList(
-                      context,
-                      groupedMemories[_selectedCategory] ?? [],
-                      themeProvider),
+                  : _buildMemoryList(context,
+                      groupedMemories[_selectedCategory] ?? [], themeProvider),
     );
   }
 

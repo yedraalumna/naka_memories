@@ -357,18 +357,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             fontFamily: 'Roboto',
                           ),
                           children: [
-                            const TextSpan(text: "Acepto las "),
+                            const TextSpan(text: "Acepto los "),
                             TextSpan(
-                              text: "cookies y los términos y condiciones",
+                              text: "términos y condiciones",
                               style: const TextStyle(
-                                color: Colors.blue,
+                                color: pinkAccent,
                                 decoration: TextDecoration.underline,
                                 fontWeight: FontWeight.bold,
                               ),
                               recognizer: TapGestureRecognizer()
                                 ..onTap = irATermsScreen,
                             ),
-                            const TextSpan(text: " para poder crear mi cuenta."),
                           ],
                         ),
                       ),

@@ -416,30 +416,6 @@ Future<bool> register(String email, String password) async {
     notifyListeners();
   }
 
-  Future<bool> changePassword(String newPassword) async {
-    try {
-      _isLoading = true;
-      _errorMessage = null;
-      notifyListeners();
-
-      await _supabase.auth.updateUser(
-        UserAttributes(password: newPassword),
-      );
-
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } on AuthException catch (e) {
-      _handleSupabaseError(e);
-      return false;
-    } catch (e) {
-      _errorMessage = 'Error desconocido';
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
   Future<bool> updateProfile({
     String? email,
     String? password,
@@ -506,7 +482,6 @@ Future<bool> register(String email, String password) async {
     }
   }
 
-    // Verificar codigo OTP de 6 digitos
   // Verificar codigo OTP de 6 u 8 digitos
   Future<bool> verifyOTP(String email, String token) async {
     try {
@@ -541,7 +516,8 @@ Future<bool> register(String email, String password) async {
       _isLoading = false;
       notifyListeners();
       return false;
-    } catch (e) {
+    } 
+    catch (e) {
       print('Error en verifyOTP: $e');
       _errorMessage = 'Error al verificar codigo';
       _isLoading = false;
@@ -549,4 +525,79 @@ Future<bool> register(String email, String password) async {
       return false;
     }
   }
-}
+
+
+  // Enviar correo de recuperación de contraseña
+  Future<bool> resetPassword(String email) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      final redirectUrl = kIsWeb
+          ? 'https://nayekamemories.cloud-ip.cc/callback'
+          : 'io.nayekamemories.app://callback';
+
+      await _supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: redirectUrl,
+      );
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on AuthException catch (e) {
+      _handleSupabaseError(e);
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error al enviar correo de recuperación';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Verificar OTP para recuperación de contraseña y actualizar contraseña
+  Future<bool> verifyResetAndChangePassword(String email, String token, String newPassword) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      // Primero verificar el OTP
+      final response = await _supabase.auth.verifyOTP(
+        email: email,
+        token: token,
+        type: OtpType.recovery,
+      );
+
+      if (response.user != null) {
+        _user = response.user;
+        
+        // Luego actualizar la contraseña
+        await _supabase.auth.updateUser(
+          UserAttributes(password: newPassword),
+        );
+        
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = 'Código inválido';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } on AuthException catch (e) {
+      _errorMessage = 'Error al verificar: ${e.message}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error al verificar código';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+  }

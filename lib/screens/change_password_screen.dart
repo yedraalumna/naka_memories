@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'reset_password_screen.dart';
 import '../providers/app_auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../constants/colors.dart';
@@ -12,298 +13,171 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
-
-  bool _showNewPassword = false;
-  bool _showConfirmPassword = false;
-  bool _isLoading = false;
-  String? _errorMessage;
-
-  @override
-  void dispose() {
-    _newPasswordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
-  }
-
-  // Con esto cambiamos la contraseña usando AppAuthProvider
-  Future<void> _changePassword() async {
-    if (_newPasswordController.text.isEmpty) {
-      setState(() {
-        _errorMessage = 'Por favor, ingresa una nueva contraseña';
-      });
-      return;
-    }
-
-    if (_newPasswordController.text.length < 6) {
-      setState(() {
-        _errorMessage = 'La contraseña debe tener al menos 6 caracteres';
-      });
-      return;
-    }
-
-    if (_newPasswordController.text != _confirmPasswordController.text) {
-      setState(() {
-        _errorMessage = 'Las contraseñas no coinciden';
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-      final success = await authProvider.changePassword(_newPasswordController.text);
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Contraseña cambiada correctamente'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-
-        // Volvemos a la pantalla atrás después de cambiar la contraseña
-        Navigator.pop(context);
-      } else {
-        setState(() {
-          _errorMessage = authProvider.errorMessage ?? 'Error al cambiar la contraseña';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Error desconocido: $e';
-        _isLoading = false;
-      });
-    }
-  }
+  // Controladores para los campos de texto
+  final emailController = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+  bool isLoading = false;
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDarkMode = themeProvider.isDarkMode;
+    // Obtener providers
+      final themeProvider = Provider.of<ThemeProvider>(context);
+      final authProvider = Provider.of<AppAuthProvider>(context);
+    
+    // Definir colores según el tema
+      Color backgroundColor = themeProvider.isDarkMode ? backgroundDark : textLight;
+      Color iconColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+      Color textColor = themeProvider.isDarkMode ? Colors.white : Colors.black87;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? backgroundDark : Colors.white,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
         title: const Text('Cambiar Contraseña'),
-        backgroundColor: pinkPrimary,
+        backgroundColor: Colors.pinkAccent,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Center(
+      body: Padding(
+        padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Cambiar contraseña',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? textDarkMode : pinkDark,
-                  ),
-                ),
+          child: Column(
+            children: [
+              const SizedBox(height: 30),
 
-                const SizedBox(height: 30),
-
-                // Información importante
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? cardDark : pinkLighter,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: pinkPrimary, width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info, color: pinkPrimary),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'La nueva contraseña debe tener al menos 6 caracteres',
-                          style: TextStyle(
-                            color: isDarkMode ? textDarkMode : pinkDark,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
+              // Icono decorativo
+                Icon(Icons.lock_reset, size: 80, color: iconColor),
                 const SizedBox(height: 20),
 
-                // Campo para nueva contraseña
-                TextField(
-                  controller: _newPasswordController,
-                  obscureText: !_showNewPassword,
-                  enabled: !_isLoading,
+              // Título
+                Text(
+                'Cambiar Contraseña',
                   style: TextStyle(
-                    color: isDarkMode ? textDarkMode : Colors.black87,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Nueva contraseña',
-                    labelStyle: TextStyle(
-                      color: isDarkMode ? textDarkMode.withOpacity(0.7) : Colors.grey[700],
-                    ),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!,
-                      ),
-                    ),
-                    prefixIcon: Icon(Icons.lock, color: pinkPrimary),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _showNewPassword ? Icons.visibility : Icons.visibility_off,
-                        color: pinkPrimary,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _showNewPassword = !_showNewPassword;
-                        });
-                      },
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: pinkPrimary, width: 2),
-                    ),
-                    fillColor: isDarkMode ? cardDark : Colors.white,
-                    filled: true,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: iconColor,
                   ),
                 ),
+                const SizedBox(height: 10),
 
-                const SizedBox(height: 15),
-
-                // Campo para confirmar contraseña
-                TextField(
-                  controller: _confirmPasswordController,
-                  obscureText: !_showConfirmPassword,
-                  enabled: !_isLoading,
+              // Texto descriptivo
+                Text(
+                  'Introduce tu correo electrónico para restablecer la contraseña.',
                   style: TextStyle(
-                    color: isDarkMode ? textDarkMode : Colors.black87,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Confirmar contraseña',
-                    labelStyle: TextStyle(
-                      color: isDarkMode ? textDarkMode.withOpacity(0.7) : Colors.grey[700],
-                    ),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!,
-                      ),
-                    ),
-                    prefixIcon: Icon(Icons.lock_reset, color: pinkPrimary),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _showConfirmPassword ? Icons.visibility : Icons.visibility_off,
-                        color: pinkPrimary,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _showConfirmPassword = !_showConfirmPassword;
-                        });
-                      },
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: pinkPrimary, width: 2),
-                    ),
-                    fillColor: isDarkMode ? cardDark : Colors.white,
-                    filled: true,
+                    fontSize: 16,
+                    color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey,
                   ),
                 ),
-
-                // Mensaje de error
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: 15),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error, color: Colors.red),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
                 const SizedBox(height: 30),
 
-                // Botones
-                Row(
+            // Formulario
+              Form(
+                key: formKey,
+                child: Column(
                   children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[300],
-                          foregroundColor: isDarkMode ? Colors.white : Colors.black87,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                    TextFormField(
+                      controller: emailController,
+                      style: TextStyle(color: textColor),
+                      decoration: InputDecoration(
+                        labelText: 'Correo Electrónico',
+                        labelStyle: TextStyle(color: iconColor),
+                        prefixIcon: Icon(Icons.email, color: iconColor),
+                        border: const OutlineInputBorder(),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: pinkPrimary),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!,
                           ),
                         ),
-                        child: const Text('Cancelar'),
                       ),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Ingresa tu correo';
+                        }
+                        if (!value.contains('@') || !value.contains('.')) {
+                          return 'Correo no válido';
+                        }
+                        return null;
+                      },
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _changePassword,
+                        onPressed: isLoading ? null :  () async { 
+                          if (formKey.currentState!.validate()) {
+                               setState(() => isLoading = true);
+
+                                final email = emailController.text.trim();
+                                final success = await authProvider.resetPassword(email);
+                                
+                                if (mounted) {
+                                  setState(() => isLoading = false);
+                                  
+                                  if (success) {
+                                    // Mostrar mensaje de éxito
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Se ha enviado un código de recuperación a tu correo'),
+                                        backgroundColor: Colors.green,
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
+
+                                    // Navegar a pantalla para ingresar el código OTP
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ResetPasswordScreen(  
+                                          email: email,
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(authProvider.errorMessage ?? 'Error al enviar el correo'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                             }
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: pinkPrimary,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          disabledBackgroundColor: Colors.grey[400],
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
                               )
-                            : const Text('Guardar'),
+                            : const Text(
+                                'Enviar Correo de Recuperación',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 20),
+            ],
           ),
         ),
       ),

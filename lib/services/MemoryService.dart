@@ -37,7 +37,7 @@ class MemoryService {
     }
   }
 
-   Future<String?> uploadAvatar(Uint8List bytes, String userId) async {
+  Future<String?> uploadAvatar(Uint8List bytes, String userId) async {
     try {
       print('Subiendo avatar para usuario: $userId');
 
@@ -145,11 +145,11 @@ class MemoryService {
       print(
           'Buscando recuerdos para usuario: $userId o compartidos con: $userEmail');
 
-      //Usamos .or() para obtener de Supabase los registros donde el propio usuario por ID lo ha creado o por su correo
+      // 🔥 ARREGLO 1: Quitadas las comillas dobles de $userEmail para que coincida en Supabase 🔥
       final response = await _supabase
           .from('nayeka memories')
           .select()
-          .or('user_id.eq.$userId,shared_with.cs.{"$userEmail"}')
+          .or('user_id.eq.$userId,shared_with.cs.{$userEmail}')
           .order('date', ascending: false);
 
       final List<Memory> memories = [];
@@ -316,6 +316,29 @@ class MemoryService {
     }
   }
 
+  // 🔥 ARREGLO 2: Función de Herencia de Permisos 🔥
+  Future<Memory> _inheritSharedUsers(Memory memory) async {
+    if (memory.category == 'Sin categoría' || memory.category.isEmpty) {
+      return memory;
+    }
+    try {
+      final localMemories = await _getMemoriesFromLocal();
+      final categoryMemories =
+          localMemories.where((m) => m.category == memory.category).toList();
+
+      Set<String> allSharedEmails = {...memory.sharedWith};
+      for (var m in categoryMemories) {
+        if (m.sharedWith.isNotEmpty) {
+          allSharedEmails.addAll(m.sharedWith);
+        }
+      }
+      return memory.copyWith(sharedWith: allSharedEmails.toList());
+    } catch (e) {
+      print('Error heredando usuarios: $e');
+      return memory;
+    }
+  }
+
   // Guardamos el recuerdo con imagen
   Future<String> saveMemoryWithImage({
     required Memory memory,
@@ -342,10 +365,13 @@ class MemoryService {
         print('Sin usuario autenticado, omitiendo subida de imagen');
       }
 
-      final finalMemory = memory.copyWith(
+      Memory finalMemory = memory.copyWith(
         id: memoryId,
         imageAsset: imageUrl,
       );
+
+      // 🔥 Aplicamos la herencia 🔥
+      finalMemory = await _inheritSharedUsers(finalMemory);
 
       await _saveMemoryToLocal(finalMemory);
       print('Memoria guardada localmente: $memoryId');
@@ -419,10 +445,13 @@ class MemoryService {
         videoUrl = await uploadVideo(videoBytes);
       }
 
-      final finalMemory = memory.copyWith(
+      Memory finalMemory = memory.copyWith(
         id: memoryId,
         imageAsset: videoUrl,
       );
+
+      // 🔥 Aplicamos la herencia 🔥
+      finalMemory = await _inheritSharedUsers(finalMemory);
 
       await _saveMemoryToLocal(finalMemory);
       print('Memoria (video) guardada localmente: $memoryId');
@@ -469,7 +498,7 @@ class MemoryService {
         'category': memory.category,
         'isFavorite': memory.isFavorite,
         'shared_with': memory.sharedWith,
-        'has_password': memory.hasPassword,     
+        'has_password': memory.hasPassword,
         'password_hash': memory.passwordHash,
       };
 
@@ -521,7 +550,10 @@ class MemoryService {
       print('Guardando recuerdo: ${memory.id}');
 
       final memoryId = memory.id.isNotEmpty ? memory.id : _generateId();
-      final finalMemory = memory.copyWith(id: memoryId);
+      Memory finalMemory = memory.copyWith(id: memoryId);
+
+      // 🔥 Aplicamos la herencia 🔥
+      finalMemory = await _inheritSharedUsers(finalMemory);
 
       await _saveMemoryToLocal(finalMemory);
 
@@ -745,35 +777,37 @@ class MemoryService {
   // 1. Obtener categorías REALES (solo las que tienen recuerdos)
   // ============ GESTIÓN DE CARPETAS (ÚNICA VERSIÓN) ============
 
-  /// Obtiene solo las categorías que tienen recuerdos reales + General
+  // Obtiene solo las categorías que tienen recuerdos reales + General
   Future<List<String>> getAllCategories() async {
-  try {
-    final user = _supabase.auth.currentUser;
-    Set<String> uniqueCategories = {'General'}; 
+    try {
+      final user = _supabase.auth.currentUser;
+      Set<String> uniqueCategories = {'General'};
 
-    // 1. Obtener categorías de recuerdos reales
-    if (user != null) {
-      final response = await _supabase
-          .from('nayeka memories')
-          .select('category')
-          .eq('user_id', user.id);
-      
-      for (var item in response) {
-        final cat = item['category'] as String?;
-        if (cat != null && cat.trim().isNotEmpty) uniqueCategories.add(cat);
+      // 1. Obtener categorías de recuerdos reales
+      if (user != null) {
+        final userEmail = user.email; // Necesitamos el correo para la consulta
+
+        final response = await _supabase
+            .from('nayeka memories')
+            .select('category')
+            .or('user_id.eq.${user.id},shared_with.cs.{$userEmail}');
+
+        for (var item in response) {
+          final cat = item['category'] as String?;
+          if (cat != null && cat.trim().isNotEmpty) uniqueCategories.add(cat);
+        }
+      } else {
+        final localMemories = await _getMemoriesFromLocal();
+        for (var m in localMemories) {
+          uniqueCategories.add(m.category);
+        }
       }
-    } else {
-      final localMemories = await _getMemoriesFromLocal();
-      for (var m in localMemories) {
-        uniqueCategories.add(m.category);
-      }
-    }
-    
-    // 2. Añadir categorías personalizadas guardadas en SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
+
+      // 2. Añadir categorías personalizadas guardadas en SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
       final customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
       uniqueCategories.addAll(customCategories);
-      
+
       List<String> result = uniqueCategories.toList();
       result.sort();
       return result;
@@ -782,44 +816,44 @@ class MemoryService {
     }
   }
 
-
   // En MemoryService.dart// En MemoryService.dart
-Future<void> renameCategory(String oldName, String newName) async {
-  if (oldName == 'General' || oldName == newName) return;
-  
-  try {
-    // 1. Actualizar recuerdos reales en Supabase
-    final user = _supabase.auth.currentUser;
-    if (user != null) {
-      await _supabase
-          .from('nayeka memories')
-          .update({'category': newName})
-          .eq('category', oldName)
-          .eq('user_id', user.id);
+  Future<void> renameCategory(String oldName, String newName) async {
+    if (oldName == 'General' || oldName == newName) return;
+
+    try {
+      // 1. Actualizar recuerdos reales en Supabase
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        await _supabase
+            .from('nayeka memories')
+            .update({'category': newName})
+            .eq('category', oldName)
+            .eq('user_id', user.id);
+      }
+
+      // 2. Actualizar recuerdos locales
+      final prefs = await SharedPreferences.getInstance();
+      final memories = await _getMemoriesFromLocal();
+      final updated = memories.map((m) {
+        return m.category == oldName ? m.copyWith(category: newName) : m;
+      }).toList();
+      await prefs.setStringList(
+          _memoriesKey, updated.map((m) => jsonEncode(m.toMap())).toList());
+
+      // 3. Actualizar en SharedPreferences (categorías personalizadas)
+      final customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
+      if (customCategories.contains(oldName)) {
+        customCategories.remove(oldName);
+        customCategories.add(newName);
+        await prefs.setStringList(_customCategoriesKey, customCategories);
+      }
+
+      print('✅ Categoría renombrada: $oldName → $newName');
+    } catch (e) {
+      print('❌ Error renombrando categoría: $e');
+      throw Exception('No se pudo renombrar la categoría: $e');
     }
-    
-    // 2. Actualizar recuerdos locales
-    final prefs = await SharedPreferences.getInstance();
-    final memories = await _getMemoriesFromLocal();
-    final updated = memories.map((m) {
-      return m.category == oldName ? m.copyWith(category: newName) : m;
-    }).toList();
-    await prefs.setStringList(_memoriesKey, updated.map((m) => jsonEncode(m.toMap())).toList());
-    
-    // 3. Actualizar en SharedPreferences (categorías personalizadas)
-    final customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
-    if (customCategories.contains(oldName)) {
-      customCategories.remove(oldName);
-      customCategories.add(newName);
-      await prefs.setStringList(_customCategoriesKey, customCategories);
-    }
-    
-    print('✅ Categoría renombrada: $oldName → $newName');
-  } catch (e) {
-    print('❌ Error renombrando categoría: $e');
-    throw Exception('No se pudo renombrar la categoría: $e');
   }
-}
 
   // Lo dejamos vacío para que no haga NADA
   Future<void> restoreDefaultCategories() async {
@@ -830,7 +864,7 @@ Future<void> renameCategory(String oldName, String newName) async {
   /// Crear una nueva categoría (opcionalmente asignada a un recuerdo)
   Future<void> createCategory(String categoryName, {String? memoryId}) async {
     if (categoryName.isEmpty) return;
-    
+
     try {
       if (memoryId != null) {
         // Asignar a un recuerdo existente
@@ -843,7 +877,8 @@ Future<void> renameCategory(String oldName, String newName) async {
       } else {
         // Guardar la categoría en SharedPreferences (persiste aunque no tenga recuerdos)
         final prefs = await SharedPreferences.getInstance();
-        List<String> customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
+        List<String> customCategories =
+            prefs.getStringList(_customCategoriesKey) ?? [];
         if (!customCategories.contains(categoryName)) {
           customCategories.add(categoryName);
           await prefs.setStringList(_customCategoriesKey, customCategories);
@@ -856,41 +891,42 @@ Future<void> renameCategory(String oldName, String newName) async {
     }
   }
 
-
   /// Eliminar una categoría (mueve todos los recuerdos a "General")
   Future<void> deleteCategory(String categoryName) async {
-  if (categoryName == 'General') {
-    throw Exception('No se puede eliminar la categoría "General"');
-  }
-  
-  try {
-    // 1. Mover recuerdos reales a "General"
-    final allMemories = await getMemories();
-    int movedCount = 0;
-    
-    for (var memory in allMemories) {
-      if (memory.category == categoryName) {
-        final updatedMemory = memory.copyWith(category: 'General');
-        await saveMemory(updatedMemory);
-        movedCount++;
+    if (categoryName == 'General') {
+      throw Exception('No se puede eliminar la categoría "General"');
+    }
+
+    try {
+      // 1. Mover recuerdos reales a "General"
+      final allMemories = await getMemories();
+      int movedCount = 0;
+
+      for (var memory in allMemories) {
+        if (memory.category == categoryName) {
+          final updatedMemory = memory.copyWith(category: 'General');
+          await saveMemory(updatedMemory);
+          movedCount++;
+        }
       }
+
+      // 2. SIEMPRE eliminar de SharedPreferences (aunque no tenga recuerdos)
+      final prefs = await SharedPreferences.getInstance();
+      List<String> customCategories =
+          prefs.getStringList(_customCategoriesKey) ?? [];
+      if (customCategories.contains(categoryName)) {
+        customCategories.remove(categoryName);
+        await prefs.setStringList(_customCategoriesKey, customCategories);
+        print('✅ Categoría "$categoryName" eliminada de SharedPreferences');
+      }
+
+      print(
+          '✅ Categoría eliminada: $categoryName ($movedCount recuerdos movidos a General)');
+    } catch (e) {
+      print('❌ Error eliminando categoría: $e');
+      throw Exception('No se pudo eliminar la categoría: $e');
     }
-    
-    // 2. SIEMPRE eliminar de SharedPreferences (aunque no tenga recuerdos)
-    final prefs = await SharedPreferences.getInstance();
-    List<String> customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
-    if (customCategories.contains(categoryName)) {
-      customCategories.remove(categoryName);
-      await prefs.setStringList(_customCategoriesKey, customCategories);
-      print('✅ Categoría "$categoryName" eliminada de SharedPreferences');
-    }
-    
-    print('✅ Categoría eliminada: $categoryName ($movedCount recuerdos movidos a General)');
-  } catch (e) {
-    print('❌ Error eliminando categoría: $e');
-    throw Exception('No se pudo eliminar la categoría: $e');
   }
-}
 
   /// Helper: Obtener un recuerdo por ID
   Future<Memory?> _getMemoryById(String id) async {
@@ -930,8 +966,8 @@ extension MemoryCopyWith on Memory {
     String? category,
     bool? isFavorite,
     List<String>? sharedWith,
-    bool? hasPassword,     
-    String? passwordHash, 
+    bool? hasPassword,
+    String? passwordHash,
   }) {
     return Memory(
       id: id ?? this.id,
@@ -943,8 +979,8 @@ extension MemoryCopyWith on Memory {
       category: category ?? this.category,
       isFavorite: isFavorite ?? this.isFavorite,
       sharedWith: sharedWith ?? this.sharedWith,
-      hasPassword: hasPassword ?? this.hasPassword,      
-      passwordHash: passwordHash ?? this.passwordHash, 
+      hasPassword: hasPassword ?? this.hasPassword,
+      passwordHash: passwordHash ?? this.passwordHash,
     );
   }
 }

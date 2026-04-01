@@ -107,12 +107,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextButton(
                       onPressed: _isLoading ? null : () {
                         authProvider.clearError(); // Limpiar errores antes de navegar
-                        //Navigator.push(
-                       //context,
-                       //   MaterialPageRoute(
-                         //   builder: (context) => change_password_screen(),
-                        //  ),
-                      //  );
+                        
+                        Navigator.push(
+                        context,
+                          MaterialPageRoute(
+                            builder: (context) => const ChangePasswordScreen(),
+                          ),
+                        );
                       },
                       child: const Text(
                         '¿Olvidaste tu contraseña?',
