@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import '../screens/coordinate_input_screen.dart';
 import '../providers/category_provider.dart';
+import 'package:crypto/crypto.dart';
 
 class MemoryForm extends StatefulWidget {
   final LatLng location;
@@ -40,8 +41,13 @@ class _MemoryFormState extends State<MemoryForm> {
   final TextEditingController _dateController = TextEditingController();
   final ImagePickerService _pickerService = ImagePickerService();
   final MemoryService _memoryService = MemoryService();
-  final TextEditingController _customCategoryController =
-      TextEditingController();
+  final TextEditingController _customCategoryController = TextEditingController();
+
+  bool _protectNewCategory = false;
+  String _newCategoryPin = '';
+  String _confirmNewCategoryPin = '';
+  TextEditingController _pinController = TextEditingController();
+  TextEditingController _confirmPinController = TextEditingController();
 
   String? _selectedAsset;
   bool _isLoadingMedia = false; // Renombrado para ser genérico (img o video)
@@ -66,12 +72,16 @@ class _MemoryFormState extends State<MemoryForm> {
     'assets/images/memory4.jpg',
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _currentFormLocation = widget.location;
-    _loadCategories(); // Esto cargará las categorías y luego llamará a _initializeFormData
-  }
+ @override
+void initState() {
+  super.initState();
+  _currentFormLocation = widget.location;
+  _loadCategories();
+  
+  // Inicializar controladores de PIN
+  _pinController = TextEditingController();
+  _confirmPinController = TextEditingController();
+}
 
     void _initializeFormData() {
     if (widget.existingMemory != null) {
@@ -715,46 +725,67 @@ class _MemoryFormState extends State<MemoryForm> {
   // LÓGICA DE CATEGORÍA: Determinar cuál usar
   String finalCategory = _selectedCategory;
   bool isProtected = false;
-  String? passwordHash = null;
+  String? passwordHash;
+  final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
 
   if (_isCustomCategory) {
-    final customText = _customCategoryController.text.trim();
-    if (customText.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, escribe un nombre para la nueva categoría'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-  
-    finalCategory = customText;
-    isProtected = false; // Las nuevas categorías no tienen PIN por defecto
-    passwordHash = null;
-
-    // Crear la nueva categoría usando el Provider
-    try {
-      final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
-      await categoryProvider.createCategory(finalCategory);
-      await _loadCategories(); // Recargar categorías
-      widget.onCategoriesChanged?.call();
-    } catch (e) {
-      print('Error creando categoría: $e');
-      // Si falla, al menos añadirla localmente
-      Provider.of<CategoryProvider>(context, listen: false)
-          .addCategoryLocally(finalCategory);
-    }
-  } else {
-    // Verificar si la categoría seleccionada está protegida
-    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
-    isProtected = categoryProvider.isCategoryProtected(finalCategory);
-    passwordHash = isProtected ? categoryProvider.getPasswordHash(finalCategory) : null;
-
-      print('🔒 Categoría: $finalCategory');
-      print('🔒 ¿Está protegida? $isProtected');
-      print('🔒 Hash: $passwordHash');
+  final customText = _customCategoryController.text.trim();
+  if (customText.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Por favor, escribe un nombre para la nueva categoría'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
   }
+
+  finalCategory = customText;
+  isProtected = false;
+  passwordHash = null;
+
+  // Crear la nueva categoría usando el Provider
+  try {
+    await categoryProvider.createCategory(finalCategory);
+    
+    // 🔥 NUEVO: Si el usuario quiere proteger la categoría, guardar el PIN
+    if (_protectNewCategory) {
+      if (_newCategoryPin.length != 6) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('El PIN debe tener 6 dígitos'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (_newCategoryPin != _confirmNewCategoryPin) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Los PINs no coinciden'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
+      // Generar hash del PIN y guardarlo
+      final hash = sha256.convert(utf8.encode(_newCategoryPin)).toString();
+      await categoryProvider.setCategoryPassword(finalCategory, hash);
+      print('✅ Categoría "$finalCategory" protegida con PIN');
+    }
+    
+    await _loadCategories();
+    widget.onCategoriesChanged?.call();
+  } catch (e) {
+    print('Error creando categoría: $e');
+    categoryProvider.addCategoryLocally(finalCategory);
+  }
+}
+
+  // Fuente única de verdad del PIN: protección configurada por categoría
+  isProtected = categoryProvider.isCategoryProtected(finalCategory);
+  passwordHash = categoryProvider.getPasswordHash(finalCategory);
 
   setState(() => _isSaving = true);
 
@@ -994,82 +1025,181 @@ class _MemoryFormState extends State<MemoryForm> {
                 const SizedBox(height: 15),
 
                 if (_isCustomCategory)
-                  // MODO ESCRITURA (TextField)
-                  Row(
+                  // MODO ESCRITURA (TextField con opción de PIN)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _customCategoryController,
+                      // Fila: Campo de texto + botón cancelar
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _customCategoryController,
+                              decoration: InputDecoration(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 20,
+                                  horizontal: 15,
+                                ),
+                                labelText: 'Escribe la nueva categoría',
+                                hintText: 'Ej: Deportes, Conciertos...',
+                                labelStyle: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[700],
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(
+                                    color: isDarkMode
+                                        ? Colors.grey[700]!
+                                        : pinkLight,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(
+                                    color: isDarkMode
+                                        ? Colors.grey[700]!
+                                        : pinkLight,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: pinkPrimary,
+                                    width: 2,
+                                  ),
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.edit,
+                                  color: pinkPrimary,
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode ? cardDark : Colors.white,
+                              ),
+                              style: TextStyle(
+                                color: isDarkMode ? textDarkMode : Colors.black87,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Botón para cancelar y volver al dropdown
+                          Container(
+                            height: 60,
+                            width: 60,
+                            decoration: BoxDecoration(
+                              color: isDarkMode ? cardDark : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDarkMode
+                                    ? Colors.grey[700]!
+                                    : Colors.grey[300]!,
+                              ),
+                            ),
+                            child: IconButton(
+                              iconSize: 30,
+                              icon: const Icon(Icons.close, color: Colors.grey),
+                              tooltip: 'Volver a la lista',
+                              onPressed: () {
+                                setState(() {
+                                  _isCustomCategory = false;
+                                  _protectNewCategory = false;
+                                  _newCategoryPin = '';
+                                  _confirmNewCategoryPin = '';
+                                  if (_categories.isNotEmpty) {
+                                    _selectedCategory = _categories.first;
+                                  } else {
+                                    _selectedCategory = 'General';
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      // Checkbox para proteger la nueva categoría con PIN
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _protectNewCategory,
+                            onChanged: (value) {
+                              setState(() {
+                                _protectNewCategory = value ?? false;
+                                if (!_protectNewCategory) {
+                                  _newCategoryPin = '';
+                                  _confirmNewCategoryPin = '';
+                                  _pinController.clear();
+                                  _confirmPinController.clear();
+                                }
+                              });
+                            },
+                            activeColor: pinkPrimary,
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Proteger esta carpeta con PIN',
+                              style: TextStyle(
+                                color: isDarkMode ? textDarkMode : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Campos de PIN (solo si _protectNewCategory es true)
+                      if (_protectNewCategory) ...[
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _pinController,
+                          keyboardType: TextInputType.number,
+                          obscureText: true,
+                          maxLength: 6,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 24, letterSpacing: 8),
                           decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.symmetric(
-                                vertical: 20, horizontal: 15),
-                            labelText: 'Escribe la nueva categoría',
-                            hintText: 'Ej: Deportes, Conciertos...',
-                            labelStyle: TextStyle(
-                              color: isDarkMode
-                                  ? Colors.grey[400]
-                                  : Colors.grey[700],
-                            ),
+                            hintText: 'PIN de 6 dígitos',
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(
-                                color:
-                                    isDarkMode ? Colors.grey[700]! : pinkLight,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(
-                                color:
-                                    isDarkMode ? Colors.grey[700]! : pinkLight,
-                              ),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(8),
                               borderSide: const BorderSide(
-                                  color: pinkPrimary, width: 2),
+                                color: pinkPrimary,
+                                width: 2,
+                              ),
                             ),
-                            prefixIcon:
-                                const Icon(Icons.edit, color: pinkPrimary),
-                            filled: true,
-                            fillColor: isDarkMode ? cardDark : Colors.white,
                           ),
-                          style: TextStyle(
-                            color: isDarkMode ? textDarkMode : Colors.black87,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Botón para cancelar y volver al dropdown
-                      Container(
-                        height: 60,
-                        width: 60,
-                        decoration: BoxDecoration(
-                          color: isDarkMode ? cardDark : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isDarkMode
-                                ? Colors.grey[700]!
-                                : Colors.grey[300]!,
-                          ),
-                        ),
-                        child: IconButton(
-                          iconSize: 30,
-                          icon: const Icon(Icons.close, color: Colors.grey),
-                          tooltip: 'Volver a la lista',
-                          onPressed: () {
-                            setState(() {
-                              _isCustomCategory = false;
-                              if (_categories.isNotEmpty) {
-                                _selectedCategory = _categories.first;
-                              } else {
-                                _selectedCategory = 'General';
-                              }
-                            });
+                          onChanged: (value) {
+                            setState(() => _newCategoryPin = value);
                           },
                         ),
-                      ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _confirmPinController,
+                          keyboardType: TextInputType.number,
+                          obscureText: true,
+                          maxLength: 6,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 24, letterSpacing: 8),
+                          decoration: InputDecoration(
+                            hintText: 'Confirmar PIN',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: pinkPrimary,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setState(() => _confirmNewCategoryPin = value);
+                          },
+                        ),
+                      ],
                     ],
                   )
                 else
@@ -1387,11 +1517,13 @@ class _MemoryFormState extends State<MemoryForm> {
   }
 
   @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _dateController.dispose();
-    _customCategoryController.dispose();
-    super.dispose();
-  }
+void dispose() {
+  _titleController.dispose();
+  _descriptionController.dispose();
+  _dateController.dispose();
+  _customCategoryController.dispose();
+  _pinController.dispose();        // 🔥 Agregar
+  _confirmPinController.dispose(); // 🔥 Agregar
+  super.dispose();
+}
 }

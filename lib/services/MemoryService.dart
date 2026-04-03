@@ -600,6 +600,91 @@ class MemoryService {
     }
   }
 
+  /// Obtiene el mapa de contraseñas de carpetas leyendo recuerdos existentes.
+  /// Fuente cloud: tabla `nayeka memories` (has_password/password_hash).
+  Future<Map<String, String?>> getCategoryPasswordsFromMemories() async {
+    final Map<String, String?> result = {};
+
+    try {
+      final user = _supabase.auth.currentUser;
+
+      if (user != null) {
+        final userEmail = user.email;
+        final response = await _supabase
+            .from('nayeka memories')
+            .select('category, has_password, password_hash')
+            .or('user_id.eq.${user.id},shared_with.cs.{$userEmail}');
+
+        for (final row in response) {
+          final category = row['category']?.toString();
+          final hasPassword = row['has_password'] == true;
+          final hash = row['password_hash']?.toString();
+
+          if (category == null || category.trim().isEmpty) continue;
+          if (!hasPassword || hash == null || hash.isEmpty) continue;
+
+          // Conserva el primer hash válido por categoría.
+          result.putIfAbsent(category, () => hash);
+        }
+      }
+    } catch (e) {
+      print('Error cargando contraseñas de categorías desde Supabase: $e');
+    }
+
+    // Fallback/merge local para modo offline.
+    try {
+      final localMemories = await _getMemoriesFromLocal();
+      for (final memory in localMemories) {
+        if (!memory.hasPassword || memory.passwordHash == null) continue;
+        if (memory.passwordHash!.isEmpty) continue;
+        result.putIfAbsent(memory.category, () => memory.passwordHash);
+      }
+    } catch (e) {
+      print('Error cargando contraseñas de categorías desde local: $e');
+    }
+
+    return result;
+  }
+
+  /// Aplica/elimina PIN a todos los recuerdos de una categoría y lo sincroniza.
+  Future<void> applyCategoryPasswordToMemories(
+      String categoryName, String? passwordHash) async {
+    try {
+      final hasPassword = passwordHash != null && passwordHash.isNotEmpty;
+
+      // 1) Local
+      final prefs = await SharedPreferences.getInstance();
+      final memories = await _getMemoriesFromLocal();
+      final updated = memories.map((m) {
+        if (m.category != categoryName) return m;
+        return m.copyWith(
+          hasPassword: hasPassword,
+          passwordHash: hasPassword ? passwordHash : null,
+        );
+      }).toList();
+
+      await prefs.setStringList(
+        _memoriesKey,
+        updated.map((m) => jsonEncode(m.toMap())).toList(),
+      );
+
+      // 2) Supabase
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        await _supabase
+            .from('nayeka memories')
+            .update({
+              'has_password': hasPassword,
+              'password_hash': hasPassword ? passwordHash : null,
+            })
+            .eq('user_id', user.id)
+            .eq('category', categoryName);
+      }
+    } catch (e) {
+      print('Error aplicando PIN de categoría: $e');
+    }
+  }
+
   // Método para verificar y crear bucket
   Future<void> verifyStorageBucket() async {
     try {

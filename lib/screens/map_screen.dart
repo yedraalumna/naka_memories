@@ -56,6 +56,8 @@ class _MapScreenState extends State<MapScreen> {
   bool _isLoading = false;
   String _selectedCategory = 'Todas'; // Filtros
   List<String> _dynamicCategories = []; // Lista de categorias
+  Set<String> _unlockedCategories = {}; // Almacena categorías desbloqueadas
+  bool _showPrivateInAll = false; // Para controlar "Ver todos" con privados
 
   // Detectar si es web
   bool get _isWeb => kIsWeb;
@@ -455,65 +457,94 @@ class _MapScreenState extends State<MapScreen> {
 
   // Cargamos los recuerdos con marcadores personalizados
   Future<void> _loadMemories() async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
+  if (_isLoading) return;
+  setState(() => _isLoading = true);
 
-    try {
-      // 1. Cargamos las categorías reales desde el Provider
-      final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
-      await categoryProvider.loadCategories(); 
+  try {
+    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+    await categoryProvider.loadCategories();
+    
+    // 🔥 AGREGAR ESTO PARA DEPURAR
+    await categoryProvider.debugPrintAllPasswords();
 
-      // 2. Cargamos todos los recuerdos desde el Service
-      final allMemories = await _memoryService.getMemories();
+    final allMemories = await _memoryService.getMemories();
+    
+    // 🔥 VERIFICAR CADA CATEGORÍA
+    print('\n📋 VERIFICANDO CATEGORÍAS EXISTENTES:');
+    final uniqueCategories = allMemories.map((m) => m.category).toSet();
+    for (var cat in uniqueCategories) {
+      final isProtected = categoryProvider.isCategoryProtected(cat);
+      print('   📁 $cat: ${isProtected ? "🔒 PROTEGIDA" : "📂 PÚBLICA"}');
+      if (isProtected) {
+        final hash = categoryProvider.getCategoryHash(cat);
+        print('      Hash: ${hash != null ? hash.substring(0, 20) : "null"}...');
+      }
+    }
 
-      // 3. Filtramos la lista según la categoría seleccionada
-      final filteredList = _selectedCategory == 'Todas'
-          ? allMemories
-          : allMemories.where((m) => m.category == _selectedCategory).toList();
+    List<Memory> finalMemories;
+    
+    if (_selectedCategory == 'Todas') {
+      if (_showPrivateInAll) {
+        finalMemories = allMemories.where((memory) {
+          final bool hasPassword = categoryProvider.isCategoryProtected(memory.category);
+          if (!hasPassword) return true;
+          return _unlockedCategories.contains(memory.category);
+        }).toList();
+      } else {
+        finalMemories = allMemories.where((memory) {
+          return !categoryProvider.isCategoryProtected(memory.category);
+        }).toList();
+      }
+    } else {
+      finalMemories = allMemories.where((m) => m.category == _selectedCategory).toList();
+    }
+    
+    print('\n🎯 RESULTADO FILTRADO: ${finalMemories.length} recuerdos visibles');
+    print('   Categoría seleccionada: $_selectedCategory');
+    print('   Mostrar privadas: $_showPrivateInAll');
+    print('   Desbloqueadas: ${_unlockedCategories}');
 
-      // 4. Creamos los marcadores para la lista filtrada
-      Set<Marker> newMarkers = {};
-      for (var memory in filteredList) {
-        try {
-          final icon = await _getMarkerIconSquare(memory.imageAsset);
-          newMarkers.add(
-            Marker(
-              markerId: MarkerId(memory.id),
-              position: memory.toLatLng,
-              icon: icon,
-              anchor: const Offset(0.5, 0.5),
-              infoWindow: InfoWindow(
-                title: memory.title,
-                snippet: memory.category,
-                onTap: () => _showMemoryDetails(memory),
-              ),
+    // Resto del código igual...
+    Set<Marker> newMarkers = {};
+    for (var memory in finalMemories) {
+      try {
+        final icon = await _getMarkerIconSquare(memory.imageAsset);
+        newMarkers.add(
+          Marker(
+            markerId: MarkerId(memory.id),
+            position: memory.toLatLng,
+            icon: icon,
+            anchor: const Offset(0.5, 0.5),
+            infoWindow: InfoWindow(
+              title: memory.title,
+              snippet: memory.category,
               onTap: () => _showMemoryDetails(memory),
             ),
-          );
-        } catch (e) {
-          debugPrint("Error marcador: $e");
-        }
+            onTap: () => _showMemoryDetails(memory),
+          ),
+        );
+      } catch (e) {
+        debugPrint("Error marcador: $e");
       }
-
-      // 5. Actualizamos el estado con los datos del Provider
-      setState(() {
-        _memories = allMemories;
-        _markers = newMarkers;
-        _dynamicCategories = categoryProvider.categories;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showErrorDialog('Error al cargar recuerdos: $e');
     }
+
+    setState(() {
+      _memories = allMemories;
+      _markers = newMarkers;
+      _dynamicCategories = categoryProvider.categories;
+      _isLoading = false;
+    });
+  } catch (e) {
+    setState(() => _isLoading = false);
+    _showErrorDialog('Error al cargar recuerdos: $e');
   }
+}
 
   Widget _buildFiltersOverlay() {
   final themeProvider = Provider.of<ThemeProvider>(context);
   final categoryProvider = Provider.of<CategoryProvider>(context);
   final isDarkMode = themeProvider.isDarkMode;
 
-  // 2. Usamos la lista real de categorías del provider
   final listadoCategorias = categoryProvider.categories;
   final categoriasConTodas = ['Todas', ...listadoCategorias];
 
@@ -529,17 +560,13 @@ class _MapScreenState extends State<MapScreen> {
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 10),
-        itemCount: categoriasConTodas.length, 
+        itemCount: categoriasConTodas.length,
         itemBuilder: (context, index) {
-          final cat = categoriasConTodas[index];  
+          final cat = categoriasConTodas[index];
           final isSelected = _selectedCategory == cat;
 
           return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedCategory = isSelected ? 'Todas' : cat;
-              });
-            },
+            onTap: () => _onCategoryTap(cat), // 👈 CAMBIAR: llamar a nuevo método
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 5),
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -615,6 +642,134 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  void _onCategoryTap(String categoryName) async {
+  print('🖱️ TAP en categoría: "$categoryName"');
+  
+  if (categoryName == 'Todas') {
+    final bool? incluirPrivadas = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ver carpetas protegidas'),
+        content: const Text('¿Quieres ver los recuerdos de tus carpetas con contraseña?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No, solo públicas'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sí, incluir privadas'),
+          ),
+        ],
+      ),
+    );
+
+    if (incluirPrivadas == null) return;
+    
+    if (incluirPrivadas) {
+      await _requestPinsForAllProtectedCategories();
+    }
+    
+    print('📌 Usuario eligió: ${incluirPrivadas ? "Incluir privadas" : "Solo públicas"}');
+    
+    setState(() {
+      _selectedCategory = 'Todas';
+      _showPrivateInAll = incluirPrivadas;
+      if (!incluirPrivadas) {
+        _unlockedCategories.clear();
+      }
+    });
+    _loadMemories();
+    return;
+  }
+
+  final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+  
+  // 🔥 VERIFICAR ANTES DE CONTINUAR
+  print('🔍 Verificando si "$categoryName" está protegida...');
+  final bool hasPassword = categoryProvider.isCategoryProtected(categoryName);
+  print('   Resultado: ${hasPassword ? "🔒 PROTEGIDA" : "📂 PÚBLICA"}');
+  
+  if (hasPassword) {
+    if (_unlockedCategories.contains(categoryName)) {
+      print('   ✅ Ya desbloqueada en esta sesión');
+      setState(() {
+        _selectedCategory = categoryName;
+      });
+      _loadMemories();
+      return;
+    }
+    
+    final String? passwordHash = categoryProvider.getCategoryHash(categoryName);
+    print('   Hash encontrado: ${passwordHash != null ? "SÍ (${passwordHash.substring(0, 20)}...)" : "NO"}');
+    
+    if (passwordHash != null) {
+      print('   🔓 Mostrando diálogo PIN...');
+      final bool? isAuthorized = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => PinDialog(
+          correctHash: passwordHash,
+          titulo: 'Carpeta Protegida: $categoryName',
+        ),
+      );
+      
+      print('   Autorización: ${isAuthorized == true ? "APROBADA" : "DENEGADA"}');
+      
+      if (isAuthorized == true) {
+        setState(() {
+          _unlockedCategories.add(categoryName);
+          _selectedCategory = categoryName;
+        });
+        _loadMemories();
+        _showSnackbar('Carpeta desbloqueada: $categoryName');
+      } else {
+        _showSnackbar('Acceso denegado a: $categoryName', isError: true);
+      }
+    }
+  } else {
+    print('   📂 Carpeta sin protección, mostrando directamente');
+    setState(() {
+      _selectedCategory = categoryName;
+    });
+    _loadMemories();
+  }
+}
+
+  Future<void> _requestPinsForAllProtectedCategories() async {
+    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+    final protectedCategories = categoryProvider.categories
+        .where((cat) => categoryProvider.isCategoryProtected(cat))
+        .toList();
+
+    if (protectedCategories.isEmpty) return;
+
+    for (int i = 0; i < protectedCategories.length; i++) {
+      if (!mounted) return;
+
+      final categoryName = protectedCategories[i];
+      if (_unlockedCategories.contains(categoryName)) continue;
+
+      final passwordHash = categoryProvider.getPasswordHash(categoryName);
+      if (passwordHash == null || passwordHash.isEmpty) continue;
+
+      final bool? isAuthorized = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => PinDialog(
+          correctHash: passwordHash,
+          titulo: 'PIN de: $categoryName (${i + 1}/${protectedCategories.length})',
+        ),
+      );
+
+      if (!mounted) return;
+      if (isAuthorized == true) {
+        _unlockedCategories.add(categoryName);
+      }
+    }
+  }
+
   // manejamos el menú y la navegación
   void _handleSaveCoordinatesFromMenu() {
     if (Navigator.canPop(context)) Navigator.pop(context);
@@ -646,24 +801,65 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _goToAllMemories() {
-    if (_memories.length > 1) {
-      if (!_isWeb) {
-        // Calculamos bounds para incluir todos los marcadores
-        LatLngBounds bounds = _calculateBounds();
-        mapController.animateCamera(
-          CameraUpdate.newLatLngBounds(bounds, 100),
-        );
-        Navigator.pop(context);
-        _showSnackbar('Mostrando todos los recuerdos (${_memories.length})');
-      } else {
-        Navigator.pop(context);
-        _showSnackbar('Mostrando todos los recuerdos (${_memories.length})');
-      }
+  void _goToAllMemories() async {
+  final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+  
+  // Filtrar solo memorias visibles (públicas + privadas desbloqueadas)
+  final visibleMemories = _memories.where((memory) {
+    final bool hasPassword = categoryProvider.isCategoryProtected(memory.category);
+    if (!hasPassword) return true;
+    return _unlockedCategories.contains(memory.category);
+  }).toList();
+  
+  if (visibleMemories.length > 1) {
+    if (!_isWeb) {
+      // Calcular bounds con las memorias visibles
+      LatLngBounds bounds = _calculateBoundsForList(visibleMemories);
+      mapController.animateCamera(
+        CameraUpdate.newLatLngBounds(bounds, 100),
+      );
+      Navigator.pop(context);
+      _showSnackbar('Mostrando ${visibleMemories.length} recuerdos visibles');
     } else {
-      _goToFirstMemory();
+      Navigator.pop(context);
+      _showSnackbar('Mostrando ${visibleMemories.length} recuerdos visibles');
     }
+  } else if (visibleMemories.length == 1) {
+    final firstMemory = visibleMemories.first;
+    if (_isWeb) {
+      _showSnackbar('Centrado en: ${firstMemory.title}');
+      Navigator.pop(context);
+    } else {
+      mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(firstMemory.toLatLng, 15),
+      );
+      Navigator.pop(context);
+      _showSnackbar('Centrado en: ${firstMemory.title}');
+    }
+  } else {
+    _showSnackbar('No hay recuerdos visibles', isError: true);
   }
+}
+
+// Nuevo método auxiliar
+LatLngBounds _calculateBoundsForList(List<Memory> list) {
+  double minLat = list[0].toLatLng.latitude;
+  double maxLat = list[0].toLatLng.latitude;
+  double minLng = list[0].toLatLng.longitude;
+  double maxLng = list[0].toLatLng.longitude;
+
+  for (var memory in list) {
+    minLat = math.min(minLat, memory.toLatLng.latitude);
+    maxLat = math.max(maxLat, memory.toLatLng.latitude);
+    minLng = math.min(minLng, memory.toLatLng.longitude);
+    maxLng = math.max(maxLng, memory.toLatLng.longitude);
+  }
+
+  return LatLngBounds(
+    southwest: LatLng(minLat, minLng),
+    northeast: LatLng(maxLat, maxLng),
+  );
+}
 
   // Función para centrar el mapa en la lista
   void _centerMapOnList(List<Memory> list) {
@@ -749,110 +945,168 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Future<void> _gestionarPdf() async {
-  final List<Memory> listaCopia = List.from(_memories);
-  final auth = Provider.of<AppAuthProvider>(context, listen: false);
-  final userName = auth.userMetadata?['full_name'] ?? auth.user?.email ?? 'Usuario';
+  Future<Set<String>?> _showPdfCategorySelector(
+    List<String> categories,
+    CategoryProvider categoryProvider,
+  ) async {
+    final Set<String> selected = categories.toSet();
 
-  if (listaCopia.isEmpty) {
-    _showSnackbar('No hay recuerdos para exportar', isError: true);
-    return;
-  }
-
-  final bool tienePrivados = listaCopia.any((m) => m.hasPassword);
-
-  if (!tienePrivados) {
-    PdfService().generarPdf(listaCopia, userName);
-    return;
-  }
-
-  // Preguntamos si incluir privados
-  final bool? incluirPrivados = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Contenido Protegido'),
-      content: const Text('¿Deseas incluir los recuerdos de tus carpetas protegidas en el PDF?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('No, omitirlos'),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Sí, incluir'),
-        ),
-      ],
-    ),
-  );
-
-  if (!mounted || incluirPrivados == null) return;
-
-  if (!incluirPrivados) {
-  final soloPublicos = listaCopia.where((m) => !m.hasPassword).toList();
-  
-  print('📊 ==== DEPURACIÓN PDF ====');
-  print('Total recuerdos: ${listaCopia.length}');
-  print('Privados (hasPassword=true): ${listaCopia.where((m) => m.hasPassword).length}');
-  print('Públicos: ${soloPublicos.length}');
-  
-  for (var m in listaCopia) {
-    if (m.isVideo) {
-      print('🎬 VIDEO: ${m.title} - Carpeta: ${m.category} - hasPassword: ${m.hasPassword}');
-    }
-  }
-  
-  if (soloPublicos.isEmpty) {
-    _showSnackbar('No hay recuerdos públicos para exportar', isError: true);
-  } else {
-    PdfService().generarPdf(soloPublicos, userName);
-  }
-  return;
-}
-
-  // Incluir privados: pedimos PIN por cada carpeta única
-  final hashes = listaCopia
-      .where((m) => m.hasPassword && m.passwordHash != null)
-      .map((m) => m.passwordHash!)
-      .toSet()
-      .toList();
-
-  final List<Memory> memoriasVerificadas = listaCopia.where((m) => !m.hasPassword).toList();
-
-  for (int i = 0; i < hashes.length; i++) {
-    if (!mounted) return;
-
-    final hashActual = hashes[i];
-    // Buscamos el nombre de la categoría para mostrarlo en el diálogo
-    final memoriaEjemplo = listaCopia.firstWhere((m) => m.passwordHash == hashActual);
-    final nombreCarpeta = memoriaEjemplo.category;
-
-    final bool? pinCorrecto = await showDialog<bool>(
+    return showDialog<Set<String>>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => PinDialog(
-        correctHash: hashActual,
-        titulo: 'PIN de: $nombreCarpeta (${i + 1}/${hashes.length})',
-      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) => AlertDialog(
+            title: const Text('Selecciona carpetas a exportar'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setLocalState(() {
+                            selected
+                              ..clear()
+                              ..addAll(categories);
+                          });
+                        },
+                        child: const Text('Todas'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setLocalState(selected.clear);
+                        },
+                        child: const Text('Ninguna'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: categories.length,
+                      itemBuilder: (context, index) {
+                        final category = categories[index];
+                        final isProtected =
+                            categoryProvider.isCategoryProtected(category);
+
+                        return CheckboxListTile(
+                          value: selected.contains(category),
+                          onChanged: (value) {
+                            setLocalState(() {
+                              if (value == true) {
+                                selected.add(category);
+                              } else {
+                                selected.remove(category);
+                              }
+                            });
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text(category),
+                          secondary: isProtected
+                              ? const Icon(Icons.lock, color: pinkPrimary)
+                              : const Icon(Icons.folder_open,
+                                  color: Colors.grey),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
+                onPressed: () => Navigator.pop(ctx, Set<String>.from(selected)),
+                child: const Text('Continuar'),
+              ),
+            ],
+          ),
+        );
+      },
     );
+  }
 
-    if (!mounted) return;
+  Future<void> _gestionarPdf() async {
+    final List<Memory> listaCopia = List.from(_memories);
+    final auth = Provider.of<AppAuthProvider>(context, listen: false);
+    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+    final userName = auth.userMetadata?['full_name'] ?? auth.user?.email ?? 'Usuario';
 
-    if (pinCorrecto == true) {
-      // Añadir TODOS los recuerdos de esta carpeta (incluyendo videos)
-      final recuerdosDeEstaCarpeta = listaCopia.where((m) => m.passwordHash == hashActual).toList();
-      memoriasVerificadas.addAll(recuerdosDeEstaCarpeta);
+    if (listaCopia.isEmpty) {
+      _showSnackbar('No hay recuerdos para exportar', isError: true);
+      return;
+    }
+
+    final categories = listaCopia.map((m) => m.category).toSet().toList()..sort();
+    final selectedCategories =
+        await _showPdfCategorySelector(categories, categoryProvider);
+
+    if (!mounted || selectedCategories == null) return;
+    if (selectedCategories.isEmpty) {
+      _showSnackbar('Selecciona al menos una carpeta', isError: true);
+      return;
+    }
+
+    final selectedMemories = listaCopia
+        .where((m) => selectedCategories.contains(m.category))
+        .toList();
+
+    final privateSelectedCategories = selectedCategories
+        .where((c) => categoryProvider.isCategoryProtected(c))
+        .toList();
+
+    final Set<String> unlockedForPdf = {};
+    for (int i = 0; i < privateSelectedCategories.length; i++) {
+      if (!mounted) return;
+
+      final category = privateSelectedCategories[i];
+      final hash = categoryProvider.getPasswordHash(category);
+
+      if (hash == null || hash.isEmpty) continue;
+
+      final bool? pinCorrecto = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => PinDialog(
+          correctHash: hash,
+          titulo: 'PIN de: $category (${i + 1}/${privateSelectedCategories.length})',
+        ),
+      );
+
+      if (!mounted) return;
+      if (pinCorrecto == true) {
+        unlockedForPdf.add(category);
+      }
+    }
+
+    final exportList = selectedMemories.where((m) {
+      final isProtected = categoryProvider.isCategoryProtected(m.category);
+      if (!isProtected) return true;
+      return unlockedForPdf.contains(m.category);
+    }).toList();
+
+    if (exportList.isEmpty) {
+      _showSnackbar('No hay recuerdos autorizados para exportar', isError: true);
+      return;
+    }
+
+    exportList.sort((a, b) => b.date.compareTo(a.date));
+    PdfService().generarPdf(exportList, userName);
+
+    final omittedPrivate = privateSelectedCategories.length - unlockedForPdf.length;
+    if (omittedPrivate > 0) {
+      _showSnackbar(
+        'PDF generado. Se omitieron $omittedPrivate carpetas privadas no verificadas.',
+      );
     }
   }
-
-  if (memoriasVerificadas.isEmpty) {
-    _showSnackbar('No se verificó ninguna carpeta', isError: true);
-  } else {
-    // Ordenar por fecha antes de generar
-    memoriasVerificadas.sort((a, b) => b.date.compareTo(a.date));
-    PdfService().generarPdf(memoriasVerificadas, userName);
-  }
-}
 
   void _onMapLongPress(LatLng position) {
     if (!_isWeb) {
@@ -1050,12 +1304,21 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   List<fmap.Marker> _buildWebMarkers() {
-    // FILTRAMOS LA LISTA SEGÚN LA CATEGORÍA ANTES DE CREAR LOS PINES WEB
-    final filteredList = _selectedCategory == 'Todas'
-        ? _memories
-        : _memories.where((m) => m.category == _selectedCategory).toList();
+  final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+  
+  // Filtrar según permisos
+  final visibleMemories = _memories.where((memory) {
+    final bool hasPassword = categoryProvider.isCategoryProtected(memory.category);
+    if (!hasPassword) return true;
+    return _unlockedCategories.contains(memory.category);
+  }).toList();
+  
+  // Aplicar filtro de categoría seleccionada
+  final filteredList = _selectedCategory == 'Todas'
+      ? visibleMemories
+      : visibleMemories.where((m) => m.category == _selectedCategory).toList();
 
-    return filteredList.map((memory) {
+  return filteredList.map((memory) {
       return fmap.Marker(
         point: latlong2.LatLng(
           memory.toLatLng.latitude,

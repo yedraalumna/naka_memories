@@ -42,12 +42,12 @@ class _PinDialogState extends State<PinDialog> {
     final hashInput = sha256.convert(utf8.encode(pin)).toString();
 
     if (hashInput == widget.correctHash) {
-      // ✅ PIN correcto: cerramos devolviendo TRUE
+      // PIN correcto: cerramos devolviendo TRUE
       if (mounted) {
         Navigator.pop(context, true);
       }
     } else {
-      // ❌ PIN incorrecto: mostramos error, NO cerramos
+      // PIN incorrecto: mostramos error, NO cerramos
       if (mounted) {
         setState(() {
           errorMessage = "PIN incorrecto";
@@ -131,7 +131,6 @@ class _PinDialogState extends State<PinDialog> {
           onPressed: isVerifying
               ? null
               : () {
-                  // ✅ Cancelar: cerramos devolviendo FALSE
                   Navigator.pop(context, false);
                 },
           child: const Text(

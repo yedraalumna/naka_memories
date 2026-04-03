@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../providers/category_provider.dart';
 import '../providers/theme_provider.dart';
+import 'package:crypto/crypto.dart';
+import 'pin_dialog.dart';
 
 class CategoryManager extends StatefulWidget {
   const CategoryManager({Key? key}) : super(key: key);
@@ -356,6 +359,18 @@ class _CategoryManagerState extends State<CategoryManager> {
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        categoryProvider.isCategoryProtected(category)
+                                            ? Icons.lock
+                                            : Icons.lock_open,
+                                        color: categoryProvider.isCategoryProtected(category)
+                                            ? Colors.orange
+                                            : Colors.grey,
+                                      ),
+                                      onPressed: () => _manageCategoryPin(category),
+                                      tooltip: 'Proteger con PIN',
+                                    ),
                                     if (!isGeneral)
                                       IconButton(
                                         icon: const Icon(Icons.edit, color: Colors.blue),
@@ -385,6 +400,144 @@ class _CategoryManagerState extends State<CategoryManager> {
       ),
     );
   }
+
+  Future<void> _manageCategoryPin(String categoryName) async {
+  final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+  final isProtected = categoryProvider.isCategoryProtected(categoryName);
+  final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+  final isDarkMode = themeProvider.isDarkMode;
+
+  if (isProtected) {
+    final currentHash = categoryProvider.getPasswordHash(categoryName);
+    if (currentHash == null || currentHash.isEmpty) {
+      _showError('No se encontró el PIN actual de esta carpeta');
+      return;
+    }
+
+    final bool? authorized = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PinDialog(
+        correctHash: currentHash,
+        titulo: 'Verificar PIN para eliminar',
+      ),
+    );
+
+    if (authorized != true) {
+      _showError('PIN incorrecto. No se eliminó la protección');
+      return;
+    }
+
+    // Si ya tiene PIN, preguntar si quiere eliminarlo
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? cardDark : Colors.white,
+        title: const Text('Eliminar PIN'),
+        content: Text('¿Quieres eliminar el PIN de la carpeta "$categoryName"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm == true) {
+      await categoryProvider.setCategoryPassword(categoryName, null);
+      _showSuccess('PIN eliminado de "$categoryName"');
+      setState(() {});
+    }
+  } else {
+    // Pedir nuevo PIN
+    final TextEditingController pinController = TextEditingController();
+    final TextEditingController confirmController = TextEditingController();
+    
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? cardDark : Colors.white,
+        title: const Text('Proteger Carpeta con PIN'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Establece un PIN de 6 dígitos para proteger esta carpeta'),
+            const SizedBox(height: 20),
+            TextField(
+              controller: pinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 24, letterSpacing: 8),
+              decoration: InputDecoration(
+                hintText: 'PIN',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: confirmController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 24, letterSpacing: 8),
+              decoration: InputDecoration(
+                hintText: 'Confirmar PIN',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final pin = pinController.text.trim();
+              final confirm = confirmController.text.trim();
+              
+              if (pin.length != 6) {
+                _showError('El PIN debe tener 6 dígitos');
+                return;
+              }
+              if (pin != confirm) {
+                _showError('Los PINs no coinciden');
+                return;
+              }
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
+            child: const Text('Guardar PIN'),
+          ),
+        ],
+      ),
+    );
+    
+    // En _manageCategoryPin, después de setCategoryPassword
+    if (result == true) {
+      final pin = pinController.text.trim();
+      final hash = sha256.convert(utf8.encode(pin)).toString();
+      await categoryProvider.setCategoryPassword(categoryName, hash);
+      
+      _showSuccess('Carpeta "$categoryName" protegida con PIN');
+      setState(() {});
+    }
+  }
+}
 
   Future<void> _showRestoreDialog() async {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);

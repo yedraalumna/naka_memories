@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../models/Memory.dart';
 import '../services/MemoryService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,15 +18,32 @@ class CategoryProvider with ChangeNotifier {
   List<String> get categories => _categories;
   bool get isLoading => _isLoading;
 
+  String? getCategoryHash(String categoryName) {
+    return _categoryPasswords[categoryName];
+  }
+
+  /// Alias para isCategoryProtected (por si prefieres el nombre más corto)
+bool hasPassword(String categoryName) {
+  return isCategoryProtected(categoryName);
+}
+
   // Constructor
   CategoryProvider() {
     _loadPasswords(); // Cargar los PINs guardados
     loadCategories();
   }
 
+  Future<void> init() async {
+    await _loadPasswords();
+    await loadCategories();
+  }
+
   // Cargar los PINs desde SharedPreferences
   Future<void> _loadPasswords() async {
     try {
+      // 1) Intentar recuperar desde recuerdos (Supabase + local)
+      final fromMemories = await _memoryService.getCategoryPasswordsFromMemories();
+
       final prefs = await SharedPreferences.getInstance();
       final passwordsJson = prefs.getString(_passwordsKey);
       if (passwordsJson != null) {
@@ -36,19 +52,12 @@ class CategoryProvider with ChangeNotifier {
         );
         _categoryPasswords = decoded.map((key, value) => MapEntry(key, value as String?));
       }
+
+      // 2) Lo que venga de recuerdos tiene prioridad para sincronizar entre dispositivos
+      _categoryPasswords.addAll(fromMemories);
+      await _savePasswords();
     } catch (e) {
       print('Error cargando contraseñas: $e');
-    }
-  }
-
-  // Guardar los PINs en SharedPreferences
-  Future<void> _savePasswords() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final passwordsJson = jsonEncode(_categoryPasswords);
-      await prefs.setString(_passwordsKey, passwordsJson);
-    } catch (e) {
-      print('Error guardando contraseñas: $e');
     }
   }
 
@@ -66,14 +75,21 @@ class CategoryProvider with ChangeNotifier {
 
   /// Establece o elimina la protección de una categoría
   Future<void> setCategoryPassword(String categoryName, String? passwordHash) async {
-    if (passwordHash == null || passwordHash.isEmpty) {
-      _categoryPasswords.remove(categoryName);
-    } else {
-      _categoryPasswords[categoryName] = passwordHash;
-    }
-    await _savePasswords();
-    notifyListeners();
+  print('🔐 setCategoryPassword: $categoryName, hash: ${passwordHash != null ? "PROVIDED" : "NULL"}');
+  
+  if (passwordHash == null || passwordHash.isEmpty) {
+    _categoryPasswords.remove(categoryName);
+  } else {
+    _categoryPasswords[categoryName] = passwordHash;
   }
+
+  // Sincroniza el estado de protección en recuerdos (local + Supabase).
+  await _memoryService.applyCategoryPasswordToMemories(categoryName, passwordHash);
+  
+  print('📝 _categoryPasswords actual: $_categoryPasswords');
+  await _savePasswords();
+  notifyListeners();
+}
 
   /// CARGAR CATEGORÍAS: Solo trae las que existen en la base de datos
   Future<void> loadCategories() async {
@@ -197,4 +213,31 @@ class CategoryProvider with ChangeNotifier {
   Future<void> syncCategories() async {
     await loadCategories();
   }
+
+  // En CategoryProvider - Agrega este método
+Future<void> debugPrintAllPasswords() async {
+  print('🔐 ==== CATEGORÍAS PROTEGIDAS ====');
+  print('Total en memoria: ${_categoryPasswords.length}');
+  _categoryPasswords.forEach((key, value) {
+    print('   📁 $key: ${value != null ? "HASH: ${value!.substring(0, 10)}..." : "SIN HASH"}');
+  });
+  
+  // También verificar en SharedPreferences directamente
+  final prefs = await SharedPreferences.getInstance();
+  final savedJson = prefs.getString(_passwordsKey);
+  print('📦 SharedPreferences: ${savedJson ?? "VACÍO"}');
+  print('================================');
+}
+
+Future<void> _savePasswords() async {
+  try {
+    print('💾 Guardando contraseñas: $_categoryPasswords');
+    final prefs = await SharedPreferences.getInstance();
+    final passwordsJson = jsonEncode(_categoryPasswords);
+    await prefs.setString(_passwordsKey, passwordsJson);
+    print('✅ Contraseñas guardadas correctamente');
+  } catch (e) {
+    print('❌ Error guardando contraseñas: $e');
+  }
+}
 }

@@ -79,12 +79,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   // ✅ CORREGIDO: usa el nuevo PinDialog que devuelve true/false
   Future<void> _onFolderTap(
       String category, Map<String, List<Memory>> grouped) async {
-    final memoriesInCategory = grouped[category] ?? [];
-
-    final folderHasPassword = memoriesInCategory.any((m) => m.hasPassword);
-    final passwordHash = folderHasPassword
-        ? memoriesInCategory.firstWhere((m) => m.hasPassword).passwordHash
-        : null;
+    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+    final folderHasPassword = categoryProvider.isCategoryProtected(category);
+    final passwordHash = categoryProvider.getPasswordHash(category);
 
     if (folderHasPassword && passwordHash != null && passwordHash.isNotEmpty) {
       final bool? correcto = await showDialog<bool>(
@@ -148,6 +145,10 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               final pin = pinController.text;
               if (pin.length == 6) {
                 final hash = sha256.convert(utf8.encode(pin)).toString();
+                final categoryProvider =
+                    Provider.of<CategoryProvider>(context, listen: false);
+
+                await categoryProvider.setCategoryPassword(category, hash);
 
                 for (var memory
                     in _memories.where((m) => m.category == category)) {
@@ -458,6 +459,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     List<String> categories,
     Map<String, List<Memory>> grouped,
     ThemeProvider themeProvider,
+    CategoryProvider categoryProvider,
   ) {
     if (categories.isEmpty) {
       return Center(
@@ -485,9 +487,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       itemBuilder: (context, index) {
         final cat = categories[index];
         final lastMemory = _getLastMemoryForCategory(cat, grouped);
-        final isProtected = grouped[cat]
-                ?.any((m) => m.hasPassword == true && m.passwordHash != null) ??
-            false;
+        final isProtected = categoryProvider.isCategoryProtected(cat);
 
         return GestureDetector(
           onTap: () => _onFolderTap(cat, grouped),
@@ -761,7 +761,12 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               ? _buildEmptyState(themeProvider)
               : _selectedCategory == null
                   ? _buildFolderGrid(
-                      context, categories, groupedMemories, themeProvider)
+                      context,
+                      categories,
+                      groupedMemories,
+                      themeProvider,
+                      categoryProvider,
+                    )
                   : _buildMemoryList(context,
                       groupedMemories[_selectedCategory] ?? [], themeProvider),
     );
