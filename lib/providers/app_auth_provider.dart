@@ -18,7 +18,7 @@ class AppAuthProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
   
   // Generador de UUIDs
-  const _uuid = Uuid();
+  final _uuid = Uuid();
 
   AppAuthProvider() {
     _checkCurrentUser();
