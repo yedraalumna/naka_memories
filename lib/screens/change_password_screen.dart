@@ -85,7 +85,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         labelStyle: TextStyle(color: iconColor),
                         prefixIcon: Icon(Icons.email, color: iconColor),
                         border: const OutlineInputBorder(),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: pinkPrimary),
                         ),
                         enabledBorder: OutlineInputBorder(

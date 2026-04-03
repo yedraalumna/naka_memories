@@ -165,7 +165,7 @@ class PdfService {
                       pw.SizedBox(width: 10),
                       pw.Text(
                         'Usuario',
-                        style: pw.TextStyle(
+                        style: const pw.TextStyle(
                           fontSize: 16,
                           color: PdfColors.grey600,
                         ),
@@ -383,8 +383,8 @@ class PdfService {
                             children: [
                               pw.Expanded(
                                 child: pw.Text(
-                                  '${recuerdo.imageAsset?.split('/').last ?? 'video.mp4'}',
-                                  style: pw.TextStyle(
+                                  recuerdo.imageAsset?.split('/').last ?? 'video.mp4',
+                                  style: const pw.TextStyle(
                                     fontSize: 11,
                                     color: PdfColors.blue800,
                                   ),
@@ -507,7 +507,7 @@ class PdfService {
                         pw.SizedBox(width: 8),
                         pw.Text(
                           'Nayeka Memories',
-                          style: pw.TextStyle(
+                          style: const pw.TextStyle(
                               fontSize: 9, color: PdfColors.grey500),
                         ),
                       ],
@@ -518,7 +518,7 @@ class PdfService {
                         pw.SizedBox(width: 3),
                         pw.Text(
                           '${recuerdo.latitude.toStringAsFixed(4)}, ${recuerdo.longitude.toStringAsFixed(4)}',
-                          style: pw.TextStyle(
+                          style: const pw.TextStyle(
                               fontSize: 9, color: PdfColors.grey500),
                         ),
                       ],
@@ -570,7 +570,7 @@ class PdfService {
         ),
         pw.Text(
           label,
-          style: pw.TextStyle(
+          style: const pw.TextStyle(
             fontSize: 11,
             color: PdfColors.grey600,
           ),

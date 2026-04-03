@@ -21,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _widgetOptions = <Widget>[
     const MemoryGalleryScreen(),
-    MapScreen(isLibrary: true),
+    const MapScreen(isLibrary: true),
     const ProfileScreen(),
   ];
 

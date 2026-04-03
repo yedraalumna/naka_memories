@@ -219,7 +219,7 @@ Future<void> debugPrintAllPasswords() async {
   print('🔐 ==== CATEGORÍAS PROTEGIDAS ====');
   print('Total en memoria: ${_categoryPasswords.length}');
   _categoryPasswords.forEach((key, value) {
-    print('   📁 $key: ${value != null ? "HASH: ${value!.substring(0, 10)}..." : "SIN HASH"}');
+    print('   📁 $key: ${value != null ? "HASH: ${value.substring(0, 10)}..." : "SIN HASH"}');
   });
   
   // También verificar en SharedPreferences directamente

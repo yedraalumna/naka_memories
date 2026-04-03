@@ -64,7 +64,7 @@ class _PinDialogState extends State<PinDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(
         children: [
-          Icon(Icons.lock, color: pinkPrimary, size: 28),
+          const Icon(Icons.lock, color: pinkPrimary, size: 28),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

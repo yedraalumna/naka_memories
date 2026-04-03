@@ -41,7 +41,8 @@ class _MemoryFormState extends State<MemoryForm> {
   final TextEditingController _dateController = TextEditingController();
   final ImagePickerService _pickerService = ImagePickerService();
   final MemoryService _memoryService = MemoryService();
-  final TextEditingController _customCategoryController = TextEditingController();
+  final TextEditingController _customCategoryController =
+      TextEditingController();
 
   bool _protectNewCategory = false;
   String _newCategoryPin = '';
@@ -72,18 +73,18 @@ class _MemoryFormState extends State<MemoryForm> {
     'assets/images/memory4.jpg',
   ];
 
- @override
-void initState() {
-  super.initState();
-  _currentFormLocation = widget.location;
-  _loadCategories();
-  
-  // Inicializar controladores de PIN
-  _pinController = TextEditingController();
-  _confirmPinController = TextEditingController();
-}
+  @override
+  void initState() {
+    super.initState();
+    _currentFormLocation = widget.location;
+    _loadCategories();
 
-    void _initializeFormData() {
+    // Inicializar controladores de PIN
+    _pinController = TextEditingController();
+    _confirmPinController = TextEditingController();
+  }
+
+  void _initializeFormData() {
     if (widget.existingMemory != null) {
       _titleController.text = widget.existingMemory!.title;
       _descriptionController.text = widget.existingMemory!.description;
@@ -107,9 +108,10 @@ void initState() {
   Future<void> _loadCategories() async {
     setState(() => _isLoadingCategories = true);
     try {
-      final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+      final categoryProvider =
+          Provider.of<CategoryProvider>(context, listen: false);
       await categoryProvider.loadCategories();
-      
+
       setState(() {
         _categories = List.from(categoryProvider.categories);
         _isLoadingCategories = false;
@@ -554,7 +556,7 @@ void initState() {
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
                               color: isDarkMode ? cardLight : pinkLighter,
-                              child: Icon(Icons.error, color: pinkDark),
+                              child: const Icon(Icons.error, color: pinkDark),
                             ),
                           ),
                         ),
@@ -591,10 +593,10 @@ void initState() {
     }
 
     if (_selectedAsset == null || _selectedAsset!.isEmpty) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
+          children: [
             Icon(Icons.add_a_photo, color: pinkPrimary, size: 40),
             SizedBox(height: 5),
             Text('Añadir Foto o Video', style: TextStyle(color: pinkPrimary)),
@@ -607,10 +609,10 @@ void initState() {
     if (_isVideo) {
       return Container(
         color: Colors.black87,
-        child: Center(
+        child: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
+            children: [
               Icon(Icons.play_circle_fill, color: Colors.white, size: 50),
               SizedBox(height: 10),
               Text('Video seleccionado', style: TextStyle(color: Colors.white)),
@@ -626,7 +628,7 @@ void initState() {
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => Container(
           color: pinkLighter,
-          child: Center(
+          child: const Center(
             child: Icon(Icons.error, color: pinkDark, size: 40),
           ),
         ),
@@ -644,7 +646,7 @@ void initState() {
       } catch (e) {
         return Container(
           color: pinkLighter,
-          child: Center(
+          child: const Center(
             child: Icon(Icons.error, color: pinkDark, size: 40),
           ),
         );
@@ -658,7 +660,7 @@ void initState() {
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => Container(
           color: pinkLighter,
-          child: Center(
+          child: const Center(
             child: Icon(Icons.error, color: pinkDark, size: 40),
           ),
         ),
@@ -684,7 +686,7 @@ void initState() {
         },
         errorBuilder: (context, error, stackTrace) => Container(
           color: pinkLighter,
-          child: Center(
+          child: const Center(
             child: Icon(Icons.error, color: pinkDark, size: 40),
           ),
         ),
@@ -692,12 +694,12 @@ void initState() {
     }
 
     // Por defecto
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.image_not_supported, color: pinkPrimary, size: 40),
-          const SizedBox(height: 5),
+          SizedBox(height: 5),
           Text('Imagen no compatible', style: TextStyle(color: pinkPrimary)),
         ],
       ),
@@ -705,177 +707,179 @@ void initState() {
   }
 
   Future<void> _saveMemory() async {
-  if (_isSaving) return;
+    if (_isSaving) return;
 
-  final title = _titleController.text.trim();
-  final description = _descriptionController.text.trim();
-  final date = _dateController.text.trim();
+    final title = _titleController.text.trim();
+    final description = _descriptionController.text.trim();
+    final date = _dateController.text.trim();
 
-  // Validaciones básicas
-  if (title.isEmpty || date.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Por favor, completa los campos obligatorios'),
-        backgroundColor: Colors.red,
-      ),
-    );
-    return;
-  }
-
-  // LÓGICA DE CATEGORÍA: Determinar cuál usar
-  String finalCategory = _selectedCategory;
-  bool isProtected = false;
-  String? passwordHash;
-  final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
-
-  if (_isCustomCategory) {
-  final customText = _customCategoryController.text.trim();
-  if (customText.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Por favor, escribe un nombre para la nueva categoría'),
-        backgroundColor: Colors.red,
-      ),
-    );
-    return;
-  }
-
-  finalCategory = customText;
-  isProtected = false;
-  passwordHash = null;
-
-  // Crear la nueva categoría usando el Provider
-  try {
-    await categoryProvider.createCategory(finalCategory);
-    
-    // 🔥 NUEVO: Si el usuario quiere proteger la categoría, guardar el PIN
-    if (_protectNewCategory) {
-      if (_newCategoryPin.length != 6) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('El PIN debe tener 6 dígitos'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-      if (_newCategoryPin != _confirmNewCategoryPin) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Los PINs no coinciden'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-      
-      // Generar hash del PIN y guardarlo
-      final hash = sha256.convert(utf8.encode(_newCategoryPin)).toString();
-      await categoryProvider.setCategoryPassword(finalCategory, hash);
-      print('✅ Categoría "$finalCategory" protegida con PIN');
-    }
-    
-    await _loadCategories();
-    widget.onCategoriesChanged?.call();
-  } catch (e) {
-    print('Error creando categoría: $e');
-    categoryProvider.addCategoryLocally(finalCategory);
-  }
-}
-
-  // Fuente única de verdad del PIN: protección configurada por categoría
-  isProtected = categoryProvider.isCategoryProtected(finalCategory);
-  passwordHash = categoryProvider.getPasswordHash(finalCategory);
-
-  setState(() => _isSaving = true);
-
-  try {
-    // Determinar qué ubicación usar
-    double latitude, longitude;
-
-    bool ubicacionModificada =
-        _currentFormLocation.latitude != widget.location.latitude ||
-            _currentFormLocation.longitude != widget.location.longitude;
-
-    if (ubicacionModificada) {
-      latitude = _currentFormLocation.latitude;
-      longitude = _currentFormLocation.longitude;
-      print('Usando ubicación manual: $latitude, $longitude');
-    } else if (_usePhotoLocation &&
-        _photoLatitude != null &&
-        _photoLongitude != null) {
-      latitude = _photoLatitude!;
-      longitude = _photoLongitude!;
-      print('Usando ubicación actual: $latitude, $longitude');
-    } else {
-      latitude = _currentFormLocation.latitude;
-      longitude = _currentFormLocation.longitude;
-      print('Usando ubicación del formulario: $latitude, $longitude');
-    }
-
-    // 3. Crear el objeto Memory con la categoría correcta
-    Memory memoryToSave = Memory(
-      id: widget.existingMemory?.id ?? '',
-      title: title,
-      description: description,
-      date: date,
-      location: {
-        'latitude': latitude,
-        'longitude': longitude,
-      },
-      imageAsset: _selectedAsset,
-      category: finalCategory,
-      hasPassword: isProtected,  // ← CORRECTO
-      passwordHash: passwordHash, // ← CORRECTO
-    );
-
-    Memory finalMemory;
-
-    // Lógica de guardado según el tipo de archivo
-    if (_selectedBytes != null && _selectedBytes!.isNotEmpty) {
-      if (_isVideo) {
-        print('Subiendo video...');
-        finalMemory = await _memoryService.saveMemoryWithVideo(
-          memory: memoryToSave,
-          videoBytes: _selectedBytes!,
-        );
-      } else {
-        print('Subiendo imagen...');
-        final savedId = await _memoryService.saveMemoryWithImage(
-          memory: memoryToSave,
-          imageBytes: _selectedBytes!,
-        );
-        final memories = await _memoryService.getMemories();
-        finalMemory = memories.firstWhere((m) => m.id == savedId);
-      }
-    } else {
-      await _memoryService.saveMemory(memoryToSave);
-      finalMemory = memoryToSave;
-    }
-
-    if (mounted) {
+    // Validaciones básicas
+    if (title.isEmpty || date.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Recuerdo guardado correctamente'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      widget.onSave(finalMemory);
-    }
-  } catch (e) {
-    print('Error guardando recuerdo: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al guardar: $e'),
+          content: Text('Por favor, completa los campos obligatorios'),
           backgroundColor: Colors.red,
         ),
       );
+      return;
     }
-  } finally {
-    if (mounted) setState(() => _isSaving = false);
+
+    // LÓGICA DE CATEGORÍA: Determinar cuál usar
+    String finalCategory = _selectedCategory;
+    bool isProtected = false;
+    String? passwordHash;
+    final categoryProvider =
+        Provider.of<CategoryProvider>(context, listen: false);
+
+    if (_isCustomCategory) {
+      final customText = _customCategoryController.text.trim();
+      if (customText.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Por favor, escribe un nombre para la nueva categoría'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      finalCategory = customText;
+      isProtected = false;
+      passwordHash = null;
+
+      // Crear la nueva categoría usando el Provider
+      try {
+        await categoryProvider.createCategory(finalCategory);
+
+        // 🔥 NUEVO: Si el usuario quiere proteger la categoría, guardar el PIN
+        if (_protectNewCategory) {
+          if (_newCategoryPin.length != 6) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('El PIN debe tener 6 dígitos'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+          if (_newCategoryPin != _confirmNewCategoryPin) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Los PINs no coinciden'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
+          // Generar hash del PIN y guardarlo
+          final hash = sha256.convert(utf8.encode(_newCategoryPin)).toString();
+          await categoryProvider.setCategoryPassword(finalCategory, hash);
+          print('✅ Categoría "$finalCategory" protegida con PIN');
+        }
+
+        await _loadCategories();
+        widget.onCategoriesChanged?.call();
+      } catch (e) {
+        print('Error creando categoría: $e');
+        categoryProvider.addCategoryLocally(finalCategory);
+      }
+    }
+
+    // Fuente única de verdad del PIN: protección configurada por categoría
+    isProtected = categoryProvider.isCategoryProtected(finalCategory);
+    passwordHash = categoryProvider.getPasswordHash(finalCategory);
+
+    setState(() => _isSaving = true);
+
+    try {
+      // Determinar qué ubicación usar
+      double latitude, longitude;
+
+      bool ubicacionModificada =
+          _currentFormLocation.latitude != widget.location.latitude ||
+              _currentFormLocation.longitude != widget.location.longitude;
+
+      if (ubicacionModificada) {
+        latitude = _currentFormLocation.latitude;
+        longitude = _currentFormLocation.longitude;
+        print('Usando ubicación manual: $latitude, $longitude');
+      } else if (_usePhotoLocation &&
+          _photoLatitude != null &&
+          _photoLongitude != null) {
+        latitude = _photoLatitude!;
+        longitude = _photoLongitude!;
+        print('Usando ubicación actual: $latitude, $longitude');
+      } else {
+        latitude = _currentFormLocation.latitude;
+        longitude = _currentFormLocation.longitude;
+        print('Usando ubicación del formulario: $latitude, $longitude');
+      }
+
+      // 3. Crear el objeto Memory con la categoría correcta
+      Memory memoryToSave = Memory(
+        id: widget.existingMemory?.id ?? '',
+        title: title,
+        description: description,
+        date: date,
+        location: {
+          'latitude': latitude,
+          'longitude': longitude,
+        },
+        imageAsset: _selectedAsset,
+        category: finalCategory,
+        hasPassword: isProtected, // ← CORRECTO
+        passwordHash: passwordHash, // ← CORRECTO
+      );
+
+      Memory finalMemory;
+
+      // Lógica de guardado según el tipo de archivo
+      if (_selectedBytes != null && _selectedBytes!.isNotEmpty) {
+        if (_isVideo) {
+          print('Subiendo video...');
+          finalMemory = await _memoryService.saveMemoryWithVideo(
+            memory: memoryToSave,
+            videoBytes: _selectedBytes!,
+          );
+        } else {
+          print('Subiendo imagen...');
+          final savedId = await _memoryService.saveMemoryWithImage(
+            memory: memoryToSave,
+            imageBytes: _selectedBytes!,
+          );
+          final memories = await _memoryService.getMemories();
+          finalMemory = memories.firstWhere((m) => m.id == savedId);
+        }
+      } else {
+        await _memoryService.saveMemory(memoryToSave);
+        finalMemory = memoryToSave;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Recuerdo guardado correctamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        widget.onSave(finalMemory);
+      }
+    } catch (e) {
+      print('Error guardando recuerdo: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -937,7 +941,7 @@ void initState() {
                       borderSide:
                           const BorderSide(color: pinkPrimary, width: 2),
                     ),
-                    prefixIcon: Icon(Icons.title, color: pinkPrimary),
+                    prefixIcon: const Icon(Icons.title, color: pinkPrimary),
                     fillColor: isDarkMode ? cardDark : Colors.white,
                     filled: true,
                   ),
@@ -972,7 +976,7 @@ void initState() {
                       borderSide:
                           const BorderSide(color: pinkPrimary, width: 2),
                     ),
-                    prefixIcon: Icon(Icons.description, color: pinkPrimary),
+                    prefixIcon: const Icon(Icons.description, color: pinkPrimary),
                     fillColor: isDarkMode ? cardDark : Colors.white,
                     filled: true,
                   ),
@@ -1013,7 +1017,7 @@ void initState() {
                               const BorderSide(color: pinkPrimary, width: 2),
                         ),
                         prefixIcon:
-                            Icon(Icons.calendar_today, color: pinkPrimary),
+                            const Icon(Icons.calendar_today, color: pinkPrimary),
                         fillColor: isDarkMode ? cardDark : Colors.white,
                         filled: true,
                       ),
@@ -1078,7 +1082,8 @@ void initState() {
                                 fillColor: isDarkMode ? cardDark : Colors.white,
                               ),
                               style: TextStyle(
-                                color: isDarkMode ? textDarkMode : Colors.black87,
+                                color:
+                                    isDarkMode ? textDarkMode : Colors.black87,
                                 fontSize: 16,
                               ),
                             ),
@@ -1141,7 +1146,8 @@ void initState() {
                             child: Text(
                               'Proteger esta carpeta con PIN',
                               style: TextStyle(
-                                color: isDarkMode ? textDarkMode : Colors.black87,
+                                color:
+                                    isDarkMode ? textDarkMode : Colors.black87,
                               ),
                             ),
                           ),
@@ -1156,7 +1162,8 @@ void initState() {
                           obscureText: true,
                           maxLength: 6,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 24, letterSpacing: 8),
+                          style:
+                              const TextStyle(fontSize: 24, letterSpacing: 8),
                           decoration: InputDecoration(
                             hintText: 'PIN de 6 dígitos',
                             border: OutlineInputBorder(
@@ -1181,7 +1188,8 @@ void initState() {
                           obscureText: true,
                           maxLength: 6,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 24, letterSpacing: 8),
+                          style:
+                              const TextStyle(fontSize: 24, letterSpacing: 8),
                           decoration: InputDecoration(
                             hintText: 'Confirmar PIN',
                             border: OutlineInputBorder(
@@ -1217,11 +1225,13 @@ void initState() {
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         // Aseguramos que el valor seleccionado exista en la lista actual
-                          value: _categories.contains(_selectedCategory)
+                        value: _categories.contains(_selectedCategory)
                             ? _selectedCategory
-                            : (_categories.isNotEmpty ? _categories.first : null),
-                            isExpanded: true,
-                            itemHeight:
+                            : (_categories.isNotEmpty
+                                ? _categories.first
+                                : null),
+                        isExpanded: true,
+                        itemHeight:
                             60, // Altura ampliada para facilitar el toque
                         dropdownColor: isDarkMode ? cardDark : Colors.white,
                         icon: const Icon(Icons.arrow_drop_down,
@@ -1250,11 +1260,11 @@ void initState() {
                             );
                           }),
                           // Opción especial al final para crear nueva
-                          DropdownMenuItem<String>(
+                          const DropdownMenuItem<String>(
                             value:
                                 'custom_option_marker', // Valor identificador único
                             child: Row(
-                              children: const [
+                              children: [
                                 Icon(Icons.add_circle_outline,
                                     color: pinkPrimary, size: 24),
                                 SizedBox(width: 15),
@@ -1395,7 +1405,7 @@ void initState() {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.location_on, color: pinkPrimary, size: 20),
+                        const Icon(Icons.location_on, color: pinkPrimary, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -1414,7 +1424,7 @@ void initState() {
                               const SizedBox(height: 2),
                               Text(
                                 '${_currentFormLocation.latitude.toStringAsFixed(6)}, ${_currentFormLocation.longitude.toStringAsFixed(6)}',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 14,
                                   color: pinkPrimary,
                                   fontWeight: FontWeight.w500,
@@ -1424,7 +1434,7 @@ void initState() {
                             ],
                           ),
                         ),
-                        Icon(Icons.open_in_new, color: pinkPrimary, size: 18),
+                        const Icon(Icons.open_in_new, color: pinkPrimary, size: 18),
                       ],
                     ),
                   ),
@@ -1517,13 +1527,13 @@ void initState() {
   }
 
   @override
-void dispose() {
-  _titleController.dispose();
-  _descriptionController.dispose();
-  _dateController.dispose();
-  _customCategoryController.dispose();
-  _pinController.dispose();        // 🔥 Agregar
-  _confirmPinController.dispose(); // 🔥 Agregar
-  super.dispose();
-}
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _dateController.dispose();
+    _customCategoryController.dispose();
+    _pinController.dispose();
+    _confirmPinController.dispose();
+    super.dispose();
+  }
 }

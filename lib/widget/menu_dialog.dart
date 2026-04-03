@@ -4,10 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
 import 'MemoryThumbnail.dart';
-import '../services/pdfService.dart';
-import '../providers/app_auth_provider.dart';
 import '../providers/theme_provider.dart';
-import '../widget/pin_dialog.dart';
 
 class MenuDialog extends StatefulWidget {
   final List<Memory> memories;

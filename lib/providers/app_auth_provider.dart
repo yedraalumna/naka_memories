@@ -18,7 +18,7 @@ class AppAuthProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
   
   // Generador de UUIDs
-  final _uuid = Uuid();
+  const _uuid = Uuid();
 
   AppAuthProvider() {
     _checkCurrentUser();
@@ -150,7 +150,7 @@ Future<bool> register(String email, String password) async {
     notifyListeners();
 
     // URL diferente según la plataforma (Web o Android/iOS)
-    final redirectUrl = kIsWeb
+    const redirectUrl = kIsWeb
         ? 'https://nayekamemories.cloud-ip.cc/callback'
         : 'io.nayekamemories.app://callback';
 
@@ -534,7 +534,7 @@ Future<bool> register(String email, String password) async {
       _errorMessage = null;
       notifyListeners();
 
-      final redirectUrl = kIsWeb
+      const redirectUrl = kIsWeb
           ? 'https://nayekamemories.cloud-ip.cc/callback'
           : 'io.nayekamemories.app://callback';
 

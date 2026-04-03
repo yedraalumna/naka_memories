@@ -392,7 +392,7 @@ https://nayeka-memories.com
       height: 250,
       color: isDarkMode ? cardDark : pinkLighter,
       alignment: Alignment.center,
-      child: Icon(Icons.error, color: pinkPrimary, size: 50),
+      child: const Icon(Icons.error, color: pinkPrimary, size: 50),
     );
   }
 
@@ -464,7 +464,7 @@ https://nayeka-memories.com
   Widget _buildDate(bool isDarkMode) {
     return Row(
       children: [
-        Icon(Icons.calendar_today, color: pinkPrimary, size: 18),
+        const Icon(Icons.calendar_today, color: pinkPrimary, size: 18),
         const SizedBox(width: 8),
         Text(
           widget.memory.date,
@@ -518,7 +518,7 @@ https://nayeka-memories.com
         children: [
           Row(
             children: [
-              Icon(Icons.location_on, color: pinkPrimary, size: 24),
+              const Icon(Icons.location_on, color: pinkPrimary, size: 24),
               const SizedBox(width: 10),
               Text(
                 'Ubicación Exacta',
@@ -533,7 +533,7 @@ https://nayeka-memories.com
           const SizedBox(height: 15),
           Row(
             children: [
-              Icon(Icons.north, color: pinkPrimary, size: 16),
+              const Icon(Icons.north, color: pinkPrimary, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -549,7 +549,7 @@ https://nayeka-memories.com
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.east, color: pinkPrimary, size: 16),
+              const Icon(Icons.east, color: pinkPrimary, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -640,8 +640,8 @@ https://nayeka-memories.com
                 side: const BorderSide(color: pinkPrimary, width: 2),
               ),
             ),
-            icon: Icon(Icons.delete, color: pinkPrimary),
-            label: Text(
+            icon: const Icon(Icons.delete, color: pinkPrimary),
+            label: const Text(
               'Eliminar',
               style: TextStyle(
                 color: pinkPrimary,
@@ -686,7 +686,7 @@ https://nayeka-memories.com
 
               // Opción 1: Editar solo la ubicación (coordenadas)
               ListTile(
-                leading: Icon(Icons.edit_location, color: pinkPrimary),
+                leading: const Icon(Icons.edit_location, color: pinkPrimary),
                 title: Text(
                   'Editar solo ubicación',
                   style: TextStyle(
@@ -710,7 +710,7 @@ https://nayeka-memories.com
 
               // Opción 2: Editar todos los datos
               ListTile(
-                leading: Icon(Icons.edit_note, color: pinkPrimary),
+                leading: const Icon(Icons.edit_note, color: pinkPrimary),
                 title: Text(
                   'Editar todos los datos',
                   style: TextStyle(
@@ -734,7 +734,7 @@ https://nayeka-memories.com
 
               // Eliminar recuerdo
               ListTile(
-                leading: Icon(Icons.delete, color: Colors.pinkAccent),
+                leading: const Icon(Icons.delete, color: Colors.pinkAccent),
                 title: Text(
                   'Eliminar recuerdo',
                   style: TextStyle(
@@ -777,10 +777,10 @@ https://nayeka-memories.com
             }
 
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Text('Recuerdo actualizado correctamente'),
                 backgroundColor: pinkPrimary,
-                duration: const Duration(seconds: 2),
+                duration: Duration(seconds: 2),
               ),
             );
           },

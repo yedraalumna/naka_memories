@@ -201,7 +201,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.close, size: 18),
+                        icon: const Icon(Icons.close, size: 18),
                         onPressed: auth.clearError,
                       ),
                     ],

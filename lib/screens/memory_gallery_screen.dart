@@ -15,7 +15,6 @@ import '../widget/pin_dialog.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../widget/MemoryForm.dart';
 

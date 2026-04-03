@@ -292,7 +292,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           if (_isUploading)
                             Positioned.fill(
                               child: Container(
-                                decoration: BoxDecoration(
+                                decoration: const BoxDecoration(
                                   color: Colors.black54,
                                   shape: BoxShape.circle,
                                 ),
@@ -534,7 +534,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               value ? ThemeMode.dark : ThemeMode.light,
                             );
                           },
-                          activeColor: pinkPrimary,
+                          activeThumbColor: pinkPrimary,
                           activeTrackColor: pinkLighter,
                           inactiveThumbColor: Colors.grey,
                           inactiveTrackColor: Colors.grey[300],

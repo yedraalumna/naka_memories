@@ -96,7 +96,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         labelStyle: TextStyle(color: iconColor),
                         prefixIcon: Icon(Icons.pin, color: iconColor),
                         border: const OutlineInputBorder(),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: pinkPrimary),
                         ),
                         enabledBorder: OutlineInputBorder(
@@ -138,7 +138,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           },
                         ),
                         border: const OutlineInputBorder(),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: pinkPrimary),
                         ),
                         enabledBorder: OutlineInputBorder(
@@ -180,7 +180,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           },
                         ),
                         border: const OutlineInputBorder(),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: pinkPrimary),
                         ),
                         enabledBorder: OutlineInputBorder(

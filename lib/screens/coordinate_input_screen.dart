@@ -23,7 +23,7 @@ class CoordinateInputScreen extends StatefulWidget {
 class _CoordinateInputScreenState extends State<CoordinateInputScreen> {
   // Es la coordenada que se actualizará al mover el mapa
   LatLng _selectedPosition = const LatLng(40.4168, -3.7038); // Posición inicial (Madrid)
-  bool _isWeb = kIsWeb;
+  final bool _isWeb = kIsWeb;
   Set<Marker> _markers = {};
 
   @override
@@ -302,8 +302,8 @@ class _CoordinateInputScreenState extends State<CoordinateInputScreen> {
                         ),
                       // Indicador de plataforma
                       if (_isWeb)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4.0),
                           child: Text(
                             'Modo web - Ingresa coordenadas manualmente',
                             style: TextStyle(
@@ -332,28 +332,28 @@ class _CoordinateInputScreenState extends State<CoordinateInputScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
+                child: const Padding(
+                  padding: EdgeInsets.all(12.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
+                      Text(
                         'Cómo seleccionar:',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 5),
-                      const Text(
+                      SizedBox(height: 5),
+                      Text(
                         '1. Mueve el mapa para ajustar la ubicación',
                         style: TextStyle(color: Colors.white, fontSize: 12),
                       ),
-                      const Text(
+                      Text(
                         '2. Las coordenadas se actualizan automáticamente',
                         style: TextStyle(color: Colors.white, fontSize: 12),
                       ),
-                      const Text(
+                      Text(
                         '3. Toca y mantén presionado para mover directamente',
                         style: TextStyle(color: Colors.white, fontSize: 12),
                       ),

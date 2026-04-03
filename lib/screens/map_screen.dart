@@ -35,13 +35,13 @@ class MapScreen extends StatefulWidget {
   final Function(LatLng, GoogleMapController)? onLongPressCallback;
 
   const MapScreen({
-    Key? key,
+    super.key,
     this.isLibrary = true,
     this.initialMarkers,
     this.onMapCreatedCallback,
     this.onCameraMoveCallback,
     this.onLongPressCallback,
-  }) : super(key: key);
+  });
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -56,7 +56,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _isLoading = false;
   String _selectedCategory = 'Todas'; // Filtros
   List<String> _dynamicCategories = []; // Lista de categorias
-  Set<String> _unlockedCategories = {}; // Almacena categorías desbloqueadas
+  final Set<String> _unlockedCategories = {}; // Almacena categorías desbloqueadas
   bool _showPrivateInAll = false; // Para controlar "Ver todos" con privados
 
   // Detectar si es web
@@ -106,7 +106,7 @@ class _MapScreenState extends State<MapScreen> {
             children: [
               Text(
                 'Opciones de: $categoryName',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: pinkPrimary,
@@ -320,13 +320,13 @@ class _MapScreenState extends State<MapScreen> {
 
       final rect = ui.Rect.fromLTWH(
           0, 0, targetWidth.toDouble(), targetWidth.toDouble());
-      final innerRect = ui.Rect.fromLTWH(borderWidth, borderWidth,
+      const innerRect = ui.Rect.fromLTWH(borderWidth, borderWidth,
           targetWidth - (borderWidth * 2), targetWidth - (borderWidth * 2));
 
       // Dibujamos fondo con borde rosado
       paint.color = pinkPrimary;
       canvas.drawRRect(
-        ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(borderRadius)),
+        ui.RRect.fromRectAndRadius(rect, const ui.Radius.circular(borderRadius)),
         paint,
       );
 
@@ -334,14 +334,14 @@ class _MapScreenState extends State<MapScreen> {
       paint.color = Colors.white;
       canvas.drawRRect(
         ui.RRect.fromRectAndRadius(
-            innerRect, ui.Radius.circular(borderRadius - borderWidth)),
+            innerRect, const ui.Radius.circular(borderRadius - borderWidth)),
         paint,
       );
 
       // Recortamos con bordes redondeados
       final clipPath = ui.Path()
         ..addRRect(ui.RRect.fromRectAndRadius(
-            innerRect, ui.Radius.circular(borderRadius - borderWidth)));
+            innerRect, const ui.Radius.circular(borderRadius - borderWidth)));
 
       canvas.clipPath(clipPath);
 
@@ -359,7 +359,7 @@ class _MapScreenState extends State<MapScreen> {
         paint.color = Colors.black45;
         canvas.drawRect(innerRect, paint);
 
-        final iconPlay = Icons.play_circle_fill;
+        const iconPlay = Icons.play_circle_fill;
         final textPainter = TextPainter(
           text: TextSpan(
             text: String.fromCharCode(iconPlay.codePoint),
@@ -400,14 +400,14 @@ class _MapScreenState extends State<MapScreen> {
     final canvas = ui.Canvas(pictureRecorder);
     final paint = ui.Paint();
 
-    final rect = ui.Rect.fromLTWH(0, 0, size, size);
-    final innerRect = ui.Rect.fromLTWH(borderWidth, borderWidth,
+    const rect = ui.Rect.fromLTWH(0, 0, size, size);
+    const innerRect = ui.Rect.fromLTWH(borderWidth, borderWidth,
         size - (borderWidth * 2), size - (borderWidth * 2));
 
     // Fondo con borde rosado
     paint.color = pinkPrimary;
     canvas.drawRRect(
-      ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(borderRadius)),
+      ui.RRect.fromRectAndRadius(rect, const ui.Radius.circular(borderRadius)),
       paint,
     );
 
@@ -415,7 +415,7 @@ class _MapScreenState extends State<MapScreen> {
     paint.color = isVideo ? Colors.black87 : Colors.white; // CAMBIO
     canvas.drawRRect(
       ui.RRect.fromRectAndRadius(
-          innerRect, ui.Radius.circular(borderRadius - borderWidth)),
+          innerRect, const ui.Radius.circular(borderRadius - borderWidth)),
       paint,
     );
 
@@ -433,7 +433,7 @@ class _MapScreenState extends State<MapScreen> {
       ..addText(String.fromCharCode(Icons.photo.codePoint));
 
     final paragraph = paragraphBuilder.build();
-    paragraph.layout(ui.ParagraphConstraints(width: size));
+    paragraph.layout(const ui.ParagraphConstraints(width: size));
 
     canvas.drawParagraph(
       paragraph,
@@ -499,10 +499,10 @@ class _MapScreenState extends State<MapScreen> {
       finalMemories = allMemories.where((m) => m.category == _selectedCategory).toList();
     }
     
-    print('\n🎯 RESULTADO FILTRADO: ${finalMemories.length} recuerdos visibles');
+    print('\n RESULTADO FILTRADO: ${finalMemories.length} recuerdos visibles');
     print('   Categoría seleccionada: $_selectedCategory');
     print('   Mostrar privadas: $_showPrivateInAll');
-    print('   Desbloqueadas: ${_unlockedCategories}');
+    print('   Desbloqueadas: $_unlockedCategories');
 
     // Resto del código igual...
     Set<Marker> newMarkers = {};
@@ -1266,7 +1266,7 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
     return Stack(
       children: [
         fmap.FlutterMap(
-          options: fmap.MapOptions(
+          options: const fmap.MapOptions(
             initialCenter: latlong2.LatLng(40.4168, -3.7038),
             initialZoom: 15.0,
           ),
@@ -1356,12 +1356,12 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: pinkLighter,
                           child:
-                              Icon(Icons.photo, color: pinkPrimary, size: 30),
+                              const Icon(Icons.photo, color: pinkPrimary, size: 30),
                         ),
                       )
                     : Container(
                         color: pinkLighter,
-                        child: Icon(Icons.photo, color: pinkPrimary, size: 30),
+                        child: const Icon(Icons.photo, color: pinkPrimary, size: 30),
                       ),
               ),
             ),
@@ -1409,10 +1409,10 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
     // Configuramos colores dinámicos para la UI
     final Color appBarBg = isDarkMode ? backgroundDark : backgroundLight;
     final Color titleColor = isDarkMode ? textDarkMode : textDark;
-    final Color iconColor = pinkPrimary;
+    const Color iconColor = pinkPrimary;
 
     // Función compartida para el AppBar (evita duplicar código)
-    AppBar _buildAppBar() {
+    AppBar buildAppBar() {
       return AppBar(
         title: Text(
           _selectedCategory == 'Todas' ? 'Memory Places' : _selectedCategory,
@@ -1452,7 +1452,7 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
     // Si es web y estamos en modo biblioteca
     if (_isWeb && widget.isLibrary) {
       return Scaffold(
-        appBar: _buildAppBar(),
+        appBar: buildAppBar(),
         body: _buildWebMap(),
       );
     }
@@ -1465,7 +1465,7 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
     // Para móvil - Modo biblioteca
     if (widget.isLibrary) {
       return Scaffold(
-        appBar: _buildAppBar(),
+        appBar: buildAppBar(),
         body: Stack(
           children: [
             GoogleMap(

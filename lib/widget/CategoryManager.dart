@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/colors.dart';
 import '../providers/category_provider.dart';
 import '../providers/theme_provider.dart';
@@ -8,7 +9,7 @@ import 'package:crypto/crypto.dart';
 import 'pin_dialog.dart';
 
 class CategoryManager extends StatefulWidget {
-  const CategoryManager({Key? key}) : super(key: key);
+  const CategoryManager({super.key});
 
   @override
   State<CategoryManager> createState() => _CategoryManagerState();
@@ -17,6 +18,7 @@ class CategoryManager extends StatefulWidget {
 class _CategoryManagerState extends State<CategoryManager> {
   bool _isLoading = true;
   bool _showDefaultHint = true;
+  final SupabaseClient _supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -240,12 +242,12 @@ class _CategoryManagerState extends State<CategoryManager> {
         backgroundColor: isDarkMode ? backgroundDark : backgroundLight,
         elevation: 1,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: pinkPrimary),
+          icon: const Icon(Icons.arrow_back, color: pinkPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.restore, color: pinkPrimary),
+            icon: const Icon(Icons.restore, color: pinkPrimary),
             onPressed: () => _showRestoreDialog(),
             tooltip: 'Restaurar carpetas predeterminadas',
           ),
@@ -268,7 +270,7 @@ class _CategoryManagerState extends State<CategoryManager> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: pinkPrimary, size: 20),
+                        const Icon(Icons.info_outline, color: pinkPrimary, size: 20),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -281,7 +283,7 @@ class _CategoryManagerState extends State<CategoryManager> {
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.close, size: 16, color: pinkPrimary),
+                          icon: const Icon(Icons.close, size: 16, color: pinkPrimary),
                           onPressed: () => setState(() => _showDefaultHint = false),
                         ),
                       ],
@@ -365,21 +367,21 @@ class _CategoryManagerState extends State<CategoryManager> {
                                             ? Icons.lock
                                             : Icons.lock_open,
                                         color: categoryProvider.isCategoryProtected(category)
-                                            ? Colors.orange
-                                            : Colors.grey,
+                                          ? lilaMedio
+                                          : Colors.grey,
                                       ),
                                       onPressed: () => _manageCategoryPin(category),
                                       tooltip: 'Proteger con PIN',
                                     ),
                                     if (!isGeneral)
                                       IconButton(
-                                        icon: const Icon(Icons.edit, color: Colors.blue),
+                                        icon: const Icon(Icons.edit, color: lilaClarito),
                                         onPressed: () => _renameCategory(category),
                                         tooltip: 'Renombrar',
                                       ),
                                     if (!isGeneral)
                                       IconButton(
-                                        icon: const Icon(Icons.delete, color: Colors.red),
+                                        icon: const Icon(Icons.delete, color: lilaFuerte),
                                         onPressed: () => _deleteCategory(category),
                                         tooltip: 'Eliminar',
                                       ),
@@ -395,8 +397,8 @@ class _CategoryManagerState extends State<CategoryManager> {
       floatingActionButton: FloatingActionButton(
         onPressed: _createCategory,
         backgroundColor: pinkPrimary,
-        child: const Icon(Icons.add, color: Colors.white),
         tooltip: 'Nueva carpeta',
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
@@ -424,7 +426,35 @@ class _CategoryManagerState extends State<CategoryManager> {
     );
 
     if (authorized != true) {
-      _showError('PIN incorrecto. No se eliminó la protección');
+      final bool? forgotPin = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: isDarkMode ? cardDark : Colors.white,
+          title: const Text('PIN incorrecto'),
+          content: const Text(
+            'Si no recuerdas el PIN, puedes verificar tu contraseña de inicio de sesión para cambiarlo.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
+              child: const Text('Olvidé mi PIN'),
+            ),
+          ],
+        ),
+      );
+
+      if (forgotPin == true) {
+        await _recoverPinWithLoginPassword(
+          categoryName: categoryName,
+          categoryProvider: categoryProvider,
+          isDarkMode: isDarkMode,
+        );
+      }
       return;
     }
 
@@ -538,6 +568,167 @@ class _CategoryManagerState extends State<CategoryManager> {
     }
   }
 }
+
+  Future<void> _recoverPinWithLoginPassword({
+    required String categoryName,
+    required CategoryProvider categoryProvider,
+    required bool isDarkMode,
+  }) async {
+    final currentUser = _supabase.auth.currentUser;
+    final userEmail = currentUser?.email;
+
+    if (currentUser == null || userEmail == null || userEmail.isEmpty) {
+      _showError('No se pudo verificar la cuenta. Inicia sesión nuevamente.');
+      return;
+    }
+
+    final TextEditingController passwordController = TextEditingController();
+
+    final bool? passwordOk = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? cardDark : Colors.white,
+        title: const Text('Verificar identidad'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Introduce tu contraseña de inicio de sesión:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: 'Contraseña de tu cuenta',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: pinkPrimary, width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final password = passwordController.text.trim();
+              if (password.isEmpty) {
+                _showError('Debes ingresar tu contraseña');
+                return;
+              }
+              if (password.length < 6) {
+                _showError('La contraseña debe tener al menos 6 caracteres');
+                return;
+              }
+
+              try {
+                await _supabase.auth.signInWithPassword(
+                  email: userEmail,
+                  password: password,
+                );
+
+                if (mounted) Navigator.pop(context, true);
+              } catch (e) {
+                _showError('Contraseña de inicio de sesión incorrecta');
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
+            child: const Text('Verificar'),
+          ),
+        ],
+      ),
+    );
+
+    if (passwordOk != true) return;
+
+    final TextEditingController newPinController = TextEditingController();
+    final TextEditingController confirmPinController = TextEditingController();
+
+    final bool? changeOk = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? cardDark : Colors.white,
+        title: const Text('Cambiar PIN de carpeta'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Nueva contraseña PIN para "$categoryName"'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: newPinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 24, letterSpacing: 8),
+              decoration: InputDecoration(
+                hintText: 'Nuevo PIN',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: confirmPinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 24, letterSpacing: 8),
+              decoration: InputDecoration(
+                hintText: 'Confirmar nuevo PIN',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newPin = newPinController.text.trim();
+              final confirmPin = confirmPinController.text.trim();
+
+              if (newPin.length != 6) {
+                _showError('El PIN debe tener 6 dígitos');
+                return;
+              }
+              if (newPin != confirmPin) {
+                _showError('Los PINs no coinciden');
+                return;
+              }
+
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
+            child: const Text('Cambiar PIN'),
+          ),
+        ],
+      ),
+    );
+
+    if (changeOk == true) {
+      final hash = sha256.convert(utf8.encode(newPinController.text.trim())).toString();
+      await categoryProvider.setCategoryPassword(categoryName, hash);
+      _showSuccess('PIN actualizado para "$categoryName"');
+      if (mounted) setState(() {});
+    }
+  }
 
   Future<void> _showRestoreDialog() async {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);

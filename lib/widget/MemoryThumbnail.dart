@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'; // Para kIsWeb
+// Para kIsWeb
 import '../constants/colors.dart';
 
 class MemoryThumbnail extends StatelessWidget {

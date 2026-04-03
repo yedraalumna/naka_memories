@@ -17,3 +17,8 @@ const Color textDark = Color(0xFF212529);
 const Color backgroundDark = Color(0xFF1A1A2E);
 const Color cardDark = Color(0xFF16213E);
 const Color textDarkMode = Color(0xFFF8F9FA);
+
+// Colores personalizados para categorías
+const Color lilaFuerte = Color(0xFF6A1B9A); 
+const Color lilaMedio = Color(0xFF9575CD);  
+const Color lilaClarito = Color(0xFFD1C4E9);

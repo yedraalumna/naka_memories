@@ -746,10 +746,8 @@ class MemoryService {
             .eq('user_id', user.id)
             .limit(1);
 
-        if (response != null) {
-          print('Tabla accesible');
-        }
-      } catch (e) {
+        print('Tabla accesible');
+            } catch (e) {
         print('Error accediendo a tabla: $e');
         print('''
           CREATE TABLE "nayeka memories" (  
@@ -773,7 +771,7 @@ class MemoryService {
       print('\nVerificando storage...');
       await verifyStorageBucket();
 
-      print('\n' + '=' * 50);
+      print('\n${'=' * 50}');
       print('Prueba completa');
     } catch (e) {
       print('Error en testSupabaseConnection: $e');

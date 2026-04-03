@@ -11,7 +11,6 @@ import 'providers/favorite_provider.dart';
 import 'providers/category_provider.dart';
 import 'constants/colors.dart';
 import 'providers/memory_provider.dart';
-import 'package:flutter/services.dart';
 import 'package:app_links/app_links.dart';
 
 void main() async {

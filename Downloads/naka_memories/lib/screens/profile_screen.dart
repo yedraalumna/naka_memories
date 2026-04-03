@@ -25,7 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => LoginScreen()),
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
       (route) => false,
     );
   }
@@ -183,7 +183,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => ChangePasswordScreen(),
+                              builder: (context) => const ChangePasswordScreen(),
                             ),
                           );
                         },

@@ -83,7 +83,7 @@ class _TravelGoalsScreenState extends State<TravelGoalsScreen> {
                         Container(
                           width: 80,
                           height: 80,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: pinkLighter,
                             shape: BoxShape.circle,
                           ),
@@ -243,7 +243,7 @@ class _TravelGoalsScreenState extends State<TravelGoalsScreen> {
                         ),
                       ),
                     );
-                  }).toList(),
+                  }),
 
                   const SizedBox(height: 20),
 
