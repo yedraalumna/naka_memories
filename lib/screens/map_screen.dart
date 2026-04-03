@@ -499,7 +499,7 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _memories = allMemories;
         _markers = newMarkers;
-        _dynamicCategories = categoryProvider.categories; // <--- USA LAS DEL PROVIDER
+        _dynamicCategories = categoryProvider.categories;
         _isLoading = false;
       });
     } catch (e) {
@@ -508,27 +508,72 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // Nuevo método para no duplicar código en Web y Móvil
   Widget _buildFiltersOverlay() {
-    return Positioned(
-      top: 10,
-      left: 0,
-      right: 0,
-      child: SingleChildScrollView(
+  final themeProvider = Provider.of<ThemeProvider>(context);
+  final categoryProvider = Provider.of<CategoryProvider>(context);
+  final isDarkMode = themeProvider.isDarkMode;
+
+  // 2. Usamos la lista real de categorías del provider
+  final listadoCategorias = categoryProvider.categories;
+  final categoriasConTodas = ['Todas', ...listadoCategorias];
+
+  Color backgroundColor = isDarkMode ? cardDark : Colors.white;
+  Color textColor = isDarkMode ? textDarkMode : Colors.black87;
+
+  return Positioned(
+    top: 60,
+    left: 0,
+    right: 0,
+    child: SizedBox(
+      height: 45,
+      child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Row(
-          children: [
-            _buildFilterChip('Todas'),
-            ..._dynamicCategories.map((category) {
-              return _buildFilterChip(category);
-            }).toList(),
-          ],
-        ),
-      ),
-    );
-  }
+        itemCount: categoriasConTodas.length, 
+        itemBuilder: (context, index) {
+          final cat = categoriasConTodas[index];  
+          final isSelected = _selectedCategory == cat;
 
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedCategory = isSelected ? 'Todas' : cat;
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                color: isSelected ? pinkPrimary : backgroundColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all( 
+                  color: pinkPrimary,
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  cat,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : pinkPrimary,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    ),
+  );
+  }
   // Función que crea un chip de filtro (ahora más grande)
   Widget _buildFilterChip(String label) {
     final bool isSelected = _selectedCategory == label;
@@ -993,7 +1038,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
           ],
         ),
-        // ¡AQUÍ AÑADIMOS EL PANEL DE FILTROS EN LA WEB!
+
         if (widget.isLibrary) _buildFiltersOverlay(),
 
         if (_isLoading)
