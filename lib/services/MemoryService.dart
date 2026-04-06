@@ -187,30 +187,30 @@ class MemoryService {
   }
 
   // Compartir todos los recuerdos de una categoría con un correo
-  Future<void> shareCategory(String category, String emailToShare) async {
+  Future<void> shareCategoryWithRole(
+      String category, String emailToShare, String selectedRole) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null || emailToShare.isEmpty) return;
 
-      // Llamamos a la función SQL que verifica si el correo existe en Supabase
+      // 1. Verificar si el usuario existe (tu RPC actual)
       final bool userExists = await _supabase.rpc(
         'check_user_exists',
         params: {'search_email': emailToShare},
       );
 
-      // Si no existe, cortamos el proceso y lanzamos un mensaje limpio
       if (!userExists) {
         throw 'No hay ninguna cuenta registrada con el correo:\n$emailToShare';
       }
 
-      // 2. Si existe, obtenemos solo los recuerdos de ESA carpeta que sean del propio usuario
+      // 2. Obtener los recuerdos de la categoría
       final response = await _supabase
           .from('nayeka memories')
           .select()
           .eq('user_id', user.id)
           .eq('category', category);
 
-      // Iteramos para añadir el correo
+      // 3. Actualizar cada recuerdo con el email Y el rol
       for (var item in response) {
         List<String> currentShared = [];
         if (item['shared_with'] != null) {
@@ -218,18 +218,29 @@ class MemoryService {
               List<String>.from(item['shared_with'].map((e) => e.toString()));
         }
 
-        // Si el email no está ya en la lista, lo añadimos y actualizamos
+        Map<String, dynamic> currentRoles = {};
+        if (item['shared_roles'] != null) {
+          currentRoles = Map<String, dynamic>.from(item['shared_roles']);
+        }
+
+        // Añadimos el correo si no estaba
         if (!currentShared.contains(emailToShare)) {
           currentShared.add(emailToShare);
-
-          await _supabase
-              .from('nayeka memories')
-              .update({'shared_with': currentShared}).eq('id', item['id']);
         }
+
+        // Asignamos o actualizamos el rol para ese correo específico
+        currentRoles[emailToShare] = selectedRole;
+
+        await _supabase.from('nayeka memories').update({
+          'shared_with': currentShared,
+          'shared_roles': currentRoles,
+        }).eq('id', item['id']);
       }
+
+      // Sincronizamos localmente para que los cambios se vean ya
+      await getMemories();
     } catch (e) {
-      print('Error compartiendo carpeta internamente: $e');
-      // Lanzamos el error exacto (limpiando la palabra Exception si aparece)
+      print('Error en shareCategoryWithRole: $e');
       throw e.toString().replaceAll('Exception: ', '');
     }
   }
@@ -327,14 +338,25 @@ class MemoryService {
           localMemories.where((m) => m.category == memory.category).toList();
 
       Set<String> allSharedEmails = {...memory.sharedWith};
+      // Cogemos los roles existentes de la carpeta
+      Map<String, dynamic> allRoles = {...(memory.sharedRoles ?? {})};
+
       for (var m in categoryMemories) {
         if (m.sharedWith.isNotEmpty) {
           allSharedEmails.addAll(m.sharedWith);
         }
+        // Si algún recuerdo de la carpeta tiene roles, los copiamos
+        if (m.sharedRoles != null && m.sharedRoles!.isNotEmpty) {
+          allRoles.addAll(m.sharedRoles!);
+        }
       }
-      return memory.copyWith(sharedWith: allSharedEmails.toList());
+
+      return memory.copyWith(
+        sharedWith: allSharedEmails.toList(),
+        sharedRoles: allRoles, // Aplicamos los roles heredados
+      );
     } catch (e) {
-      print('Error heredando usuarios: $e');
+      print('Error heredando usuarios y roles: $e');
       return memory;
     }
   }
@@ -475,20 +497,19 @@ class MemoryService {
   // Guardar recuerdo en Supabase
   Future<void> _saveMemoryToSupabase(Memory memory) async {
     try {
-      final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) {
-        throw Exception('Usuario no autenticado');
-      }
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser == null) throw Exception('Usuario no autenticado');
 
-      if (memory.id.isEmpty) {
-        throw Exception('ID de memoria no puede estar vacío');
-      }
+      // LÓGICA DE PROTECCIÓN:
+      // Si el objeto ya trae un creatorId (porque es una edición), usamos ese.
+      // Si el creatorId es null (porque es nuevo), usamos el ID del usuario actual.
+      final String finalUserId = memory.creatorId ?? currentUser.id;
 
-      print('Guardando en Supabase: ${memory.id}');
+      print('Guardando en Supabase con dueño: $finalUserId');
 
       final memoryData = {
         'id': memory.id,
-        'user_id': userId,
+        'user_id': finalUserId,
         'title': memory.title,
         'description': memory.description,
         'date': memory.date,
@@ -500,15 +521,12 @@ class MemoryService {
         'shared_with': memory.sharedWith,
         'has_password': memory.hasPassword,
         'password_hash': memory.passwordHash,
+        'shared_roles': memory.sharedRoles,
       };
-
-      print('Datos a guardar: $memoryData');
 
       await _supabase
           .from('nayeka memories')
           .upsert(memoryData, onConflict: 'id');
-
-      print('Recuerdo guardado en Supabase: ${memory.id}');
     } catch (e) {
       print('Error guardando en Supabase: $e');
       throw Exception('Error al guardar en la nube: $e');
@@ -747,7 +765,7 @@ class MemoryService {
             .limit(1);
 
         print('Tabla accesible');
-            } catch (e) {
+      } catch (e) {
         print('Error accediendo a tabla: $e');
         print('''
           CREATE TABLE "nayeka memories" (  
@@ -1051,6 +1069,8 @@ extension MemoryCopyWith on Memory {
     List<String>? sharedWith,
     bool? hasPassword,
     String? passwordHash,
+    String? creatorId,
+    Map<String, dynamic>? sharedRoles,
   }) {
     return Memory(
       id: id ?? this.id,
@@ -1064,6 +1084,8 @@ extension MemoryCopyWith on Memory {
       sharedWith: sharedWith ?? this.sharedWith,
       hasPassword: hasPassword ?? this.hasPassword,
       passwordHash: passwordHash ?? this.passwordHash,
+      creatorId: creatorId ?? this.creatorId,
+      sharedRoles: sharedRoles ?? this.sharedRoles,
     );
   }
 }

@@ -17,6 +17,7 @@ import 'dart:convert';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../widget/MemoryForm.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MemoryGalleryScreen extends StatefulWidget {
   const MemoryGalleryScreen({super.key});
@@ -35,6 +36,43 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   void initState() {
     super.initState();
     _loadMemories();
+  }
+
+  // Determina si el usuario es el creador de la categoría
+  bool _isOwner(String category) {
+    final categoryMemories =
+        _memories.where((m) => m.category == category).toList();
+    if (categoryMemories.isEmpty)
+      return true; // Si está vacía, la acabo de crear yo
+
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    // Si no hay creatorId antiguo, asumimos que es nuestra por defecto
+    final ownerId = categoryMemories.first.creatorId ?? currentUser?.id;
+    return currentUser?.id == ownerId;
+  }
+
+  // Determina si el usuario puede editar la categoría
+  bool _canAddOrEdit(String category) {
+    if (_isOwner(category)) return true; // El dueño siempre puede
+
+    final categoryMemories =
+        _memories.where((m) => m.category == category).toList();
+    if (categoryMemories.isEmpty) return false;
+
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    final role = categoryMemories.first.sharedRoles?[currentUser?.email];
+
+    return role == 'editor' || role == 'admin';
+  }
+
+  // Determina si el usuario puede borrar la categoría
+  bool _canDelete(Memory memory) {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    if (memory.creatorId == currentUser?.id)
+      return true; // El dueño siempre puede
+
+    final role = memory.sharedRoles?[currentUser?.email];
+    return role == 'admin';
   }
 
   Future<void> _loadMemories() async {
@@ -78,7 +116,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   // ✅ CORREGIDO: usa el nuevo PinDialog que devuelve true/false
   Future<void> _onFolderTap(
       String category, Map<String, List<Memory>> grouped) async {
-    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+    final categoryProvider =
+        Provider.of<CategoryProvider>(context, listen: false);
     final folderHasPassword = categoryProvider.isCategoryProtected(category);
     final passwordHash = categoryProvider.getPasswordHash(category);
 
@@ -302,114 +341,212 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   }
 
   void _showShareCategoryDialog(String categoryToShare) {
+    // 1. Evitar compartir carpetas vacías
+    final categoryMemories =
+        _memories.where((m) => m.category == categoryToShare).toList();
+    if (categoryMemories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Añade un recuerdo primero para compartir.'),
+            backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    // 2. Verificar quién es el dueño (el creador del primer recuerdo de la carpeta)
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    // Si la foto antigua no tiene creatorId, asumimos por seguridad que es del usuario actual para no bloquearle
+    final String ownerId =
+        categoryMemories.first.creatorId ?? currentUser?.id ?? '';
+    final bool isOwner = currentUser?.id == ownerId;
+
+    if (!isOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Solo el dueño original puede administrar los permisos de esta carpeta.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
     final TextEditingController emailController = TextEditingController();
+    String selectedRole = 'lector'; // Rol por defecto
 
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          contentPadding: const EdgeInsets.all(24),
-          title: Text(
-            'Compartir "$categoryToShare"',
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+        return StatefulBuilder(
+            // Necesario para que el Dropdown se actualice sin recargar toda la pantalla
+            builder: (context, setDialogState) {
+          return AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            contentPadding: const EdgeInsets.all(24),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Ingresa el correo electrónico del usuario con el que deseas compartir esta carpeta:',
-                  style: TextStyle(fontSize: 18),
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(fontSize: 18),
-                  decoration: InputDecoration(
-                    hintText: 'amigo@correo.com',
-                    contentPadding: const EdgeInsets.symmetric(
-                        vertical: 20, horizontal: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.email, size: 32),
+                Text('Compartir "$categoryToShare"',
+                    style: const TextStyle(
+                        fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                // Mostramos quién es el dueño original en un cuadro destacado
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.shield, color: Colors.green, size: 32),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text('Propietario:\n${currentUser?.email}',
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87)),
+                      ),
+                    ],
                   ),
-                  autofocus: true,
                 ),
               ],
             ),
-          ),
-          actions: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                    ),
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child:
-                        const Text('Cancelar', style: TextStyle(fontSize: 18)),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: pinkPrimary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 20),
+                  // Campo de email súper espacioso
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(fontSize: 18),
+                    decoration: InputDecoration(
+                      hintText: 'amigo@correo.com',
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 24, horizontal: 20),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Icon(Icons.email, size: 32),
                       ),
                     ),
-                    onPressed: () async {
-                      final email = emailController.text.trim();
-                      if (email.isNotEmpty) {
-                        Navigator.pop(dialogContext);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Compartiendo carpeta con $email...'),
-                            backgroundColor: Colors.blueGrey,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                        try {
-                          await _memoryService.shareCategory(
-                              categoryToShare, email);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('¡Carpeta compartida con éxito!'),
-                                backgroundColor: pinkPrimary,
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: $e'),
-                                backgroundColor: Colors.red,
-                                duration: const Duration(seconds: 4),
-                              ),
-                            );
-                          }
-                        }
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Dropdown de permisos grande y cómodo
+                  DropdownButtonFormField<String>(
+                    value: selectedRole,
+                    iconSize: 36,
+                    isExpanded: true,
+                    itemHeight: 60,
+                    style: const TextStyle(fontSize: 18, color: Colors.black87),
+                    decoration: InputDecoration(
+                      labelText: 'Administrar permisos',
+                      labelStyle: const TextStyle(fontSize: 18),
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 20, horizontal: 20),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'lector', child: Text('Lector (Solo ver)')),
+                      DropdownMenuItem(
+                          value: 'editor',
+                          child: Text('Editor (Ver y editar)')),
+                      DropdownMenuItem(
+                          value: 'admin',
+                          child: Text('Todos los permisos (Admin)')),
+                    ],
+                    onChanged: (String? newValue) {
+                      if (newValue != null) {
+                        setDialogState(() => selectedRole = newValue);
                       }
                     },
-                    child:
-                        const Text('Compartir', style: TextStyle(fontSize: 18)),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ],
-        );
+            actions: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 20)),
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('Cancelar',
+                          style: TextStyle(fontSize: 18)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors
+                            .pink, // Cambia esto por pinkPrimary si lo tienes definido en el archivo
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        final email = emailController.text.trim();
+                        if (email.isNotEmpty) {
+                          // 1. Guardamos el mensajero ANTES de cerrar nada o hacer await
+                          final scaffoldMessenger =
+                              ScaffoldMessenger.of(context);
+
+                          // 2. cerramos el diálogo
+                          Navigator.pop(dialogContext);
+
+                          // 3. Usamos la variable guardada en lugar de 'of(context)'
+                          scaffoldMessenger.showSnackBar(
+                            SnackBar(
+                                content: Text('Otorgando permisos a $email...'),
+                                backgroundColor: Colors.blueGrey),
+                          );
+
+                          try {
+                            await _memoryService.shareCategoryWithRole(
+                                categoryToShare, email, selectedRole);
+
+                            if (mounted) {
+                              // 4. Volvemos a usar la variable guardada
+                              scaffoldMessenger.showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('¡Permisos asignados con éxito!'),
+                                    backgroundColor: Colors.green),
+                              );
+                              _loadMemories();
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              scaffoldMessenger.showSnackBar(
+                                SnackBar(
+                                    content: Text('Error: $e'),
+                                    backgroundColor: Colors.red),
+                              );
+                            }
+                          }
+                        }
+                      },
+                      child: const Text('Compartir',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        });
       },
     );
   }
@@ -422,6 +559,16 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       builder: (context) => MemoryDetailScreen(
         memory: memory,
         onEdit: () async {
+          // Solo puede editar si tiene permiso
+          if (!_canAddOrEdit(memory.category)) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text(
+                  'No tienes permiso para editar. Eres Lector de esta carpeta.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ));
+            return;
+          }
           Navigator.pop(context);
           final result = await Navigator.push(
             context,
@@ -435,6 +582,16 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           }
         },
         onDelete: () async {
+          // Solo puede borrar si tiene permiso
+          if (!_canDelete(memory)) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text(
+                  'No tienes permisos de Administrador para eliminar este recuerdo.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ));
+            return;
+          }
           try {
             await _memoryService.deleteMemory(memory.id);
             Navigator.pop(context);
@@ -707,7 +864,8 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               )
             : null,
         actions: [
-          if (_selectedCategory != null)
+          // SOLO EL PROPIETARIO VE EL BOTÓN DE PONER PIN
+          if (_selectedCategory != null && _isOwner(_selectedCategory!))
             IconButton(
               iconSize: 32,
               padding: const EdgeInsets.all(12),
@@ -715,7 +873,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               tooltip: 'Proteger esta carpeta con PIN',
               onPressed: () => _showProtectFolderDialog(_selectedCategory!),
             ),
-          if (_selectedCategory != null)
+
+          // SOLO EL PROPIETARIO VE EL BOTÓN DE COMPARTIR
+          if (_selectedCategory != null && _isOwner(_selectedCategory!))
             IconButton(
               iconSize: 32,
               padding: const EdgeInsets.all(12),
@@ -723,7 +883,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               tooltip: 'Compartir esta carpeta con un usuario',
               onPressed: () => _showShareCategoryDialog(_selectedCategory!),
             ),
-          if (_selectedCategory != null)
+
+          // LECTORES NO VEN EL BOTÓN DE AÑADIR FOTO
+          if (_selectedCategory != null && _canAddOrEdit(_selectedCategory!))
             IconButton(
               iconSize: 32,
               padding: const EdgeInsets.all(12),
@@ -731,6 +893,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               tooltip: 'Agregar recuerdo a esta carpeta',
               onPressed: _navigateToCreateMemoryInCategory,
             ),
+
           if (_selectedCategory == null)
             IconButton(
               iconSize: 32,

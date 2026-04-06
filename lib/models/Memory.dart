@@ -10,8 +10,10 @@ class Memory {
   final String category;
   final bool isFavorite;
   final List<String> sharedWith;
-  final bool hasPassword;    
-  final String? passwordHash; 
+  final bool hasPassword;
+  final String? passwordHash;
+  final String? creatorId;
+  final Map<String, dynamic>? sharedRoles;
 
   // Lista de las categorias
   static const List<String> categoriesList = [
@@ -33,8 +35,10 @@ class Memory {
     this.category = 'Sin categoría',
     this.isFavorite = false,
     this.sharedWith = const [],
-    this.hasPassword = false,    
+    this.hasPassword = false,
     this.passwordHash,
+    this.creatorId,
+    this.sharedRoles,
   });
 
   static const List<String> defaultCategories = [
@@ -56,11 +60,11 @@ class Memory {
   bool get isVideo {
     if (imageAsset == null) return false;
     final lowerCaseAsset = imageAsset!.toLowerCase();
-    return lowerCaseAsset.contains('.mp4') || 
-           lowerCaseAsset.contains('.mov') || 
-           lowerCaseAsset.contains('.avi') ||
-           lowerCaseAsset.contains('.mkv') ||
-           lowerCaseAsset.contains('.webm');
+    return lowerCaseAsset.contains('.mp4') ||
+        lowerCaseAsset.contains('.mov') ||
+        lowerCaseAsset.contains('.avi') ||
+        lowerCaseAsset.contains('.mkv') ||
+        lowerCaseAsset.contains('.webm');
   }
 
   // Getter para verificar si es una imagen
@@ -68,12 +72,12 @@ class Memory {
     if (imageAsset == null) return false;
     if (isVideo) return false;
     final lowerCaseAsset = imageAsset!.toLowerCase();
-    return lowerCaseAsset.contains('.jpg') || 
-           lowerCaseAsset.contains('.jpeg') || 
-           lowerCaseAsset.contains('.png') ||
-           lowerCaseAsset.contains('.gif') ||
-           lowerCaseAsset.contains('.bmp') ||
-           lowerCaseAsset.contains('.webp');
+    return lowerCaseAsset.contains('.jpg') ||
+        lowerCaseAsset.contains('.jpeg') ||
+        lowerCaseAsset.contains('.png') ||
+        lowerCaseAsset.contains('.gif') ||
+        lowerCaseAsset.contains('.bmp') ||
+        lowerCaseAsset.contains('.webp');
   }
 
   // Getter para obtener el tipo de multimedia
@@ -97,8 +101,10 @@ class Memory {
       'category': category,
       'isFavorite': isFavorite,
       'shared_with': sharedWith,
-      'has_password': hasPassword,      
+      'has_password': hasPassword,
       'password_hash': passwordHash,
+      'creatorId': creatorId,
+      'sharedRoles': sharedRoles,
     };
   }
 
@@ -139,11 +145,22 @@ class Memory {
       List<String> parsedSharedWith = [];
       if (sharedRaw is List) {
         parsedSharedWith = sharedRaw.map((e) => e.toString()).toList();
-      }    
+      }
 
       // hasPassword y passwordHash, con valor por defecto
-      final hasPassword = (map['has_password'] == true) || (map['hasPassword'] == true);
-      final passwordHash = map['password_hash']?.toString() ?? map['passwordHash']?.toString();
+      final hasPassword =
+          (map['has_password'] == true) || (map['hasPassword'] == true);
+      final passwordHash =
+          map['password_hash']?.toString() ?? map['passwordHash']?.toString();
+
+      // Lectura correcta de la propiedad creatorId (del userId) y sharedRoles
+      final creatorId = _safeString(map['user_id'] ?? map['creatorId']);
+
+      Map<String, dynamic>? parsedSharedRoles;
+      final rolesRaw = map['shared_roles'] ?? map['sharedRoles'];
+      if (rolesRaw is Map) {
+        parsedSharedRoles = Map<String, dynamic>.from(rolesRaw);
+      }
 
       return Memory(
         id: id,
@@ -158,8 +175,10 @@ class Memory {
         category: category,
         isFavorite: isFavorite,
         sharedWith: parsedSharedWith,
-        hasPassword: hasPassword,          
+        hasPassword: hasPassword,
         passwordHash: passwordHash?.isEmpty == true ? null : passwordHash,
+        creatorId: creatorId.isEmpty ? null : creatorId,
+        sharedRoles: parsedSharedRoles ?? {},
       );
     } catch (e) {
       print('ERROR en Memory.fromMap: $e');
@@ -173,8 +192,10 @@ class Memory {
         category: 'General',
         isFavorite: false,
         sharedWith: [],
-        hasPassword: false,  
+        hasPassword: false,
         passwordHash: null,
+        creatorId: null,
+        sharedRoles: {},
       );
     }
   }
@@ -212,8 +233,10 @@ class Memory {
     String? category,
     bool? isFavorite,
     List<String>? sharedWith,
-    bool? hasPassword,     
+    bool? hasPassword,
     String? passwordHash,
+    String? creatorId,
+    Map<String, dynamic>? sharedRoles,
   }) {
     return Memory(
       id: id ?? this.id,
@@ -225,15 +248,17 @@ class Memory {
       category: category ?? this.category,
       isFavorite: isFavorite ?? this.isFavorite,
       sharedWith: sharedWith ?? this.sharedWith,
-      hasPassword: hasPassword ?? this.hasPassword,   
+      hasPassword: hasPassword ?? this.hasPassword,
       passwordHash: passwordHash ?? this.passwordHash,
+      creatorId: creatorId ?? this.creatorId,
+      sharedRoles: sharedRoles ?? this.sharedRoles,
     );
   }
 
   // Método opcional para debug
   @override
   String toString() {
-    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category, isFavorite: $isFavorite, mediaType: $mediaType, sharedWith: $sharedWith}';
+    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category, isFavorite: $isFavorite, mediaType: $mediaType, sharedWith: $sharedWith, creatorId: $creatorId, sharedRoles: $sharedRoles}';
   }
 
   // Método para comparar dos memorias

@@ -77,7 +77,12 @@ class _MemoryFormState extends State<MemoryForm> {
   void initState() {
     super.initState();
     _currentFormLocation = widget.location;
-    _loadCategories();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadCategories();
+      }
+    });
 
     // Inicializar controladores de PIN
     _pinController = TextEditingController();
@@ -829,8 +834,11 @@ class _MemoryFormState extends State<MemoryForm> {
         },
         imageAsset: _selectedAsset,
         category: finalCategory,
-        hasPassword: isProtected, // ← CORRECTO
-        passwordHash: passwordHash, // ← CORRECTO
+        hasPassword: isProtected, 
+        passwordHash: passwordHash, 
+        creatorId: widget.existingMemory?.creatorId, 
+        sharedRoles: widget.existingMemory?.sharedRoles ?? {},
+        sharedWith: widget.existingMemory?.sharedWith ?? [],
       );
 
       Memory finalMemory;
@@ -976,7 +984,8 @@ class _MemoryFormState extends State<MemoryForm> {
                       borderSide:
                           const BorderSide(color: pinkPrimary, width: 2),
                     ),
-                    prefixIcon: const Icon(Icons.description, color: pinkPrimary),
+                    prefixIcon:
+                        const Icon(Icons.description, color: pinkPrimary),
                     fillColor: isDarkMode ? cardDark : Colors.white,
                     filled: true,
                   ),
@@ -1016,8 +1025,8 @@ class _MemoryFormState extends State<MemoryForm> {
                           borderSide:
                               const BorderSide(color: pinkPrimary, width: 2),
                         ),
-                        prefixIcon:
-                            const Icon(Icons.calendar_today, color: pinkPrimary),
+                        prefixIcon: const Icon(Icons.calendar_today,
+                            color: pinkPrimary),
                         fillColor: isDarkMode ? cardDark : Colors.white,
                         filled: true,
                       ),
@@ -1405,7 +1414,8 @@ class _MemoryFormState extends State<MemoryForm> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.location_on, color: pinkPrimary, size: 20),
+                        const Icon(Icons.location_on,
+                            color: pinkPrimary, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -1434,7 +1444,8 @@ class _MemoryFormState extends State<MemoryForm> {
                             ],
                           ),
                         ),
-                        const Icon(Icons.open_in_new, color: pinkPrimary, size: 18),
+                        const Icon(Icons.open_in_new,
+                            color: pinkPrimary, size: 18),
                       ],
                     ),
                   ),

@@ -26,7 +26,11 @@ class _PinDialogState extends State<PinDialog> {
 
   @override
   void dispose() {
-    controller.dispose();
+    // Retrasamos un frame la destrucción para que pin_code_fields
+    // termine sus animaciones internas sin lanzar error.
+    Future.microtask(() {
+      controller.dispose();
+    });
     super.dispose();
   }
 

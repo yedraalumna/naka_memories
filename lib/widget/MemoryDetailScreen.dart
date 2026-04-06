@@ -12,6 +12,7 @@ import 'package:chewie/chewie.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MemoryDetailScreen extends StatefulWidget {
   // Antes era StatelessWidget, se cambia pq es necesario para video
@@ -65,6 +66,26 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     _chewieController?.dispose();
     _videoPlayerController = null;
     _chewieController = null;
+  }
+
+  // LÓGICA DE PERMISOS
+  bool _canEdit() {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    // Si no hay creador definido, asumimos que es el dueño por defecto
+    if (widget.memory.creatorId == null ||
+        widget.memory.creatorId == currentUser?.id) return true;
+
+    final role = widget.memory.sharedRoles?[currentUser?.email];
+    return role == 'admin' || role == 'editor';
+  }
+
+  bool _canDelete() {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    if (widget.memory.creatorId == null ||
+        widget.memory.creatorId == currentUser?.id) return true;
+
+    final role = widget.memory.sharedRoles?[currentUser?.email];
+    return role == 'admin';
   }
 
   // LÓGICA DE DETECCIÓN
@@ -281,6 +302,9 @@ https://nayeka-memories.com
 
   // Contenedor principal con todos los elementos de la memoria
   Widget _buildContent(BuildContext context, bool isDarkMode) {
+    // Verificamos si hay algún botón de acción que mostrar
+    final bool showActions = _canEdit() || _canDelete();
+
     return Padding(
       padding: const EdgeInsets.all(25),
       child: Column(
@@ -296,8 +320,12 @@ https://nayeka-memories.com
           const SizedBox(height: 25),
           _buildLocationInfo(isDarkMode),
           const SizedBox(height: 30),
-          _buildActionButtons(context, isDarkMode),
-          const SizedBox(height: 30),
+
+          // Si hay permisos se muestran los botones
+          if (showActions) ...[
+            _buildActionButtons(context, isDarkMode),
+            const SizedBox(height: 30),
+          ],
         ],
       ),
     );
@@ -567,90 +595,86 @@ https://nayeka-memories.com
     );
   }
 
-  // construimos los botones de acción, es decir editar y eliminar
+  // construimos los botones de acción, es decir editar y eliminar y oculta botones según permisos
   Widget _buildActionButtons(BuildContext context, bool isDarkMode) {
     return Column(
       children: [
-        // Botón de Compartir Externamente
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _shareMemory,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: pinkLighter,
-              foregroundColor: pinkPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
+        if (_canEdit()) ...[
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _shareMemory,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: pinkLighter,
+                foregroundColor: pinkPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                elevation: 3,
               ),
-              elevation: 3,
-            ),
-            icon: const Icon(Icons.share, size: 28),
-            label: const Text(
-              'Compartir',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 15),
-
-        // Botón de editar
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              _showEditOptions(context, isDarkMode);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: pinkPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              elevation: 5,
-            ),
-            icon: const Icon(Icons.edit, color: Colors.white),
-            label: const Text(
-              'Editar Recuerdo',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+              icon: const Icon(Icons.share, size: 28),
+              label: const Text(
+                'Compartir',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
-        ),
-
-        const SizedBox(height: 15),
-
-        // Botón de eliminar
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: widget.onDelete,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? cardDark : Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-                side: const BorderSide(color: pinkPrimary, width: 2),
+          const SizedBox(height: 15),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                _showEditOptions(context, isDarkMode);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: pinkPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                elevation: 5,
               ),
-            ),
-            icon: const Icon(Icons.delete, color: pinkPrimary),
-            label: const Text(
-              'Eliminar',
-              style: TextStyle(
-                color: pinkPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+              icon: const Icon(Icons.edit, color: Colors.white),
+              label: const Text(
+                'Editar Recuerdo',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
-        ),
+          const SizedBox(height: 15),
+        ],
+        if (_canDelete())
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: widget.onDelete,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDarkMode ? cardDark : Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  side: const BorderSide(color: pinkPrimary, width: 2),
+                ),
+              ),
+              icon: const Icon(Icons.delete, color: pinkPrimary),
+              label: const Text(
+                'Eliminar',
+                style: TextStyle(
+                  color: pinkPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -672,7 +696,6 @@ https://nayeka-memories.com
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Título del menú de opciones
               Text(
                 '¿Qué deseas editar?',
                 style: TextStyle(
@@ -681,10 +704,7 @@ https://nayeka-memories.com
                   color: isDarkMode ? textDarkMode : pinkDark,
                 ),
               ),
-
               const SizedBox(height: 20),
-
-              // Opción 1: Editar solo la ubicación (coordenadas)
               ListTile(
                 leading: const Icon(Icons.edit_location, color: pinkPrimary),
                 title: Text(
@@ -699,16 +719,13 @@ https://nayeka-memories.com
                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                   ),
                 ),
-                tileColor: isDarkMode ? cardDark.withOpacity(0.5) : null,
+                tileColor: isDarkMode ? cardDark.withValues(alpha: 0.5) : null,
                 onTap: () {
                   Navigator.pop(context);
                   widget.onEdit();
                 },
               ),
-
               Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[300]),
-
-              // Opción 2: Editar todos los datos
               ListTile(
                 leading: const Icon(Icons.edit_note, color: pinkPrimary),
                 title: Text(
@@ -723,36 +740,39 @@ https://nayeka-memories.com
                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                   ),
                 ),
-                tileColor: isDarkMode ? cardDark.withOpacity(0.5) : null,
+                tileColor: isDarkMode ? cardDark.withValues(alpha: 0.5) : null,
                 onTap: () {
                   Navigator.pop(context);
                   _navigateToFullEditForm(context);
                 },
               ),
 
-              Divider(color: isDarkMode ? Colors.grey[700] : Colors.grey[300]),
-
-              // Eliminar recuerdo
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.pinkAccent),
-                title: Text(
-                  'Eliminar recuerdo',
-                  style: TextStyle(
-                    color: isDarkMode ? textDarkMode : Colors.black87,
+              // Ocultamos la opción de borrar en el menú si no es admin
+              if (_canDelete()) ...[
+                Divider(
+                    color: isDarkMode ? Colors.grey[700] : Colors.grey[300]),
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.pinkAccent),
+                  title: Text(
+                    'Eliminar recuerdo',
+                    style: TextStyle(
+                      color: isDarkMode ? textDarkMode : Colors.black87,
+                    ),
                   ),
-                ),
-                subtitle: Text(
-                  'Elimina permanentemente este recuerdo',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  subtitle: Text(
+                    'Elimina permanentemente este recuerdo',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                    ),
                   ),
+                  tileColor:
+                      isDarkMode ? cardDark.withValues(alpha: 0.5) : null,
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onDelete();
+                  },
                 ),
-                tileColor: isDarkMode ? cardDark.withOpacity(0.5) : null,
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onDelete();
-                },
-              ),
+              ],
             ],
           ),
         );
