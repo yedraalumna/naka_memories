@@ -834,9 +834,10 @@ class _MemoryFormState extends State<MemoryForm> {
         },
         imageAsset: _selectedAsset,
         category: finalCategory,
-        hasPassword: isProtected, 
-        passwordHash: passwordHash, 
-        creatorId: widget.existingMemory?.creatorId, 
+        hasPassword: isProtected,
+        passwordHash: passwordHash,
+        creatorId: widget.existingMemory?.creatorId,
+        creatorEmail: widget.existingMemory?.creatorEmail,
         sharedRoles: widget.existingMemory?.sharedRoles ?? {},
         sharedWith: widget.existingMemory?.sharedWith ?? [],
       );

@@ -223,13 +223,15 @@ class MemoryService {
           currentRoles = Map<String, dynamic>.from(item['shared_roles']);
         }
 
-        // Añadimos el correo si no estaba
-        if (!currentShared.contains(emailToShare)) {
-          currentShared.add(emailToShare);
+        if (selectedRole == 'quitar') {
+          currentShared.remove(emailToShare); // Lo borramos de la lista
+          currentRoles.remove(emailToShare); // Le quitamos el rol
+        } else {
+          if (!currentShared.contains(emailToShare)) {
+            currentShared.add(emailToShare);
+          }
+          currentRoles[emailToShare] = selectedRole;
         }
-
-        // Asignamos o actualizamos el rol para ese correo específico
-        currentRoles[emailToShare] = selectedRole;
 
         await _supabase.from('nayeka memories').update({
           'shared_with': currentShared,
@@ -237,7 +239,6 @@ class MemoryService {
         }).eq('id', item['id']);
       }
 
-      // Sincronizamos localmente para que los cambios se vean ya
       await getMemories();
     } catch (e) {
       print('Error en shareCategoryWithRole: $e');
@@ -500,12 +501,14 @@ class MemoryService {
       final currentUser = _supabase.auth.currentUser;
       if (currentUser == null) throw Exception('Usuario no autenticado');
 
-      // LÓGICA DE PROTECCIÓN:
-      // Si el objeto ya trae un creatorId (porque es una edición), usamos ese.
-      // Si el creatorId es null (porque es nuevo), usamos el ID del usuario actual.
+      // 1. El ID del dueño original o el actual si es nuevo
       final String finalUserId = memory.creatorId ?? currentUser.id;
 
-      print('Guardando en Supabase con dueño: $finalUserId');
+      // 2. El Email del dueño original o el actual si es nuevo
+      // IMPORTANTE: memory.creatorEmail DEBE venir del formulario para no perderse
+      final String? finalUserEmail = (memory.creatorId != null)
+          ? memory.creatorEmail
+          : (memory.creatorEmail ?? currentUser.email);
 
       final memoryData = {
         'id': memory.id,
@@ -522,6 +525,7 @@ class MemoryService {
         'has_password': memory.hasPassword,
         'password_hash': memory.passwordHash,
         'shared_roles': memory.sharedRoles,
+        'creator_email': finalUserEmail, 
       };
 
       await _supabase
@@ -1071,6 +1075,7 @@ extension MemoryCopyWith on Memory {
     String? passwordHash,
     String? creatorId,
     Map<String, dynamic>? sharedRoles,
+    String? creatorEmail,
   }) {
     return Memory(
       id: id ?? this.id,
@@ -1086,6 +1091,7 @@ extension MemoryCopyWith on Memory {
       passwordHash: passwordHash ?? this.passwordHash,
       creatorId: creatorId ?? this.creatorId,
       sharedRoles: sharedRoles ?? this.sharedRoles,
+      creatorEmail: creatorEmail ?? this.creatorEmail,
     );
   }
 }

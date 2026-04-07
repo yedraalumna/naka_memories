@@ -14,6 +14,7 @@ class Memory {
   final String? passwordHash;
   final String? creatorId;
   final Map<String, dynamic>? sharedRoles;
+  final String? creatorEmail;
 
   // Lista de las categorias
   static const List<String> categoriesList = [
@@ -39,6 +40,7 @@ class Memory {
     this.passwordHash,
     this.creatorId,
     this.sharedRoles,
+    this.creatorEmail,
   });
 
   static const List<String> defaultCategories = [
@@ -103,8 +105,9 @@ class Memory {
       'shared_with': sharedWith,
       'has_password': hasPassword,
       'password_hash': passwordHash,
-      'creatorId': creatorId,
-      'sharedRoles': sharedRoles,
+      'user_id': creatorId,
+      'shared_roles': sharedRoles,
+      'creator_email': creatorEmail,
     };
   }
 
@@ -156,6 +159,10 @@ class Memory {
       // Lectura correcta de la propiedad creatorId (del userId) y sharedRoles
       final creatorId = _safeString(map['user_id'] ?? map['creatorId']);
 
+      // Lectura correcta de la propiedad creatorEmail
+      final creatorEmail =
+          _safeString(map['creator_email'] ?? map['creatorEmail']);
+
       Map<String, dynamic>? parsedSharedRoles;
       final rolesRaw = map['shared_roles'] ?? map['sharedRoles'];
       if (rolesRaw is Map) {
@@ -179,24 +186,25 @@ class Memory {
         passwordHash: passwordHash?.isEmpty == true ? null : passwordHash,
         creatorId: creatorId.isEmpty ? null : creatorId,
         sharedRoles: parsedSharedRoles ?? {},
+        creatorEmail: creatorEmail.isEmpty ? null : creatorEmail,
       );
     } catch (e) {
       print('ERROR en Memory.fromMap: $e');
       return Memory(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        title: 'Recuerdo con error',
-        description: 'Error al cargar este recuerdo',
-        date: DateTime.now().toIso8601String(),
-        location: {'latitude': 0.0, 'longitude': 0.0},
-        imageAsset: null,
-        category: 'General',
-        isFavorite: false,
-        sharedWith: [],
-        hasPassword: false,
-        passwordHash: null,
-        creatorId: null,
-        sharedRoles: {},
-      );
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          title: 'Recuerdo con error',
+          description: 'Error al cargar este recuerdo',
+          date: DateTime.now().toIso8601String(),
+          location: {'latitude': 0.0, 'longitude': 0.0},
+          imageAsset: null,
+          category: 'General',
+          isFavorite: false,
+          sharedWith: [],
+          hasPassword: false,
+          passwordHash: null,
+          creatorId: null,
+          sharedRoles: {},
+          creatorEmail: null);
     }
   }
 
@@ -237,6 +245,7 @@ class Memory {
     String? passwordHash,
     String? creatorId,
     Map<String, dynamic>? sharedRoles,
+    String? creatorEmail,
   }) {
     return Memory(
       id: id ?? this.id,
@@ -252,13 +261,14 @@ class Memory {
       passwordHash: passwordHash ?? this.passwordHash,
       creatorId: creatorId ?? this.creatorId,
       sharedRoles: sharedRoles ?? this.sharedRoles,
+      creatorEmail: creatorEmail ?? this.creatorEmail,
     );
   }
 
   // Método opcional para debug
   @override
   String toString() {
-    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category, isFavorite: $isFavorite, mediaType: $mediaType, sharedWith: $sharedWith, creatorId: $creatorId, sharedRoles: $sharedRoles}';
+    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category, isFavorite: $isFavorite, mediaType: $mediaType, sharedWith: $sharedWith, creatorId: $creatorId, sharedRoles: $sharedRoles, creatorEmail: $creatorEmail}';
   }
 
   // Método para comparar dos memorias

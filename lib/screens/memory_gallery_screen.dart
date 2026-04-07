@@ -341,7 +341,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   }
 
   void _showShareCategoryDialog(String categoryToShare) {
-    // 1. Evitar compartir carpetas vacías
     final categoryMemories =
         _memories.where((m) => m.category == categoryToShare).toList();
     if (categoryMemories.isEmpty) {
@@ -353,9 +352,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       return;
     }
 
-    // 2. Verificar quién es el dueño (el creador del primer recuerdo de la carpeta)
     final currentUser = Supabase.instance.client.auth.currentUser;
-    // Si la foto antigua no tiene creatorId, asumimos por seguridad que es del usuario actual para no bloquearle
     final String ownerId =
         categoryMemories.first.creatorId ?? currentUser?.id ?? '';
     final bool isOwner = currentUser?.id == ownerId;
@@ -373,14 +370,12 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     }
 
     final TextEditingController emailController = TextEditingController();
-    String selectedRole = 'lector'; // Rol por defecto
+    String selectedRole = 'lector';
 
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-            // Necesario para que el Dropdown se actualice sin recargar toda la pantalla
-            builder: (context, setDialogState) {
+        return StatefulBuilder(builder: (context, setDialogState) {
           return AlertDialog(
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -390,22 +385,21 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               children: [
                 Text('Compartir "$categoryToShare"',
                     style: const TextStyle(
-                        fontSize: 24, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                // Mostramos quién es el dueño original en un cuadro destacado
+                        fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                       color: Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12)),
                   child: Row(
                     children: [
-                      const Icon(Icons.shield, color: Colors.green, size: 32),
-                      const SizedBox(width: 16),
+                      const Icon(Icons.shield, color: pinkPrimary, size: 28),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text('Propietario:\n${currentUser?.email}',
                             style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87)),
                       ),
@@ -417,39 +411,44 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 20),
-                  // Campo de email súper espacioso
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    'Escribe un correo electrónico:',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87),
+                  ),
+                  const SizedBox(height: 8),
+
                   TextField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(fontSize: 18),
+                    style: const TextStyle(fontSize: 16),
                     decoration: InputDecoration(
                       hintText: 'amigo@correo.com',
                       contentPadding: const EdgeInsets.symmetric(
-                          vertical: 24, horizontal: 20),
+                          vertical: 16, horizontal: 16),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12)),
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Icon(Icons.email, size: 32),
-                      ),
+                      prefixIcon: const Icon(Icons.email, color: pinkPrimary),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
-                  // Dropdown de permisos grande y cómodo
                   DropdownButtonFormField<String>(
                     value: selectedRole,
-                    iconSize: 36,
                     isExpanded: true,
-                    itemHeight: 60,
-                    style: const TextStyle(fontSize: 18, color: Colors.black87),
+                    isDense: false,
+                    style: const TextStyle(fontSize: 16, color: Colors.black87),
                     decoration: InputDecoration(
-                      labelText: 'Administrar permisos',
-                      labelStyle: const TextStyle(fontSize: 18),
+                      labelText: 'Permiso otorgado',
+                      labelStyle: const TextStyle(fontSize: 14),
                       contentPadding: const EdgeInsets.symmetric(
-                          vertical: 20, horizontal: 20),
+                          vertical: 16, horizontal: 16),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
@@ -460,8 +459,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                           value: 'editor',
                           child: Text('Editor (Ver y editar)')),
                       DropdownMenuItem(
-                          value: 'admin',
-                          child: Text('Todos los permisos (Admin)')),
+                          value: 'admin', child: Text('Todo (Admin)')),
                     ],
                     onChanged: (String? newValue) {
                       if (newValue != null) {
@@ -469,6 +467,129 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                       }
                     },
                   ),
+
+                  // LISTA DE INVITADOS
+                  if (categoryMemories.first.sharedRoles != null &&
+                      categoryMemories.first.sharedRoles!.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    const Text('Usuarios con acceso:',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        children: categoryMemories.first.sharedRoles!.entries
+                            .map((entry) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.person,
+                                    color: pinkPrimary, size: 20),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                    child: Text(entry.key,
+                                        style: const TextStyle(fontSize: 14))),
+                                const SizedBox(width: 8),
+
+                                // Menú interactivo
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                      color: entry.value == 'quitar'
+                                          ? Colors.red.shade50
+                                          : pinkLighter,
+                                      borderRadius: BorderRadius.circular(6)),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: entry.value,
+                                      icon: const Icon(Icons.arrow_drop_down,
+                                          size: 20, color: pinkDark),
+                                      isDense: false,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: pinkDark),
+                                      dropdownColor: Colors.white,
+                                      items: const [
+                                        DropdownMenuItem(
+                                            value: 'lector',
+                                            child: Text('Lector')),
+                                        DropdownMenuItem(
+                                            value: 'editor',
+                                            child: Text('Editor')),
+                                        DropdownMenuItem(
+                                            value: 'admin',
+                                            child: Text('Admin')),
+                                        DropdownMenuItem(
+                                            value: 'quitar',
+                                            child: Text('QUITAR',
+                                                style: TextStyle(
+                                                    color: Colors.red,
+                                                    fontWeight:
+                                                        FontWeight.bold))),
+                                      ],
+                                      onChanged: (String? newRole) async {
+                                        if (newRole != null &&
+                                            newRole != entry.value) {
+                                          final scaffoldMessenger =
+                                              ScaffoldMessenger.of(context);
+
+                                          setDialogState(() {
+                                            if (newRole == 'quitar') {
+                                              categoryMemories
+                                                  .first.sharedRoles!
+                                                  .remove(entry.key);
+                                            } else {
+                                              categoryMemories.first
+                                                      .sharedRoles![entry.key] =
+                                                  newRole;
+                                            }
+                                          });
+
+                                          scaffoldMessenger.showSnackBar(
+                                            const SnackBar(
+                                                content: Text(
+                                                    'Actualizando accesos...'),
+                                                backgroundColor:
+                                                    Colors.blueGrey,
+                                                duration: Duration(seconds: 1)),
+                                          );
+
+                                          try {
+                                            await _memoryService
+                                                .shareCategoryWithRole(
+                                                    categoryToShare,
+                                                    entry.key,
+                                                    newRole);
+                                            _loadMemories();
+                                          } catch (e) {
+                                            scaffoldMessenger.showSnackBar(
+                                              SnackBar(
+                                                  content: Text(
+                                                      'Error al actualizar: $e'),
+                                                  backgroundColor: Colors.red),
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                )
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    )
+                  ],
                 ],
               ),
             ),
@@ -478,50 +599,42 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                   Expanded(
                     child: TextButton(
                       style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 20)),
+                          padding: const EdgeInsets.symmetric(vertical: 16)),
                       onPressed: () => Navigator.pop(dialogContext),
                       child: const Text('Cancelar',
-                          style: TextStyle(fontSize: 18)),
+                          style: TextStyle(fontSize: 16)),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors
-                            .pink, // Cambia esto por pinkPrimary si lo tienes definido en el archivo
+                        backgroundColor: pinkPrimary,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () async {
                         final email = emailController.text.trim();
                         if (email.isNotEmpty) {
-                          // 1. Guardamos el mensajero ANTES de cerrar nada o hacer await
                           final scaffoldMessenger =
                               ScaffoldMessenger.of(context);
-
-                          // 2. cerramos el diálogo
                           Navigator.pop(dialogContext);
 
-                          // 3. Usamos la variable guardada en lugar de 'of(context)'
                           scaffoldMessenger.showSnackBar(
                             SnackBar(
                                 content: Text('Otorgando permisos a $email...'),
                                 backgroundColor: Colors.blueGrey),
                           );
-
                           try {
                             await _memoryService.shareCategoryWithRole(
                                 categoryToShare, email, selectedRole);
-
                             if (mounted) {
-                              // 4. Volvemos a usar la variable guardada
                               scaffoldMessenger.showSnackBar(
                                 const SnackBar(
                                     content:
-                                        Text('¡Permisos asignados con éxito!'),
+                                        Text('Permisos asignados con éxito'),
                                     backgroundColor: Colors.green),
                               );
                               _loadMemories();
@@ -539,7 +652,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                       },
                       child: const Text('Compartir',
                           style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
+                              fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
@@ -645,15 +758,29 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
         final lastMemory = _getLastMemoryForCategory(cat, grouped);
         final isProtected = categoryProvider.isCategoryProtected(cat);
 
+        final bool isMine = _isOwner(cat);
+        final bool isSharedByMe =
+            isMine && (lastMemory?.sharedWith.isNotEmpty ?? false);
+
+        final Color folderColor = isMine
+            ? pinkPrimary.withValues(alpha: 0.8)
+            : lilaFuerte.withValues(alpha: 0.8);
+        final Color bgColor = themeProvider.isDarkMode
+            ? cardDark
+            : (isMine ? pinkLighter : lilaClarito);
+        final IconData folderIcon = isMine
+            ? (isSharedByMe ? Icons.folder_shared : Icons.folder)
+            : Icons.folder_special;
+
         return GestureDetector(
           onTap: () => _onFolderTap(cat, grouped),
           child: Container(
             decoration: BoxDecoration(
-              color: themeProvider.isDarkMode ? cardDark : pinkLighter,
+              color: bgColor,
               borderRadius: BorderRadius.circular(15),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 5,
                   offset: const Offset(0, 2),
                 ),
@@ -666,9 +793,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                   alignment: Alignment.center,
                   children: [
                     Icon(
-                      Icons.folder,
+                      folderIcon,
                       size: 90,
-                      color: pinkPrimary.withOpacity(0.8),
+                      color: folderColor,
                     ),
                     if (lastMemory != null && lastMemory.imageAsset != null)
                       Positioned(
@@ -701,13 +828,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                             color: pinkPrimary,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
                           ),
                           child: const Icon(
                             Icons.lock,
@@ -731,15 +851,31 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  '${grouped[cat]?.length ?? 0} recuerdos',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: themeProvider.isDarkMode
-                        ? Colors.grey[400]
-                        : Colors.grey[600],
+
+                // Etiqueta del dueño con color lilaFuerte
+                if (!isMine && lastMemory?.creatorEmail != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'De: ${lastMemory!.creatorEmail}',
+                      style: const TextStyle(
+                          fontSize: 10,
+                          color: lilaFuerte,
+                          fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  )
+                else
+                  Text(
+                    '${grouped[cat]?.length ?? 0} recuerdos',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: themeProvider.isDarkMode
+                          ? Colors.grey[400]
+                          : Colors.grey[600],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -849,10 +985,44 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     return Scaffold(
       backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
       appBar: AppBar(
-        title: Text(
-          _selectedCategory ?? 'Mis Carpetas',
-          style:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        // Título y Subtítulo dinámicos
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _selectedCategory ?? 'Mis Carpetas',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18),
+            ),
+            // Si la carpeta no es mía, buscamos quién es el dueño
+            if (_selectedCategory != null && !_isOwner(_selectedCategory!))
+              Builder(
+                builder: (context) {
+                  // Buscamos dentro de esta carpeta el primer recuerdo que tenga el email relleno
+                  final memoryWithOwner = _memories.firstWhere(
+                    (m) =>
+                        m.category == _selectedCategory &&
+                        m.creatorEmail != null &&
+                        m.creatorEmail!.isNotEmpty,
+                    orElse: () => _memories
+                        .firstWhere((m) => m.category == _selectedCategory),
+                  );
+
+                  if (memoryWithOwner.creatorEmail != null) {
+                    return Text(
+                      'Propietario: ${memoryWithOwner.creatorEmail}',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.normal),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+          ],
         ),
         backgroundColor: pinkPrimary,
         leading: _selectedCategory != null
