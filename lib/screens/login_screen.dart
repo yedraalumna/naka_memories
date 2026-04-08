@@ -18,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   late String email, password;
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  bool _ocultarPassword = true; // variable para el ojito
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +28,8 @@ class _LoginScreenState extends State<LoginScreen> {
     // Usar el error del provider en lugar de manejar errores localmente
     final error = authProvider.errorMessage ?? '';
 
-    Color backgroundColor = themeProvider.isDarkMode ? backgroundDark : textLight;
+    Color backgroundColor =
+        themeProvider.isDarkMode ? backgroundDark : textLight;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -47,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 400,
                   ),
                 ),
-                
+
                 // Mostrar error del provider
                 if (error.isNotEmpty)
                   Padding(
@@ -55,48 +57,54 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: themeProvider.isDarkMode ? Colors.red[900]?.withOpacity(0.3) : Colors.red[50],
+                        color: themeProvider.isDarkMode
+                            ? Colors.red[900]?.withOpacity(0.3)
+                            : Colors.red[50],
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: themeProvider.isDarkMode ? Colors.red[700]! : Colors.red,
+                          color: themeProvider.isDarkMode
+                              ? Colors.red[700]!
+                              : Colors.red,
                         ),
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.error, 
-                            color: themeProvider.isDarkMode ? Colors.red[300] : Colors.red, 
-                            size: 20
-                          ),
+                          Icon(Icons.error,
+                              color: themeProvider.isDarkMode
+                                  ? Colors.red[300]
+                                  : Colors.red,
+                              size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               error,
                               style: TextStyle(
-                                color: themeProvider.isDarkMode ? Colors.red[300] : Colors.red, 
-                                fontSize: 14
-                              ),
+                                  color: themeProvider.isDarkMode
+                                      ? Colors.red[300]
+                                      : Colors.red,
+                                  fontSize: 14),
                             ),
                           ),
                           IconButton(
-                            icon: Icon(
-                              Icons.close, 
-                              size: 18, 
-                              color: themeProvider.isDarkMode ? Colors.red[300] : Colors.red
-                            ),
+                            icon: Icon(Icons.close,
+                                size: 18,
+                                color: themeProvider.isDarkMode
+                                    ? Colors.red[300]
+                                    : Colors.red),
                             onPressed: () => authProvider.clearError(),
                           ),
                         ],
                       ),
                     ),
                   ),
-                
+
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: formulario(themeProvider),
                 ),
 
-                const SizedBox(height: 15), //MIRAR SI SE HA CAMBIADO BIEN EL ESPACIO
+                const SizedBox(
+                    height: 15), //MIRAR SI SE HA CAMBIADO BIEN EL ESPACIO
 
                 botonLogin(),
                 const SizedBox(height: 20),
@@ -105,19 +113,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     TextButton(
-                      onPressed: _isLoading ? null : () {
-                        authProvider.clearError(); // Limpiar errores antes de navegar
-                        
-                        Navigator.push(
-                        context,
-                          MaterialPageRoute(
-                            builder: (context) => const ChangePasswordScreen(),
-                          ),
-                        );
-                      },
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              authProvider
+                                  .clearError(); // Limpiar errores antes de navegar
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const ChangePasswordScreen(),
+                                ),
+                              );
+                            },
                       child: const Text(
                         '¿Olvidaste tu contraseña?',
-                        style: TextStyle(color: pinkAccent, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: pinkAccent, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -129,22 +142,29 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text(
                       '¿No tienes cuenta?',
                       style: TextStyle(
-                        color: themeProvider.isDarkMode ? textLight : Colors.black87,
+                        color: themeProvider.isDarkMode
+                            ? textLight
+                            : Colors.black87,
                       ),
                     ),
                     TextButton(
-                      onPressed: _isLoading ? null : () {
-                        authProvider.clearError(); // Limpiar errores antes de navegar
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const RegisterScreen(), // QUITA EL CONST
-                          ),
-                        );
-                      },
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              authProvider
+                                  .clearError(); // Limpiar errores antes de navegar
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const RegisterScreen(), // QUITA EL CONST
+                                ),
+                              );
+                            },
                       child: const Text(
                         'Regístrate aquí',
-                        style: TextStyle(color: pinkAccent, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: pinkAccent, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -172,10 +192,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget buildEmail(ThemeProvider themeProvider) {
     Color textColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
-    Color borderColor = themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
-    Color focusedBorderColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    Color borderColor =
+        themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
+    Color focusedBorderColor =
+        themeProvider.isDarkMode ? Colors.white : pinkPrimary;
     Color iconColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
-    
+
     return TextFormField(
       style: TextStyle(color: textColor),
       decoration: InputDecoration(
@@ -215,10 +237,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget buildPassword(ThemeProvider themeProvider) {
     Color textColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
-    Color borderColor = themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
-    Color focusedBorderColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    Color borderColor =
+        themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
+    Color focusedBorderColor =
+        themeProvider.isDarkMode ? Colors.white : pinkPrimary;
     Color iconColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
-    
+
     return TextFormField(
       style: TextStyle(color: textColor),
       decoration: InputDecoration(
@@ -237,10 +261,24 @@ class _LoginScreenState extends State<LoginScreen> {
           borderSide: BorderSide(color: borderColor),
         ),
         prefixIcon: Icon(Icons.lock, color: iconColor),
+
+        // Boton del ojito para mostrar contraseña
+        suffixIcon: IconButton(
+          icon: Icon(
+            _ocultarPassword ? Icons.visibility_off : Icons.visibility,
+            color: iconColor,
+          ),
+          onPressed: () {
+            setState(() {
+              _ocultarPassword = !_ocultarPassword;
+            });
+          },
+        ),
+
         filled: themeProvider.isDarkMode,
         fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
       ),
-      obscureText: true,
+      obscureText: _ocultarPassword, // dinamico
       validator: (value) {
         if (value!.isEmpty) {
           return "Este campo es obligatorio";
@@ -256,18 +294,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
   Widget botonLogin() {
     return FractionallySizedBox(
       widthFactor: 0.6,
@@ -280,35 +306,39 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(10),
           ),
         ),
-        onPressed: _isLoading ? null : () async {
-          if (_formKey.currentState!.validate()) {
-            _formKey.currentState!.save();
+        onPressed: _isLoading
+            ? null
+            : () async {
+                if (_formKey.currentState!.validate()) {
+                  _formKey.currentState!.save();
 
-            setState(() {
-              _isLoading = true;
-            });
+                  setState(() {
+                    _isLoading = true;
+                  });
 
-            final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-            authProvider.clearError();
+                  final authProvider =
+                      Provider.of<AppAuthProvider>(context, listen: false);
+                  authProvider.clearError();
 
-            final success = await authProvider.login(email, password);
+                  final success = await authProvider.login(email, password);
 
-            // COMPROBACIÓN CRUCIAL AQUÍ
-            if (!mounted) return; 
+                  // COMPROBACIÓN CRUCIAL AQUÍ
+                  if (!mounted) return;
 
-            setState(() {
-              _isLoading = false;
-            });
+                  setState(() {
+                    _isLoading = false;
+                  });
 
-            if (success) {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-                (Route<dynamic> route) => false,
-              );
-            }
-          }
-        },
+                  if (success) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const HomeScreen()),
+                      (Route<dynamic> route) => false,
+                    );
+                  }
+                }
+              },
         child: _isLoading
             ? const SizedBox(
                 height: 20,
