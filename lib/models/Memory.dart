@@ -14,6 +14,7 @@ class Memory {
   final String? passwordHash;
   final String? creatorId;
   final Map<String, dynamic>? sharedRoles;
+  final Map<String, dynamic>? pendingRoles;
   final String? creatorEmail;
 
   // Lista de las categorias
@@ -40,6 +41,7 @@ class Memory {
     this.passwordHash,
     this.creatorId,
     this.sharedRoles,
+    this.pendingRoles,
     this.creatorEmail,
   });
 
@@ -107,6 +109,7 @@ class Memory {
       'password_hash': passwordHash,
       'user_id': creatorId,
       'shared_roles': sharedRoles,
+      'pending_roles': pendingRoles,
       'creator_email': creatorEmail,
     };
   }
@@ -169,6 +172,13 @@ class Memory {
         parsedSharedRoles = Map<String, dynamic>.from(rolesRaw);
       }
 
+      // Extraemos los pendientes de supabase
+      Map<String, dynamic>? parsedPendingRoles;
+      final pendingRaw = map['pending_roles'] ?? map['pendingRoles'];
+      if (pendingRaw is Map) {
+        parsedPendingRoles = Map<String, dynamic>.from(pendingRaw);
+      }
+
       return Memory(
         id: id,
         title: title,
@@ -186,6 +196,7 @@ class Memory {
         passwordHash: passwordHash?.isEmpty == true ? null : passwordHash,
         creatorId: creatorId.isEmpty ? null : creatorId,
         sharedRoles: parsedSharedRoles ?? {},
+        pendingRoles: parsedPendingRoles ?? {},
         creatorEmail: creatorEmail.isEmpty ? null : creatorEmail,
       );
     } catch (e) {
@@ -204,6 +215,7 @@ class Memory {
           passwordHash: null,
           creatorId: null,
           sharedRoles: {},
+          pendingRoles: {},
           creatorEmail: null);
     }
   }
@@ -245,6 +257,7 @@ class Memory {
     String? passwordHash,
     String? creatorId,
     Map<String, dynamic>? sharedRoles,
+    Map<String, dynamic>? pendingRoles,
     String? creatorEmail,
   }) {
     return Memory(
@@ -261,6 +274,7 @@ class Memory {
       passwordHash: passwordHash ?? this.passwordHash,
       creatorId: creatorId ?? this.creatorId,
       sharedRoles: sharedRoles ?? this.sharedRoles,
+      pendingRoles: pendingRoles ?? this.pendingRoles,
       creatorEmail: creatorEmail ?? this.creatorEmail,
     );
   }
@@ -268,7 +282,7 @@ class Memory {
   // Método opcional para debug
   @override
   String toString() {
-    return 'Memory{id: $id, title: $title, date: $date, lat: $latitude, lng: $longitude, image: $imageAsset, category: $category, isFavorite: $isFavorite, mediaType: $mediaType, sharedWith: $sharedWith, creatorId: $creatorId, sharedRoles: $sharedRoles, creatorEmail: $creatorEmail}';
+    return 'Memory{id: $id, title: $title, category: $category, sharedWith: $sharedWith, sharedRoles: $sharedRoles, pendingRoles: $pendingRoles}';
   }
 
   // Método para comparar dos memorias

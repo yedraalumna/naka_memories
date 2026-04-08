@@ -6,7 +6,7 @@ import '../providers/theme_provider.dart';
 import 'login_screen.dart';
 import 'change_password_screen.dart';
 import 'travel_goals_screen.dart';
-import 'visited_places_screen.dart'; 
+import 'visited_places_screen.dart';
 import '../constants/colors.dart';
 import '../services/ImagePickerService.dart';
 import '../services/MemoryService.dart';
@@ -33,9 +33,7 @@ class TarjetaNavegacion extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15)
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       color: themeProvider.isDarkMode ? cardDark : Colors.grey[100],
       child: ListTile(
         leading: Icon(icono, color: colorIcono),
@@ -71,12 +69,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final MemoryService _memoryService = MemoryService();
   bool _isUploading = false;
 
+  // VARIABLES PARA NOTIFICACIONES
+  List<Map<String, dynamic>> _invitaciones = [];
+  bool _cargandoInvitaciones = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cargar invitaciones después de dibujar la pantalla por primera vez
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _cargarInvitaciones();
+    });
+  }
+
+  // LÓGICA DE NOTIFICACIONES
+  Future<void> _cargarInvitaciones() async {
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    if (authProvider.userEmail != null) {
+      final inv =
+          await _memoryService.getPendingInvitations(authProvider.userEmail!);
+      if (mounted) {
+        setState(() {
+          _invitaciones = inv;
+          _cargandoInvitaciones = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _responderInvitacion(
+      Map<String, dynamic> inv, bool aceptar) async {
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    final email = authProvider.userEmail;
+    if (email == null) return;
+
+    // Actualizamos la UI inmediatamente para que sea rápido (quitamos la invitación de la lista)
+    setState(() {
+      _invitaciones.remove(inv);
+    });
+
+    _mostrarSnackbar(
+        aceptar ? 'Aceptando invitación...' : 'Rechazando invitación...');
+
+    try {
+      await _memoryService.respondToInvitation(
+          inv['category'], inv['owner_id'], email, aceptar);
+      _mostrarSnackbar(
+          aceptar ? 'Ahora tienes acceso a la carpeta' : 'Invitación rechazada',
+          isError: !aceptar && false);
+      // Forzar recarga de memorias si estamos en la galería
+      await _memoryService.getMemories();
+    } catch (e) {
+      _mostrarSnackbar('Error al procesar la invitación', isError: true);
+      _cargarInvitaciones(); // Recargamos por si hubo error
+    }
+  }
+
   // actualizamos foto de perfil
   Future<void> _cambiarFoto(AppAuthProvider auth) async {
     try {
       // 1. Seleccionar imagen
       final Uint8List? imageBytes = await _pickerService.pickImageAsBytes();
-      
+
       if (imageBytes == null) return;
 
       if (auth.userId == null) {
@@ -88,18 +142,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       // 2. Subir imagen a Supabase Storage
       final String? url = await _memoryService.uploadAvatar(
-        imageBytes, 
+        imageBytes,
         auth.userId!,
       );
-      
+
       if (url != null) {
         // 3. Actualizar metadatos en Supabase
         final success = await auth.updateProfilePhoto(url);
-        
+
         if (success && mounted) {
           // 4. forzamos la actualización de la UI para reflejar el cambio inmediatamente
           setState(() {});
-          
+
           _mostrarSnackbar('Foto de perfil actualizada');
         }
       } else {
@@ -139,11 +193,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (confirm == true) {
         final success = await auth.removeProfilePhoto();
-        
+
         if (success && mounted) {
           // forzamos la actualización de la UI para reflejar el cambio inmediatamente
           setState(() {});
-          
+
           _mostrarSnackbar('Foto de perfil eliminada');
         }
       }
@@ -159,7 +213,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Eliminar cuenta'),
-          content: const Text('¿Estás seguro de que deseas eliminar tu cuenta?'),
+          content:
+              const Text('¿Estás seguro de que deseas eliminar tu cuenta?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -176,7 +231,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (confirm == true) {
         final success = await auth.deleteAccount();
-        
+
         if (success && mounted) {
           // al eliminar la cuenta, automaticamente se abrirá la pantalla de login
           Navigator.pushAndRemoveUntil(
@@ -184,7 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             MaterialPageRoute(builder: (context) => const LoginScreen()),
             (route) => false,
           );
-          
+
           // se muestra mensaje de confirmación
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -261,7 +316,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              
+
               // tarjeta de perfil
               Card(
                 color: themeProvider.isDarkMode ? cardDark : Colors.white,
@@ -280,14 +335,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             radius: 50,
                             backgroundColor: pinkLighter,
                             key: ValueKey(avatarUrl),
-                            backgroundImage: hasAvatar 
+                            backgroundImage: hasAvatar
                                 ? NetworkImage(avatarUrl) as ImageProvider
                                 : null,
-                            child: !hasAvatar 
-                                ? const Icon(Icons.person, size: 50, color: pinkPrimary)
+                            child: !hasAvatar
+                                ? const Icon(Icons.person,
+                                    size: 50, color: pinkPrimary)
                                 : null,
                           ),
-                          
+
                           // indicador de carga
                           if (_isUploading)
                             Positioned.fill(
@@ -303,21 +359,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                             ),
-                          
+
                           // botón de cámara
                           Positioned(
                             bottom: 0,
                             right: 0,
                             child: GestureDetector(
-                              onTap: _isUploading 
-                                ? null 
-                                : () => _cambiarFoto(authProvider),
+                              onTap: _isUploading
+                                  ? null
+                                  : () => _cambiarFoto(authProvider),
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: _isUploading 
-                                    ? Colors.grey 
-                                    : pinkPrimary,
+                                  color:
+                                      _isUploading ? Colors.grey : pinkPrimary,
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: Colors.white,
@@ -325,9 +380,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                 ),
                                 child: Icon(
-                                  _isUploading 
-                                    ? Icons.hourglass_empty 
-                                    : Icons.camera_alt,
+                                  _isUploading
+                                      ? Icons.hourglass_empty
+                                      : Icons.camera_alt,
                                   color: Colors.white,
                                   size: 22,
                                 ),
@@ -336,9 +391,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 20),
-                      
+
                       // email del usuario
                       Text(
                         userEmail,
@@ -351,9 +406,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      
                       const SizedBox(height: 8),
-                      
                       // fecha de registro del usuario
                       Text(
                         'Miembro desde: ${_formatDate(registeredAt)}',
@@ -364,14 +417,202 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : Colors.grey[600],
                         ),
                       ),
-                      
-                      const SizedBox(height: 8),
                     ],
                   ),
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
+
+              // tarjeta de notificaciones
+              Card(
+                color: themeProvider.isDarkMode ? cardDark : Colors.white,
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.notifications_active,
+                              color: pinkPrimary),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Notificaciones',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: themeProvider.isDarkMode
+                                  ? textLight
+                                  : Colors.black87,
+                            ),
+                          ),
+                          if (_invitaciones.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${_invitaciones.length}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ]
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (_cargandoInvitaciones)
+                        const Center(
+                            child: Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: CircularProgressIndicator(color: pinkPrimary),
+                        ))
+                      else if (_invitaciones.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10.0),
+                          child: Text(
+                            'No tienes invitaciones nuevas.',
+                            style: TextStyle(
+                                color: themeProvider.isDarkMode
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600]),
+                          ),
+                        )
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _invitaciones.length,
+                          itemBuilder: (context, index) {
+                            final inv = _invitaciones[index];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: themeProvider.isDarkMode
+                                    ? cardLight
+                                    : pinkLighter.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color: pinkLight.withValues(alpha: 0.5)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  RichText(
+                                    text: TextSpan(
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        height: 1.4,
+                                        color: themeProvider.isDarkMode
+                                            ? Colors.grey[300]
+                                            : Colors.black87,
+                                      ),
+                                      children: [
+                                        TextSpan(
+                                          text: '${inv['owner_email']}',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        const TextSpan(
+                                            text:
+                                                ' te ha invitado a colaborar en la carpeta:'),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.folder_shared,
+                                          color: lilaFuerte, size: 24),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '"${inv['category']}"',
+                                          style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: themeProvider.isDarkMode
+                                                  ? textLight
+                                                  : lilaFuerte),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Rol otorgado: ${inv['role'].toString().toUpperCase()}',
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: pinkDark),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      TextButton.icon(
+                                        onPressed: () =>
+                                            _responderInvitacion(inv, false),
+                                        icon: const Icon(Icons.close,
+                                            size: 20, color: Colors.red),
+                                        label: const Text('Rechazar',
+                                            style: TextStyle(
+                                                color: Colors.red,
+                                                fontSize: 16)),
+                                        style: TextButton.styleFrom(
+                                          backgroundColor:
+                                              Colors.red.withValues(alpha: 0.1),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 12),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      ElevatedButton.icon(
+                                        onPressed: () =>
+                                            _responderInvitacion(inv, true),
+                                        icon: const Icon(Icons.check,
+                                            size: 20, color: Colors.white),
+                                        label: const Text('Aceptar',
+                                            style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 12),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10)),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            );
+                          },
+                        )
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
 
               // tarjeta de metas de viaje
               Card(
@@ -399,7 +640,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       ListTile(
-                        leading: const Icon(Icons.emoji_events, color: pinkPrimary),
+                        leading:
+                            const Icon(Icons.emoji_events, color: pinkPrimary),
                         title: const Text(
                           "Ver progreso",
                           style: TextStyle(fontWeight: FontWeight.w500),
@@ -563,7 +805,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const ChangePasswordScreen(),
+                              builder: (context) =>
+                                  const ChangePasswordScreen(),
                             ),
                           );
                         },
@@ -591,7 +834,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       // eliminar cuenta
                       ListTile(
-                        leading: const Icon(Icons.delete_forever, color: pinkPrimary),
+                        leading: const Icon(Icons.delete_forever,
+                            color: pinkPrimary),
                         title: Text(
                           'Eliminar cuenta',
                           style: TextStyle(
@@ -632,7 +876,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
 
               const SizedBox(height: 20),
-              
+
               // versión de la app
               Text(
                 'Versión 1.0.0',

@@ -193,25 +193,16 @@ class MemoryService {
       final user = _supabase.auth.currentUser;
       if (user == null || emailToShare.isEmpty) return;
 
-      // 1. Verificar si el usuario existe (tu RPC actual)
-      final bool userExists = await _supabase.rpc(
-        'check_user_exists',
-        params: {'search_email': emailToShare},
-      );
-
-      if (!userExists) {
-        throw 'No hay ninguna cuenta registrada con el correo:\n$emailToShare';
-      }
-
-      // 2. Obtener los recuerdos de la categoría
+      // Obtenemos los recuerdos de la categoría
       final response = await _supabase
           .from('nayeka memories')
           .select()
           .eq('user_id', user.id)
           .eq('category', category);
 
-      // 3. Actualizar cada recuerdo con el email Y el rol
+      // Actualizamos cada recuerdo de la carpeta
       for (var item in response) {
+        // 1. Cargamos las listas actuales
         List<String> currentShared = [];
         if (item['shared_with'] != null) {
           currentShared =
@@ -223,19 +214,30 @@ class MemoryService {
           currentRoles = Map<String, dynamic>.from(item['shared_roles']);
         }
 
-        if (selectedRole == 'quitar') {
-          currentShared.remove(emailToShare); // Lo borramos de la lista
-          currentRoles.remove(emailToShare); // Le quitamos el rol
-        } else {
-          if (!currentShared.contains(emailToShare)) {
-            currentShared.add(emailToShare);
-          }
-          currentRoles[emailToShare] = selectedRole;
+        Map<String, dynamic> currentPending = {};
+        if (item['pending_roles'] != null) {
+          currentPending = Map<String, dynamic>.from(item['pending_roles']);
         }
 
+        // 2. Lógica de Quitar o Invitar
+        if (selectedRole == 'quitar') {
+          // Si lo quitamos, lo borramos de TODAS partes
+          currentShared.remove(emailToShare);
+          currentRoles.remove(emailToShare);
+          currentPending.remove(emailToShare);
+        } else {
+          // Si lo invitamos, lo metemos SOLO a pendientes (y le quitamos accesos si los tuviera de antes)
+          currentShared.remove(emailToShare);
+          currentRoles.remove(emailToShare);
+
+          currentPending[emailToShare] = selectedRole;
+        }
+
+        // 3. Subimos los cambios a Supabase
         await _supabase.from('nayeka memories').update({
           'shared_with': currentShared,
           'shared_roles': currentRoles,
+          'pending_roles': currentPending,
         }).eq('id', item['id']);
       }
 
@@ -525,7 +527,8 @@ class MemoryService {
         'has_password': memory.hasPassword,
         'password_hash': memory.passwordHash,
         'shared_roles': memory.sharedRoles,
-        'creator_email': finalUserEmail, 
+        'pending_roles': memory.pendingRoles,
+        'creator_email': finalUserEmail,
       };
 
       await _supabase
@@ -921,7 +924,6 @@ class MemoryService {
     }
   }
 
-  // En MemoryService.dart// En MemoryService.dart
   Future<void> renameCategory(String oldName, String newName) async {
     if (oldName == 'General' || oldName == newName) return;
 
@@ -1057,6 +1059,97 @@ class MemoryService {
       return 0;
     }
   }
+
+  // 1. Obtener las invitaciones pendientes para un correo
+  Future<List<Map<String, dynamic>>> getPendingInvitations(
+      String userEmail) async {
+    try {
+      // Traemos todos los recuerdos (esto se puede optimizar en el futuro, pero funciona perfecto)
+      final response = await _supabase.from('nayeka memories').select();
+
+      List<Map<String, dynamic>> invitations = [];
+      Set<String> seenCategories =
+          {}; // Para no repetir invitaciones de la misma carpeta
+
+      for (var item in response) {
+        if (item['pending_roles'] != null &&
+            item['pending_roles'][userEmail] != null) {
+          String category = item['category'];
+          String ownerEmail = item['creator_email'] ?? 'Un usuario';
+          String role = item['pending_roles'][userEmail];
+          String ownerId = item['user_id'];
+
+          // Usamos una clave única (dueño + categoría) para mostrar solo 1 invitación por carpeta
+          String uniqueKey = '${ownerId}_$category';
+
+          if (!seenCategories.contains(uniqueKey)) {
+            seenCategories.add(uniqueKey);
+            invitations.add({
+              'category': category,
+              'owner_id': ownerId,
+              'owner_email': ownerEmail,
+              'role': role,
+            });
+          }
+        }
+      }
+      return invitations;
+    } catch (e) {
+      print('Error obteniendo invitaciones: $e');
+      return [];
+    }
+  }
+
+  // 2. Aceptar o Rechazar una invitación
+  Future<void> respondToInvitation(
+      String category, String ownerId, String userEmail, bool accept) async {
+    try {
+      // Buscamos todas las fotos de esa carpeta exacta
+      final response = await _supabase
+          .from('nayeka memories')
+          .select()
+          .eq('user_id', ownerId)
+          .eq('category', category);
+
+      for (var item in response) {
+        Map<String, dynamic> currentPending = item['pending_roles'] != null
+            ? Map<String, dynamic>.from(item['pending_roles'])
+            : {};
+        Map<String, dynamic> currentRoles = item['shared_roles'] != null
+            ? Map<String, dynamic>.from(item['shared_roles'])
+            : {};
+        List<String> currentShared = item['shared_with'] != null
+            ? List<String>.from(item['shared_with'].map((e) => e.toString()))
+            : [];
+
+        // Si este recuerdo tiene a la persona en pendientes
+        if (currentPending.containsKey(userEmail)) {
+          String role = currentPending[userEmail];
+
+          // 1. Lo quitamos de pendientes sí o sí
+          currentPending.remove(userEmail);
+
+          // 2. Si acepta, lo metemos en los oficiales
+          if (accept) {
+            currentRoles[userEmail] = role;
+            if (!currentShared.contains(userEmail)) {
+              currentShared.add(userEmail);
+            }
+          }
+
+          // 3. Subimos los cambios a ese recuerdo
+          await _supabase.from('nayeka memories').update({
+            'pending_roles': currentPending,
+            'shared_roles': currentRoles,
+            'shared_with': currentShared,
+          }).eq('id', item['id']);
+        }
+      }
+    } catch (e) {
+      print('Error respondiendo a invitación: $e');
+      throw Exception('No se pudo procesar la invitación');
+    }
+  }
 }
 
 // Extensión para copiar Memory
@@ -1075,6 +1168,7 @@ extension MemoryCopyWith on Memory {
     String? passwordHash,
     String? creatorId,
     Map<String, dynamic>? sharedRoles,
+    Map<String, dynamic>? pendingRoles,
     String? creatorEmail,
   }) {
     return Memory(
@@ -1091,6 +1185,7 @@ extension MemoryCopyWith on Memory {
       passwordHash: passwordHash ?? this.passwordHash,
       creatorId: creatorId ?? this.creatorId,
       sharedRoles: sharedRoles ?? this.sharedRoles,
+      pendingRoles: pendingRoles ?? this.pendingRoles,
       creatorEmail: creatorEmail ?? this.creatorEmail,
     );
   }
