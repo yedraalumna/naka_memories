@@ -19,6 +19,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../widget/MemoryForm.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Pantalla principal de la galería, muestra las carpetas (categorías)
+/// y los recuerdos que hay dentro de cada una, manejando los permisos y las carpetas protegidas por un PIN
 class MemoryGalleryScreen extends StatefulWidget {
   const MemoryGalleryScreen({super.key});
 
@@ -38,20 +40,22 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     _loadMemories();
   }
 
-  // Determina si el usuario es el creador de la categoría
+  /// Verfica que el usuario actual es el creador original de la categoría
   bool _isOwner(String category) {
     final categoryMemories =
         _memories.where((m) => m.category == category).toList();
-    if (categoryMemories.isEmpty)
-      return true; // Si está vacía, la acabo de crear yo
+    if (categoryMemories.isEmpty) {
+      return true; // Si está vacía la crea el propio usuario
+    }
 
     final currentUser = Supabase.instance.client.auth.currentUser;
-    // Si no hay creatorId antiguo, asumimos que es nuestra por defecto
+    // Si no hay creatorId antiguo, es del usuario actual
     final ownerId = categoryMemories.first.creatorId ?? currentUser?.id;
     return currentUser?.id == ownerId;
   }
 
-  // Determina si el usuario puede editar la categoría
+  /// Verifica si el usuario actual tiene permisos de 'editor' o 'admin'
+  /// para poder añadir o editar recuerdos en la categoría/carpeta
   bool _canAddOrEdit(String category) {
     if (_isOwner(category)) return true; // El dueño siempre puede
 
@@ -65,16 +69,19 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     return role == 'editor' || role == 'admin';
   }
 
-  // Determina si el usuario puede borrar la categoría
+  /// Verifica si el usuario tiene permisos de 'admin' (o es el creador) para poder eliminar un recuerdo
   bool _canDelete(Memory memory) {
     final currentUser = Supabase.instance.client.auth.currentUser;
-    if (memory.creatorId == currentUser?.id)
+    if (memory.creatorId == currentUser?.id) {
       return true; // El dueño siempre puede
+    }
 
     final role = memory.sharedRoles?[currentUser?.email];
     return role == 'admin';
   }
 
+  /// Método que hace que se carguen todos los recuerdos del usuario desde la base de datos
+  /// y los almacena en la lista de favoritos para que se puedan ver en toda la app
   Future<void> _loadMemories() async {
     setState(() => _isLoading = true);
     try {
@@ -98,14 +105,18 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     }
   }
 
+  /// Agrupa la lista de recuerdos en un mapa por categorías
   Map<String, List<Memory>> _groupMemoriesByCategory() {
     Map<String, List<Memory>> grouped = {};
     for (var memory in _memories) {
-      grouped.putIfAbsent(memory.category, () => []).add(memory);
+      grouped.putIfAbsent(memory.category, () => []).add(
+          memory); // Agrega la memoria a la categoría (PutIfAbsent es un if/else compacto)
     }
     return grouped;
   }
 
+  /// Coge el último recuerdo añadido a la categoría para usarlo como miniatura de la carpeta
+  /// Si no hay recuerdos, devuelve null para mostrar el icono de carpeta vacía
   Memory? _getLastMemoryForCategory(
       String category, Map<String, List<Memory>> grouped) {
     final memories = grouped[category];
@@ -113,7 +124,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     return memories.last;
   }
 
-  // ✅ CORREGIDO: usa el nuevo PinDialog que devuelve true/false
+  /// Maneja el evento de tocar una carpeta. Si tiene PIN, se abre el diálogo del PIN antes de abrirla
   Future<void> _onFolderTap(
       String category, Map<String, List<Memory>> grouped) async {
     final categoryProvider =
@@ -138,6 +149,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     }
   }
 
+  /// Muestra el modal para ponerle PIN a una carpeta
   void _showProtectFolderDialog(String category) {
     final TextEditingController pinController = TextEditingController();
 
@@ -146,6 +158,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Proteger Carpeta'),
         content: SingleChildScrollView(
+          // hace que el teclado no tape el contenido
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -198,14 +211,14 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                 }
 
                 _loadMemories();
-                Navigator.pop(context);
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Carpeta protegida con éxito')),
-                  );
+                if (!context.mounted) {
+                  return;
                 }
+
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Carpeta protegida con éxito')),
+                );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('El PIN debe tener 6 dígitos')),
@@ -219,6 +232,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
+  /// Navega al formulario para crear un recuerdo y si hay una categoría seleccionada, se la asigna
   void _navigateToCreateMemory() {
     const ubicacionPorDefecto = LatLng(0.0, 0.0);
 
@@ -238,6 +252,10 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             : null,
         onSave: (newMemory) async {
           await _memoryService.saveMemory(newMemory);
+          if (!context.mounted) {
+            return;
+          }
+
           Navigator.pop(context);
           _loadMemories();
         },
@@ -246,11 +264,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  void _navigateToCreateMemoryInCategory() {
-    if (_selectedCategory == null) return;
-    _navigateToCreateMemory();
-  }
-
+  /// Muestra el modal para escribir el nombre y crear una nueva carpeta vacía
   void _showNewCategoryDialog() {
     final TextEditingController controller = TextEditingController();
 
@@ -340,6 +354,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
+  /// Muestra el modal para dar o eliminar permisos (roles) a otros usuarios por correo sobre toda la categoría/carpeta
   void _showShareCategoryDialog(String categoryToShare) {
     final categoryMemories =
         _memories.where((m) => m.category == categoryToShare).toList();
@@ -440,7 +455,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                   const SizedBox(height: 16),
 
                   DropdownButtonFormField<String>(
-                    value: selectedRole,
+                    initialValue: selectedRole,
                     isExpanded: true,
                     isDense: false,
                     style: const TextStyle(fontSize: 16, color: Colors.black87),
@@ -468,7 +483,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                     },
                   ),
 
-                  // LISTA DE INVITADOS
+                  // Lista de usuarios con acceso y sus roles
                   if (categoryMemories.first.sharedRoles != null &&
                       categoryMemories.first.sharedRoles!.isNotEmpty) ...[
                     const SizedBox(height: 24),
@@ -498,7 +513,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                                         style: const TextStyle(fontSize: 14))),
                                 const SizedBox(width: 8),
 
-                                // Menú interactivo
+                                // Menú de permisos por usuario con la opción de cambiar rol o quitar (eliminarlo)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 2),
@@ -664,6 +679,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
+  /// Muestra el modal de detalles del recuerdo, con todas, alguna o ninguna opción depende del rol del usuario
   void _showMemoryDetails(BuildContext context, Memory memory) {
     showModalBottomSheet(
       context: context,
@@ -707,9 +723,17 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           }
           try {
             await _memoryService.deleteMemory(memory.id);
+
+            if (!context.mounted) {
+              return;
+            }
+
             Navigator.pop(context);
             _loadMemories();
           } catch (e) {
+            if (!context.mounted) {
+              return;
+            }
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
             );
@@ -723,6 +747,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
+  /// Construye el grid principal que muestra todas las carpetas/categorías
   Widget _buildFolderGrid(
     BuildContext context,
     List<String> categories,
@@ -748,9 +773,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.9
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 0.9,
       ),
       itemCount: categories.length,
       itemBuilder: (context, index) {
@@ -852,7 +877,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
 
-                // Etiqueta del dueño con color lilaFuerte
+                // Etiqueta del propietario o número de recuerdos que hay dentro depende de si el usuario es el dueño o no de la carpeta
                 if (!isMine && lastMemory?.creatorEmail != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
@@ -884,6 +909,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
+  /// Construye el grid secundario que muestra los recuerdos una vez dentro de una carpeta
   Widget _buildMemoryList(
     BuildContext context,
     List<Memory> memories,
@@ -985,7 +1011,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     return Scaffold(
       backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
       appBar: AppBar(
-        // Título y Subtítulo dinámicos
+        // Título y Subtítulo del AppBar
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -996,11 +1022,11 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                   fontWeight: FontWeight.bold,
                   fontSize: 18),
             ),
-            // Si la carpeta no es mía, buscamos quién es el dueño
+            // Si la carpeta no es del usuario, se muestra el dueño
             if (_selectedCategory != null && !_isOwner(_selectedCategory!))
               Builder(
                 builder: (context) {
-                  // Buscamos dentro de esta carpeta el primer recuerdo que tenga el email relleno
+                  // Si no hay creatorId antiguo, es del usuario actual
                   final memoryWithOwner = _memories.firstWhere(
                     (m) =>
                         m.category == _selectedCategory &&
@@ -1034,7 +1060,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               )
             : null,
         actions: [
-          // SOLO EL PROPIETARIO VE EL BOTÓN DE PONER PIN
+          // Solo el propietario ve el botón de proteger carpeta con PIN
           if (_selectedCategory != null && _isOwner(_selectedCategory!))
             IconButton(
               iconSize: 32,
@@ -1044,7 +1070,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               onPressed: () => _showProtectFolderDialog(_selectedCategory!),
             ),
 
-          // SOLO EL PROPIETARIO VE EL BOTÓN DE COMPARTIR
+          // Solo el propietario ve el botón de compartir carpeta con otros usuarios
           if (_selectedCategory != null && _isOwner(_selectedCategory!))
             IconButton(
               iconSize: 32,
@@ -1054,16 +1080,17 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               onPressed: () => _showShareCategoryDialog(_selectedCategory!),
             ),
 
-          // LECTORES NO VEN EL BOTÓN DE AÑADIR FOTO
+          // Los lectores no ven el boton de agregar recuerdo en la carpeta, los editores y administradores si
           if (_selectedCategory != null && _canAddOrEdit(_selectedCategory!))
             IconButton(
               iconSize: 32,
               padding: const EdgeInsets.all(12),
               icon: const Icon(Icons.add, color: Colors.white),
               tooltip: 'Agregar recuerdo a esta carpeta',
-              onPressed: _navigateToCreateMemoryInCategory,
+              onPressed: _navigateToCreateMemory,
             ),
 
+          // Solo se muestra el botón de crear nueva carpeta si el usuario no está dentro de una (en la vista principal)
           if (_selectedCategory == null)
             IconButton(
               iconSize: 32,
@@ -1104,6 +1131,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
+  /// Muestra el inicio vacío cuando la cuenta aún no tiene ningún recuerdo guardado
   Widget _buildEmptyState(ThemeProvider themeProvider) {
     return Center(
       child: Column(
