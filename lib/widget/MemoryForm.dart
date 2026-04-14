@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
 import '../providers/theme_provider.dart';
-import '../services/imagePickerService.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/MemoryService.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';

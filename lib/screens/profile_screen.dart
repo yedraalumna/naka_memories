@@ -8,7 +8,7 @@ import 'change_password_screen.dart';
 import 'travel_goals_screen.dart';
 import 'visited_places_screen.dart';
 import '../constants/colors.dart';
-import '../services/imagePickerService.dart';
+import '../services/image_picker_service.dart';
 import '../services/MemoryService.dart';
 
 class TarjetaNavegacion extends StatelessWidget {
