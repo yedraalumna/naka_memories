@@ -6,8 +6,9 @@ import '../providers/favorite_provider.dart';
 import '../providers/theme_provider.dart';
 import '../constants/colors.dart';
 import '../widget/MemoryListTile.dart';
-import 'coordinate_input_screen.dart'; // Importa esto para la edición
+import 'coordinate_input_screen.dart';
 
+/// Pantalla que muestra la lista de recuerdos marcados como favoritos
 class FavoriteScreen extends StatefulWidget {
   const FavoriteScreen({super.key});
 
@@ -25,6 +26,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     _loadMemories();
   }
 
+  /// Carga o recarga la lista de recuerdos desde la base de datos
   void _loadMemories() {
     setState(() {
       _memoriesFuture = _memoryService.getMemories();
@@ -35,66 +37,48 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   Widget build(BuildContext context) {
     final favoriteIds = context.watch<FavoriteProvider>().favoriteIds;
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDarkMode = themeProvider.isDarkMode;
 
     return Scaffold(
-      backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
+      backgroundColor: isDarkMode ? backgroundDark : Colors.white,
       appBar: AppBar(
         title: Text(
           'Mis Favoritos',
           style: TextStyle(
-            color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
+            color: isDarkMode ? textDarkMode : Colors.black87,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor:
-            themeProvider.isDarkMode ? backgroundDark : Colors.white,
+        backgroundColor: isDarkMode ? backgroundDark : Colors.white,
         elevation: 0,
         iconTheme: IconThemeData(
-          color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
+          color: isDarkMode ? textDarkMode : Colors.black87,
         ),
       ),
       body: favoriteIds.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.favorite_border,
-                      size: 80, color: Colors.grey[400]),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Aún no tienes favoritos',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: themeProvider.isDarkMode
-                          ? Colors.grey[400]
-                          : Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            )
+          ? _buildEmptyState(isDarkMode)
           : FutureBuilder<List<Memory>>(
               future: _memoriesFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                      child: CircularProgressIndicator(color: pinkPrimary));
-                }
-
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(
-                    child: Text('No hay recuerdos disponibles.',
-                        style: TextStyle(
-                            color: themeProvider.isDarkMode
-                                ? Colors.grey[400]
-                                : Colors.grey)),
+                    child: CircularProgressIndicator(color: pinkPrimary),
                   );
                 }
 
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return _buildEmptyState(isDarkMode);
+                }
+
+                // Filtramos los recuerdos que estén en la lista de favoritos
                 final favoriteMemories = snapshot.data!
                     .where((memory) => favoriteIds.contains(memory.id))
                     .toList();
+
+                // Si hay IDs en favoritos pero no se encuentran en la BD (pq se borró desde otro dispositivo)
+                if (favoriteMemories.isEmpty) {
+                  return _buildEmptyState(isDarkMode);
+                }
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(12),
@@ -103,7 +87,6 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     final memory = favoriteMemories[index];
                     return MemoryListTile(
                       memory: memory,
-                      // --- LÓGICA DE EDICIÓN ---
                       onEdit: () async {
                         Navigator.pop(context); // Cierra el modal de detalles
                         final result = await Navigator.push(
@@ -115,25 +98,49 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                         );
                         if (result != null && result is Memory) {
                           await _memoryService.saveMemory(result);
-                          _loadMemories(); // Recarga la lista
+                          if (mounted) _loadMemories(); // Recarga la lista
                         }
                       },
-                      // --- LÓGICA DE BORRADO ---
                       onDelete: () async {
                         await _memoryService.deleteMemory(memory.id);
+
+                        if (!context.mounted) {
+                          return;
+                        }
+
                         Navigator.pop(context);
                         _loadMemories(); // Recarga la lista
                       },
-                      // --- LÓGICA DE ACTUALIZACIÓN ---
                       onUpdate: (updatedMemory) async {
                         await _memoryService.saveMemory(updatedMemory);
-                        _loadMemories(); // Recarga la lista
+                        if (mounted) _loadMemories(); // Recarga la lista
                       },
                     );
                   },
                 );
               },
             ),
+    );
+  }
+
+  /// Método que construye la vista cuando no hay favoritos
+  Widget _buildEmptyState(bool isDarkMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.favorite_border, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 20),
+          Text(
+            'Aún no tienes favoritos',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.grey[400] : Colors.grey,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

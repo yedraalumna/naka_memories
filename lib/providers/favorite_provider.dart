@@ -1,17 +1,21 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../services/MemoryService.dart';
 import '../models/Memory.dart';
 
+/// Proveedor encargado de gestionar de forma local el estado de los recuerdos
+/// marcados como favoritos, manteniéndolos sincronizados con la base de datos
 class FavoriteProvider extends ChangeNotifier {
   final MemoryService _memoryService = MemoryService();
   final Set<String> _favoriteIds = {};
 
   Set<String> get favoriteIds => _favoriteIds;
 
+  /// Verifica si un recuerdo en concreto está en la lista de favoritos
   bool isFavorite(String id) => _favoriteIds.contains(id);
 
-  // Inicializa el provider y carga los datos desde la BD
-  Future<void> loadFavorites(List<Memory> allMemories) async {
+  /// Inicializa el estado cargando los identificadores de los recuerdos
+  /// que ya están marcados como favoritos en la base de datos
+  void loadFavorites(List<Memory> allMemories) {
     _favoriteIds.clear();
     for (var memory in allMemories) {
       if (memory.isFavorite) {
@@ -21,11 +25,12 @@ class FavoriteProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Alternar favorito: UI instantánea + BD real
+  /// Método que alterna el estado de favorito de un recuerdo
+  /// Aplica el cambio en la UI y luego lo sincroniza
   Future<void> toggleFavorite(String id) async {
     final isAdding = !_favoriteIds.contains(id);
 
-    // UI Instantánea
+    // Se actualiza el estado en la UI instantaneamente
     if (isAdding) {
       _favoriteIds.add(id);
     } else {
@@ -33,7 +38,19 @@ class FavoriteProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    // Persistencia Real en Supabase (usando el campo isFavorite del modelo)
-    await _memoryService.updateFavoriteStatus(id, isAdding);
+    // Se actualiza el estado en la base de datos
+    try {
+      await _memoryService.updateFavoriteStatus(id, isAdding);
+    } catch (e) {
+      // Si la base de datos falla, revertimos el cambio visual
+      if (isAdding) {
+        _favoriteIds.remove(id);
+      } else {
+        _favoriteIds.add(id);
+      }
+      notifyListeners();
+
+      if (kDebugMode) print('Error actualizando favorito: $e');
+    }
   }
 }
