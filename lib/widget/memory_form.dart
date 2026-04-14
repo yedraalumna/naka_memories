@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
@@ -14,8 +13,10 @@ import 'package:geolocator/geolocator.dart';
 import '../screens/coordinate_input_screen.dart';
 import '../providers/category_provider.dart';
 import 'package:crypto/crypto.dart';
-import 'package:video_player/video_player.dart'; // Añadido para validar el video
+import 'package:video_player/video_player.dart';
 
+/// Formulario principal para crear y editar los recuerdos
+/// Maneja la subida de foto/video, PIN para carpetas y obtiene coordenadas GPS de los recuerdos
 class MemoryForm extends StatefulWidget {
   final LatLng location;
   final Memory? existingMemory;
@@ -37,6 +38,7 @@ class MemoryForm extends StatefulWidget {
 }
 
 class _MemoryFormState extends State<MemoryForm> {
+  // Controladores para los campos del formulario
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
@@ -44,28 +46,23 @@ class _MemoryFormState extends State<MemoryForm> {
   final MemoryService _memoryService = MemoryService();
   final TextEditingController _customCategoryController =
       TextEditingController();
-
   bool _protectNewCategory = false;
   String _newCategoryPin = '';
   String _confirmNewCategoryPin = '';
   TextEditingController _pinController = TextEditingController();
   TextEditingController _confirmPinController = TextEditingController();
-
   String? _selectedAsset;
-  bool _isLoadingMedia = false; // Renombrado para ser genérico (img o video)
+  bool _isLoadingMedia = false;
   bool _isSaving = false;
-  Uint8List? _selectedBytes; // Renombrado: puede ser imagen o video
-  bool _isVideo = false; // Bandera para saber si es video
-  String _selectedCategory = ''; // Categorias
-  bool _isCustomCategory = false; // Bandera para saber si es custom
-  double? _photoLatitude; // Para guardar latitud de la foto
-  double? _photoLongitude; // Para guardar longitud de la foto
-  bool _usePhotoLocation = false; // Indica si usar ubicación de la foto
-
-  late LatLng _currentFormLocation; // Para poder actualizar la ubicación
-
+  Uint8List? _selectedBytes;
+  bool _isVideo = false;
+  String _selectedCategory = '';
+  bool _isCustomCategory = false;
+  double? _photoLatitude;
+  double? _photoLongitude;
+  bool _usePhotoLocation = false;
+  late LatLng _currentFormLocation;
   List<String> _categories = [];
-  bool _isLoadingCategories = true;
 
   final List<String> _availableAssets = [
     'assets/images/gato.jpg',
@@ -90,6 +87,7 @@ class _MemoryFormState extends State<MemoryForm> {
     _confirmPinController = TextEditingController();
   }
 
+  /// Inicializa los campos del formulario si se está editando un recuerdo, o carga lo que hay por defecto si es nuevo
   void _initializeFormData() {
     if (widget.existingMemory != null) {
       _titleController.text = widget.existingMemory!.title;
@@ -111,8 +109,8 @@ class _MemoryFormState extends State<MemoryForm> {
     }
   }
 
+  /// Carga las categorías disponibles desde el Provider con "General" la primera por defecto
   Future<void> _loadCategories() async {
-    setState(() => _isLoadingCategories = true);
     try {
       final categoryProvider =
           Provider.of<CategoryProvider>(context, listen: false);
@@ -120,19 +118,18 @@ class _MemoryFormState extends State<MemoryForm> {
 
       setState(() {
         _categories = List.from(categoryProvider.categories);
-        _isLoadingCategories = false;
         _initializeFormData();
       });
     } catch (e) {
-      print('Error cargando categorías: $e');
+      debugPrint('Error cargando categorías: $e');
       setState(() {
         _categories = ['General'];
-        _isLoadingCategories = false;
         _initializeFormData();
       });
     }
   }
 
+  /// Despliega el calendario para seleccionar la fecha del recuerdo
   Future<void> _selectDate(BuildContext context) async {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDarkMode = themeProvider.isDarkMode;
@@ -170,6 +167,7 @@ class _MemoryFormState extends State<MemoryForm> {
     }
   }
 
+  /// Muestra el menú inferior (BottomSheet) con las opciones para subir contenido multimedia
   void _pickImageOptions() {
     showModalBottomSheet(
       context: context,
@@ -200,7 +198,7 @@ class _MemoryFormState extends State<MemoryForm> {
                 ),
                 const SizedBox(height: 20),
 
-                // SECCIÓN FOTOS
+                // seccion de fotos solo en movil, en web se suben como archivos normales
                 if (!kIsWeb) ...[
                   ListTile(
                     leading: const Icon(Icons.camera_alt, color: pinkPrimary),
@@ -227,7 +225,7 @@ class _MemoryFormState extends State<MemoryForm> {
 
                 const Divider(),
 
-                // SECCIÓN VIDEOS
+                // seccion de videos solo en movil, en web se suben como archivos normales
                 if (!kIsWeb) ...[
                   ListTile(
                     leading: const Icon(Icons.videocam, color: pinkPrimary),
@@ -252,7 +250,7 @@ class _MemoryFormState extends State<MemoryForm> {
                   ),
                 ],
 
-                // Opción Web
+                // subir foto en web
                 if (kIsWeb) ...[
                   ListTile(
                     leading:
@@ -265,6 +263,7 @@ class _MemoryFormState extends State<MemoryForm> {
                       await _pickImageFromGallery();
                     },
                   ),
+                  // subir video en web
                   ListTile(
                     leading:
                         const Icon(Icons.video_library, color: pinkPrimary),
@@ -280,6 +279,7 @@ class _MemoryFormState extends State<MemoryForm> {
 
                 const Divider(),
 
+                // imagenes predeterminadas
                 ListTile(
                   leading: const Icon(Icons.image_search, color: Colors.grey),
                   title: Text('Imágenes predeterminadas',
@@ -298,6 +298,7 @@ class _MemoryFormState extends State<MemoryForm> {
     );
   }
 
+  /// Método que abre la cámara para tomar una foto y extrae su ubicación actual si el usuario lo permite
   Future<void> _pickImageFromCamera() async {
     setState(() => _isLoadingMedia = true);
     try {
@@ -308,7 +309,7 @@ class _MemoryFormState extends State<MemoryForm> {
         try {
           await getCurrentLocation();
         } catch (e) {
-          print('Error obteniendo ubicación: $e');
+          debugPrint('Error obteniendo ubicación: $e');
         }
 
         setState(() {
@@ -318,6 +319,9 @@ class _MemoryFormState extends State<MemoryForm> {
         });
       }
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al tomar foto: $e'),
@@ -325,10 +329,13 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     } finally {
-      setState(() => _isLoadingMedia = false);
+      if (mounted) {
+        setState(() => _isLoadingMedia = false);
+      }
     }
   }
 
+  /// Método que solicita y verifica permisos de geolocalización actual del dispositivo
   Future<Position> determinePosition() async {
     LocationPermission permission;
 
@@ -341,69 +348,70 @@ class _MemoryFormState extends State<MemoryForm> {
       }
     }
 
-    // Verificar si la ubicación está activada
+    // verificar si la ubicación está activada
     bool isLocationServiceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!isLocationServiceEnabled) {
       throw Exception('Ubicación desactivada');
     }
 
-    // Obtener la posición actual
+    // obtener la posición actual
     return await Geolocator.getCurrentPosition();
   }
 
+  /// obitiene la ubicación actual y la guarda en el estado local del formulario
   Future<void> getCurrentLocation() async {
     try {
       Position position = await determinePosition();
-      print(position.latitude);
-      print(position.longitude);
+      debugPrint('Latitud: ${position.latitude}');
+      debugPrint('Longitud: ${position.longitude}');
 
-      // Guardar la ubicación obtenida
+      // guarda la ubicación obtenida
       setState(() {
         _photoLatitude = position.latitude;
         _photoLongitude = position.longitude;
         _usePhotoLocation = true;
       });
     } catch (e) {
-      print('Error obteniendo ubicación: $e');
+      debugPrint('Error obteniendo ubicación: $e');
       setState(() {
         _usePhotoLocation = false;
       });
     }
   }
 
-  /// Abre la galería, selecciona una imagen y la guarda lista para subir o mostrar.
-  /// Funciona de manera inteligente tanto en Web como en Móvil.
+  /// Abre la galería, selecciona una imagen y la guarda para subir o mostrar
   Future<void> _pickImageFromGallery() async {
     setState(() => _isLoadingMedia = true);
 
     try {
       if (kIsWeb) {
-        // --- LÓGICA PARA WEB ---
+        // logica para web: obtenemos los bytes y creamos una URL de datos para mostrar la imagen (ya que no hay path en web)
         final bytes = await _pickerService.pickImageAsBytes();
         if (bytes != null && bytes.isNotEmpty) {
           setState(() {
-            // En web creamos una URL de datos (Base64) para poder previsualizarla
+            // crea una URL de datos (Base64) para poder mostrar la imagen
             _selectedAsset = 'data:image/jpeg;base64,${base64.encode(bytes)}';
             _selectedBytes = bytes;
             _isVideo = false;
           });
         }
       } else {
-        // --- LÓGICA PARA MÓVIL/ESCRITORIO ---
+        // logica para móvil: obtenemos el path del archivo y leemos los bytes desde el disco para mostrar la imagen
         final path = await _pickerService.pickImageFromGallery();
         if (path != null) {
-          // En móvil sí podemos leer el archivo desde el disco
+          // lee el archivo desde el disco y lo convierte a bytes para poder subirlo después
           final bytes = await File(path).readAsBytes();
           setState(() {
-            _selectedAsset = path; // Guardamos la ruta física
+            _selectedAsset = path;
             _selectedBytes = bytes;
-            _isVideo = false; // Es foto
+            _isVideo = false; // es foto
           });
         }
       }
     } catch (e) {
-      if (!mounted)
-        return; // Buena práctica: asegurar que el widget sigue vivo antes de mostrar un snackbar
+      if (!mounted) {
+        return; // Evita mostrar el SnackBar si el widget ya no está montado
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al seleccionar imagen: $e'),
@@ -417,7 +425,7 @@ class _MemoryFormState extends State<MemoryForm> {
     }
   }
 
-  // MÉTODOS DE SELECCIÓN DE VIDEO
+  /// Método que abre la cámara para grabar un video
   Future<void> _pickVideoFromCamera() async {
     setState(() => _isLoadingMedia = true);
     try {
@@ -427,10 +435,13 @@ class _MemoryFormState extends State<MemoryForm> {
         setState(() {
           _selectedAsset = path;
           _selectedBytes = bytes;
-          _isVideo = true; // MARCAMOS COMO VIDEO
+          _isVideo = true;
         });
       }
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al grabar video: $e'),
@@ -438,10 +449,13 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     } finally {
-      setState(() => _isLoadingMedia = false);
+      if (mounted) {
+        setState(() => _isLoadingMedia = false);
+      }
     }
   }
 
+  /// Método que abre la galería para seleccionar un video
   Future<void> _pickVideoFromGallery() async {
     setState(() => _isLoadingMedia = true);
     try {
@@ -451,10 +465,13 @@ class _MemoryFormState extends State<MemoryForm> {
         setState(() {
           _selectedAsset = path;
           _selectedBytes = bytes;
-          _isVideo = true; // MARCAMOS COMO VIDEO
+          _isVideo = true;
         });
       }
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al seleccionar el video: $e'),
@@ -462,23 +479,29 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     } finally {
-      setState(() => _isLoadingMedia = false);
+      if (mounted) {
+        setState(() => _isLoadingMedia = false);
+      }
     }
   }
 
+  /// Método que selecciona un video compatible con la web
   Future<void> _pickVideoForWeb() async {
     setState(() => _isLoadingMedia = true);
     try {
       final bytes = await _pickerService.pickVideoBytesForWeb();
       if (bytes != null && bytes.isNotEmpty) {
         setState(() {
-          // Usamos un placeholder text para asset en web video, ya que no hay path real
+          // no tenemos un path real, así que usamos un placeholder y guardamos los bytes para subirlos después
           _selectedAsset = 'web_video_upload.mp4';
           _selectedBytes = bytes;
           _isVideo = true;
         });
       }
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al subir video: $e'),
@@ -486,10 +509,13 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     } finally {
-      setState(() => _isLoadingMedia = false);
+      if (mounted) {
+        setState(() => _isLoadingMedia = false);
+      }
     }
   }
 
+  /// Abre un modal con las imágenes por defecto
   void _selectAsset() {
     showModalBottomSheet(
       context: context,
@@ -547,7 +573,7 @@ class _MemoryFormState extends State<MemoryForm> {
                           boxShadow: [
                             BoxShadow(
                               color: Colors.grey
-                                  .withOpacity(isDarkMode ? 0.1 : 0.3),
+                                  .withValues(alpha: isDarkMode ? 0.1 : 0.3),
                               blurRadius: 5,
                               offset: const Offset(0, 3),
                             ),
@@ -591,7 +617,7 @@ class _MemoryFormState extends State<MemoryForm> {
     );
   }
 
-  // WIDGET DE PREVISUALIZACIÓN (SOPORTA VIDEO)
+  /// Método que muestra la imagen o video seleccionado, o un placeholder si no hay ninguno
   Widget _showSelectedImage() {
     if (_isLoadingMedia) {
       return const Center(child: CircularProgressIndicator(color: pinkPrimary));
@@ -604,13 +630,13 @@ class _MemoryFormState extends State<MemoryForm> {
           children: [
             Icon(Icons.add_a_photo, color: pinkPrimary, size: 40),
             SizedBox(height: 5),
-            Text('Añadir Foto o Video', style: TextStyle(color: pinkPrimary)),
+            Text('Añadir foto o video', style: TextStyle(color: pinkPrimary)),
           ],
         ),
       );
     }
 
-    // Si es video, muestra icono de video
+    // si es un video, se ve un placeholder de que se ha seleccionado un video
     if (_isVideo) {
       return Container(
         color: Colors.black87,
@@ -627,6 +653,7 @@ class _MemoryFormState extends State<MemoryForm> {
       );
     }
 
+    // si es un asset, se muestra desde la ruta (no se usa bytes)
     if (_selectedAsset!.startsWith('assets/')) {
       return Image.asset(
         _selectedAsset!,
@@ -640,7 +667,7 @@ class _MemoryFormState extends State<MemoryForm> {
       );
     }
 
-    // Para Web (data URL)
+    // si es una imagen web que viene como Base64 (data URL)
     if (_selectedAsset!.startsWith('data:image')) {
       try {
         final bytes = base64.decode(_selectedAsset!.split(',')[1]);
@@ -658,7 +685,7 @@ class _MemoryFormState extends State<MemoryForm> {
       }
     }
 
-    // Para imágenes locales (path de archivo)
+    // si es un path local (móvil), se muestra desde el archivo (no se usa bytes)
     if (_selectedAsset!.startsWith('/') || _selectedAsset!.contains('file:')) {
       return Image.file(
         File(_selectedAsset!),
@@ -672,7 +699,7 @@ class _MemoryFormState extends State<MemoryForm> {
       );
     }
 
-    // Para URLs web
+    // si es una imagen web que viene como URL, se muestra desde la red (no se usa bytes)
     if (_selectedAsset!.startsWith('http')) {
       return Image.network(
         _selectedAsset!,
@@ -698,7 +725,7 @@ class _MemoryFormState extends State<MemoryForm> {
       );
     }
 
-    // Por defecto
+    // por defecto
     return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -711,16 +738,24 @@ class _MemoryFormState extends State<MemoryForm> {
     );
   }
 
+  /// Método que guarda los datos del formulario en Supabase y actualiza los metadatos de las carpetas protegidas
   Future<void> _saveMemory() async {
-    if (_isSaving) return;
+    if (_isSaving) {
+      return;
+    }
+
+    // capturamos ScaffoldMessenger y CategoryProvider para evitar problemas de contexto dentro de los async/await
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final categoryProvider =
+        Provider.of<CategoryProvider>(context, listen: false);
 
     final title = _titleController.text.trim();
     final description = _descriptionController.text.trim();
     final date = _dateController.text.trim();
 
-    // Validaciones básicas
+    // validaciones de campos obligatorios
     if (title.isEmpty || date.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('Por favor, completa los campos obligatorios'),
           backgroundColor: Colors.red,
@@ -729,15 +764,15 @@ class _MemoryFormState extends State<MemoryForm> {
       return;
     }
 
-    // VALIDACIÓN DE VIDEO (MÓVIL Y WEB)
+    // validación para videos: duración máxima de 20 segundos en móvil o peso máximo de 15 MB en web
     if (_isVideo) {
       bool isVideoValid = true;
       String errorMessage = '';
 
-      setState(() => _isSaving = true); // Mostramos el loader
+      setState(() => _isSaving = true);
 
       if (!kIsWeb && _selectedAsset != null) {
-        // 1. Validación para App Móvil: Por duración exacta (20 segundos)
+        // validación para movil/app de 20 segundos
         try {
           final controller = VideoPlayerController.file(File(_selectedAsset!));
           await controller.initialize();
@@ -748,10 +783,10 @@ class _MemoryFormState extends State<MemoryForm> {
           }
           await controller.dispose();
         } catch (e) {
-          print('Error validando duración en móvil: $e');
+          debugPrint('Error validando duración en móvil: $e');
         }
       } else if (kIsWeb && _selectedBytes != null) {
-        // 2. Validación para Web: Por peso (Límite de 15 MB)
+        // validación para web 15 mb (en web no se puede validar duración)
         const int maxSizeInBytes = 15 * 1024 * 1024;
 
         if (_selectedBytes!.length > maxSizeInBytes) {
@@ -761,35 +796,31 @@ class _MemoryFormState extends State<MemoryForm> {
         }
       }
 
-      // Si el video falló alguna de las dos pruebas, cortamos el proceso
+      // si hubo algúna validación fallida, mostramos el error y detenemos el guardado
       if (!isVideoValid) {
         setState(() => _isSaving = false);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text(errorMessage),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 4),
           ),
         );
-        return; // Detenemos el guardado y no enviamos nada a Supabase
+        return;
       }
 
-      setState(
-          () => _isSaving = false); // Todo bien, quitamos el loader y seguimos
+      setState(() => _isSaving = false);
     }
 
-    // LÓGICA DE CATEGORÍA: Determinar cuál usar
+    // logica para saber la categoría del recuerdo, si es personalizada o existente, y manejar el PIN si tiene
     String finalCategory = _selectedCategory;
     bool isProtected = false;
     String? passwordHash;
-    final categoryProvider =
-        Provider.of<CategoryProvider>(context, listen: false);
 
     if (_isCustomCategory) {
       final customText = _customCategoryController.text.trim();
       if (customText.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           const SnackBar(
             content:
                 Text('Por favor, escribe un nombre para la nueva categoría'),
@@ -803,14 +834,14 @@ class _MemoryFormState extends State<MemoryForm> {
       isProtected = false;
       passwordHash = null;
 
-      // Crear la nueva categoría usando el Provider
+      // crear nueva categoría personalizada
       try {
         await categoryProvider.createCategory(finalCategory);
 
-        // 🔥 NUEVO: Si el usuario quiere proteger la categoría, guardar el PIN
+        // si el usuario quiere proteger la categoría, guardar el PIN
         if (_protectNewCategory) {
           if (_newCategoryPin.length != 6) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            scaffoldMessenger.showSnackBar(
               const SnackBar(
                 content: Text('El PIN debe tener 6 dígitos'),
                 backgroundColor: Colors.red,
@@ -818,8 +849,9 @@ class _MemoryFormState extends State<MemoryForm> {
             );
             return;
           }
+          // validamos que el PIN y su confirmación coincidan antes de guardar
           if (_newCategoryPin != _confirmNewCategoryPin) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            scaffoldMessenger.showSnackBar(
               const SnackBar(
                 content: Text('Los PINs no coinciden'),
                 backgroundColor: Colors.red,
@@ -828,28 +860,28 @@ class _MemoryFormState extends State<MemoryForm> {
             return;
           }
 
-          // Generar hash del PIN y guardarlo
+          // guardamos el PIN guardado como un hash para seguridad
           final hash = sha256.convert(utf8.encode(_newCategoryPin)).toString();
           await categoryProvider.setCategoryPassword(finalCategory, hash);
-          print('✅ Categoría "$finalCategory" protegida con PIN');
+          debugPrint('Categoría "$finalCategory" protegida con PIN');
         }
 
         await _loadCategories();
         widget.onCategoriesChanged?.call();
       } catch (e) {
-        print('Error creando categoría: $e');
+        debugPrint('Error creando categoría: $e');
         categoryProvider.addCategoryLocally(finalCategory);
       }
     }
 
-    // Fuente única de verdad del PIN: protección configurada por categoría
+    // obtener la protección configurada por categoría
     isProtected = categoryProvider.isCategoryProtected(finalCategory);
     passwordHash = categoryProvider.getPasswordHash(finalCategory);
 
     setState(() => _isSaving = true);
 
     try {
-      // Determinar qué ubicación usar
+      // determinar la ubicación a guardar
       double latitude, longitude;
 
       bool ubicacionModificada =
@@ -859,20 +891,20 @@ class _MemoryFormState extends State<MemoryForm> {
       if (ubicacionModificada) {
         latitude = _currentFormLocation.latitude;
         longitude = _currentFormLocation.longitude;
-        print('Usando ubicación manual: $latitude, $longitude');
+        debugPrint('Usando ubicación manual: $latitude, $longitude');
       } else if (_usePhotoLocation &&
           _photoLatitude != null &&
           _photoLongitude != null) {
         latitude = _photoLatitude!;
         longitude = _photoLongitude!;
-        print('Usando ubicación actual: $latitude, $longitude');
+        debugPrint('Usando ubicación actual: $latitude, $longitude');
       } else {
         latitude = _currentFormLocation.latitude;
         longitude = _currentFormLocation.longitude;
-        print('Usando ubicación del formulario: $latitude, $longitude');
+        debugPrint('Usando ubicación del formulario: $latitude, $longitude');
       }
 
-      // 3. Crear el objeto Memory con la categoría correcta
+      // crear el objeto Memory con la categoría correcta
       Memory memoryToSave = Memory(
         id: widget.existingMemory?.id ?? '',
         title: title,
@@ -894,16 +926,16 @@ class _MemoryFormState extends State<MemoryForm> {
 
       Memory finalMemory;
 
-      // Lógica de guardado según el tipo de archivo
+      // lógica de guardado según el tipo de archivo
       if (_selectedBytes != null && _selectedBytes!.isNotEmpty) {
         if (_isVideo) {
-          print('Subiendo video...');
+          debugPrint('Subiendo video...');
           finalMemory = await _memoryService.saveMemoryWithVideo(
             memory: memoryToSave,
             videoBytes: _selectedBytes!,
           );
         } else {
-          print('Subiendo imagen...');
+          debugPrint('Subiendo imagen...');
           final savedId = await _memoryService.saveMemoryWithImage(
             memory: memoryToSave,
             imageBytes: _selectedBytes!,
@@ -916,27 +948,25 @@ class _MemoryFormState extends State<MemoryForm> {
         finalMemory = memoryToSave;
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Recuerdo guardado correctamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        widget.onSave(finalMemory);
-      }
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text('Recuerdo guardado correctamente'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      widget.onSave(finalMemory);
     } catch (e) {
-      print('Error guardando recuerdo: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al guardar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint('Error guardando recuerdo: $e');
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Error al guardar: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -961,8 +991,8 @@ class _MemoryFormState extends State<MemoryForm> {
               children: [
                 Text(
                   widget.existingMemory == null
-                      ? 'Crear Nuevo Recuerdo'
-                      : 'Editar Recuerdo',
+                      ? 'Crear nuevo recuerdo'
+                      : 'Editar recuerdo',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -1085,15 +1115,13 @@ class _MemoryFormState extends State<MemoryForm> {
                   ),
                 ),
 
-                // Campo de categoría
                 const SizedBox(height: 15),
 
+                // Campo de categoría con opción de PIN
                 if (_isCustomCategory)
-                  // MODO ESCRITURA (TextField con opción de PIN)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Fila: Campo de texto + botón cancelar
                       Row(
                         children: [
                           Expanded(
@@ -1184,7 +1212,7 @@ class _MemoryFormState extends State<MemoryForm> {
                         ],
                       ),
                       const SizedBox(height: 15),
-                      // Checkbox para proteger la nueva categoría con PIN
+                      // Checkbox para proteger con PIN
                       Row(
                         children: [
                           Checkbox(
@@ -1213,7 +1241,7 @@ class _MemoryFormState extends State<MemoryForm> {
                           ),
                         ],
                       ),
-                      // Campos de PIN (solo si _protectNewCategory es true)
+                      // Campos de PIN (solo si el checkbox está activo)
                       if (_protectNewCategory) ...[
                         const SizedBox(height: 10),
                         TextField(
@@ -1271,7 +1299,7 @@ class _MemoryFormState extends State<MemoryForm> {
                     ],
                   )
                 else
-                  // MODO SELECCIÓN (Dropdown con opción de crear)
+                  // Dropdown de categorías existentes
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
@@ -1284,20 +1312,18 @@ class _MemoryFormState extends State<MemoryForm> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
-                        // Aseguramos que el valor seleccionado exista en la lista actual
                         value: _categories.contains(_selectedCategory)
                             ? _selectedCategory
                             : (_categories.isNotEmpty
                                 ? _categories.first
                                 : null),
                         isExpanded: true,
-                        itemHeight:
-                            60, // Altura ampliada para facilitar el toque
+                        itemHeight: 60,
                         dropdownColor: isDarkMode ? cardDark : Colors.white,
                         icon: const Icon(Icons.arrow_drop_down,
                             color: pinkPrimary, size: 30),
                         items: [
-                          // Las categorías desde el Provider
+                          // Se muestran las opciones del dropdown a partir de las categorías que hay
                           ..._categories.map((String category) {
                             return DropdownMenuItem<String>(
                               value: category,
@@ -1319,7 +1345,7 @@ class _MemoryFormState extends State<MemoryForm> {
                               ),
                             );
                           }),
-                          // Opción especial al final para crear nueva
+                          // opción para crear una nueva categoría personalizada
                           const DropdownMenuItem<String>(
                             value:
                                 'custom_option_marker', // Valor identificador único
@@ -1342,13 +1368,12 @@ class _MemoryFormState extends State<MemoryForm> {
                         ],
                         onChanged: (String? newValue) {
                           if (newValue == 'custom_option_marker') {
-                            // Si seleccionan "Nueva...", cambiamos a modo texto
                             setState(() {
                               _isCustomCategory = true;
                               _customCategoryController.clear();
                             });
                           } else if (newValue != null) {
-                            // Si seleccionan una normal, actualizamos valor
+                            // Si seleccionan una que habia, actualizamos valor
                             setState(() => _selectedCategory = newValue);
                           }
                         },
@@ -1358,7 +1383,7 @@ class _MemoryFormState extends State<MemoryForm> {
 
                 const SizedBox(height: 20),
 
-                // Selector de imagen
+                // Campo de imagen/video
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1376,8 +1401,8 @@ class _MemoryFormState extends State<MemoryForm> {
                         height: 200,
                         decoration: BoxDecoration(
                           color: isDarkMode
-                              ? cardDark.withOpacity(0.5)
-                              : pinkLighter.withOpacity(0.3),
+                              ? cardDark.withValues(alpha: 0.5)
+                              : pinkLighter.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: pinkPrimary,
@@ -1387,7 +1412,7 @@ class _MemoryFormState extends State<MemoryForm> {
                           boxShadow: [
                             BoxShadow(
                               color: Colors.grey
-                                  .withOpacity(isDarkMode ? 0.1 : 0.2),
+                                  .withValues(alpha: isDarkMode ? 0.1 : 0.2),
                               blurRadius: 8,
                               offset: const Offset(0, 4),
                             ),
@@ -1413,22 +1438,9 @@ class _MemoryFormState extends State<MemoryForm> {
                 ),
                 const SizedBox(height: 25),
 
-                // Coordenadas
+                // Campo de ubicación con acceso al mapa para seleccionar coordenadas
                 GestureDetector(
                   onTap: () async {
-                    // Guardar los datos actuales antes de salir
-                    final currentTitle = _titleController.text;
-                    final currentDescription = _descriptionController.text;
-                    final currentDate = _dateController.text;
-                    final currentCategory = _selectedCategory;
-                    final currentAsset = _selectedAsset;
-                    final currentBytes = _selectedBytes;
-                    final currentIsVideo = _isVideo;
-                    final currentCustomCategory =
-                        _customCategoryController.text;
-                    final currentIsCustom = _isCustomCategory;
-
-                    // Navegar a la pantalla de selección de coordenadas (mapa)
                     final LatLng? selectedLocation =
                         await Navigator.of(context).push<LatLng>(
                       MaterialPageRoute(
@@ -1436,13 +1448,17 @@ class _MemoryFormState extends State<MemoryForm> {
                       ),
                     );
 
-                    // Si seleccionó una ubicación, actualizar la ubicación actual
-                    if (selectedLocation != null && mounted) {
+                    // Evitar errores si el usuario navega fuera de la pantalla
+                    if (!context.mounted) {
+                      return;
+                    }
+
+                    // Si selecciona una ubicación, actualiza la ubicación actual
+                    if (selectedLocation != null) {
                       setState(() {
                         _currentFormLocation = selectedLocation;
                       });
 
-                      // Mostrar mensaje de confirmación
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Ubicación actualizada'),
@@ -1455,8 +1471,9 @@ class _MemoryFormState extends State<MemoryForm> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color:
-                          isDarkMode ? cardDark : pinkLighter.withOpacity(0.2),
+                      color: isDarkMode
+                          ? cardDark
+                          : pinkLighter.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isDarkMode ? Colors.grey[700]! : pinkPrimary,
@@ -1504,7 +1521,7 @@ class _MemoryFormState extends State<MemoryForm> {
 
                 const SizedBox(height: 25),
 
-                // Botones de acción
+                // Botones para guardar o cancelar
                 Row(
                   children: [
                     Expanded(
@@ -1540,7 +1557,7 @@ class _MemoryFormState extends State<MemoryForm> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 3,
-                          shadowColor: pinkPrimary.withOpacity(0.4),
+                          shadowColor: pinkPrimary.withValues(alpha: 0.4),
                         ),
                         child: _isSaving
                             ? const SizedBox(
@@ -1570,7 +1587,7 @@ class _MemoryFormState extends State<MemoryForm> {
     );
   }
 
-  // Icono de la categoria
+  /// Función para obtener el ícono correspondiente a cada categoría
   IconData _getCategoryIcon(String category) {
     switch (category) {
       case 'Viajes':
@@ -1590,6 +1607,7 @@ class _MemoryFormState extends State<MemoryForm> {
 
   @override
   void dispose() {
+    // Limpiar los controladores
     _titleController.dispose();
     _descriptionController.dispose();
     _dateController.dispose();

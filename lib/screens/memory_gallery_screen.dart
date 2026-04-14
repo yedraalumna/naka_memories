@@ -16,7 +16,7 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../widget/MemoryForm.dart';
+import '../widget/memory_form.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Pantalla principal de la galería, muestra las carpetas (categorías)

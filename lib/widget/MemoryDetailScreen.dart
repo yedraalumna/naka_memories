@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
-import 'MemoryForm.dart';
+import 'memory_form.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';

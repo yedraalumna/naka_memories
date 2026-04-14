@@ -10,7 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
-import '../widget/MemoryForm.dart';
+import '../widget/memory_form.dart';
 import '../widget/MemoryDetailScreen.dart';
 import '../widget/menu_dialog.dart';
 import '../services/MemoryService.dart';
