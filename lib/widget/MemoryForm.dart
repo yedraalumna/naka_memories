@@ -7,13 +7,14 @@ import 'package:provider/provider.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
 import '../providers/theme_provider.dart';
-import 'package:image_picker/image_picker.dart';
+import '../services/image_picker_service.dart';
 import '../services/MemoryService.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import '../screens/coordinate_input_screen.dart';
 import '../providers/category_provider.dart';
 import 'package:crypto/crypto.dart';
+import 'package:video_player/video_player.dart'; // Añadido para validar el video
 
 class MemoryForm extends StatefulWidget {
   final LatLng location;
@@ -726,6 +727,56 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
       return;
+    }
+
+    // VALIDACIÓN DE VIDEO (MÓVIL Y WEB)
+    if (_isVideo) {
+      bool isVideoValid = true;
+      String errorMessage = '';
+
+      setState(() => _isSaving = true); // Mostramos el loader
+
+      if (!kIsWeb && _selectedAsset != null) {
+        // 1. Validación para App Móvil: Por duración exacta (20 segundos)
+        try {
+          final controller = VideoPlayerController.file(File(_selectedAsset!));
+          await controller.initialize();
+          if (controller.value.duration.inSeconds > 20) {
+            isVideoValid = false;
+            errorMessage =
+                'El video dura más de 20 segundos. Por favor, selecciona uno más corto.';
+          }
+          await controller.dispose();
+        } catch (e) {
+          print('Error validando duración en móvil: $e');
+        }
+      } else if (kIsWeb && _selectedBytes != null) {
+        // 2. Validación para Web: Por peso (Límite de 15 MB)
+        const int maxSizeInBytes = 15 * 1024 * 1024;
+
+        if (_selectedBytes!.length > maxSizeInBytes) {
+          isVideoValid = false;
+          errorMessage =
+              'El video es muy pesado (máximo 15 MB / 20 seg). Por favor, sube uno más corto.';
+        }
+      }
+
+      // Si el video falló alguna de las dos pruebas, cortamos el proceso
+      if (!isVideoValid) {
+        setState(() => _isSaving = false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return; // Detenemos el guardado y no enviamos nada a Supabase
+      }
+
+      setState(
+          () => _isSaving = false); // Todo bien, quitamos el loader y seguimos
     }
 
     // LÓGICA DE CATEGORÍA: Determinar cuál usar

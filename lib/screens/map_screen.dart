@@ -22,7 +22,7 @@ import '../providers/theme_provider.dart';
 import 'package:video_thumbnail/video_thumbnail.dart'; // pa la miniatura del video
 import '../providers/favorite_provider.dart';
 import '../services/pdfService.dart';
-import '../providers/app_auth_provider.dart'; 
+import '../providers/app_auth_provider.dart';
 import '../widget/pin_dialog.dart';
 import '../widget/CategoryManager.dart';
 import '../providers/category_provider.dart';
@@ -56,7 +56,8 @@ class _MapScreenState extends State<MapScreen> {
   bool _isLoading = false;
   String _selectedCategory = 'Todas'; // Filtros
   List<String> _dynamicCategories = []; // Lista de categorias
-  final Set<String> _unlockedCategories = {}; // Almacena categorías desbloqueadas
+  final Set<String> _unlockedCategories =
+      {}; // Almacena categorías desbloqueadas
   bool _showPrivateInAll = false; // Para controlar "Ver todos" con privados
 
   // Detectar si es web
@@ -76,16 +77,16 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _openCategoryManager() {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const CategoryManager(),
-    ),
-  ).then((_) {
-    // Cuando vuelva del gestor, recargar los recuerdos y categorías
-    _loadMemories();
-  });
-}
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const CategoryManager(),
+      ),
+    ).then((_) {
+      // Cuando vuelva del gestor, recargar los recuerdos y categorías
+      _loadMemories();
+    });
+  }
 
   void _showCategoryOptions(String categoryName) {
     showModalBottomSheet(
@@ -113,17 +114,18 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Opción Renombrar
               ListTile(
-                leading: const Icon(Icons.drive_file_rename_outline, color: Colors.blue),
+                leading: const Icon(Icons.drive_file_rename_outline,
+                    color: Colors.blue),
                 title: const Text('Renombrar carpeta'),
                 onTap: () {
                   Navigator.pop(context);
                   _showRenameCategoryDialog(categoryName);
                 },
               ),
-              
+
               // Opción Eliminar (excepto para "General")
               if (categoryName != 'General')
                 ListTile(
@@ -135,7 +137,7 @@ class _MapScreenState extends State<MapScreen> {
                     _confirmDeleteCategory(categoryName);
                   },
                 ),
-              
+
               const SizedBox(height: 10),
             ],
           ),
@@ -145,8 +147,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _showRenameCategoryDialog(String oldName) async {
-    final TextEditingController controller = TextEditingController(text: oldName);
-    final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+    final TextEditingController controller =
+        TextEditingController(text: oldName);
+    final isDarkMode =
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
 
     final result = await showDialog<String>(
       context: context,
@@ -195,13 +199,15 @@ class _MapScreenState extends State<MapScreen> {
       setState(() => _isLoading = true);
       try {
         // LLAMA AL PROVIDER, NO AL SERVICE DIRECTAMENTE
-        final catProvider = Provider.of<CategoryProvider>(context, listen: false);
+        final catProvider =
+            Provider.of<CategoryProvider>(context, listen: false);
         await catProvider.renameCategory(oldName, result);
-        
+
         setState(() {
-          _selectedCategory = result; // Actualizamos la selección al nuevo nombre
+          _selectedCategory =
+              result; // Actualizamos la selección al nuevo nombre
         });
-        
+
         await _loadMemories(); // Esto ahora cargará las categorías correctas
         _showSnackbar('Carpeta actualizada con éxito');
       } catch (e) {
@@ -218,7 +224,8 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    final isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+    final isDarkMode =
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -326,7 +333,8 @@ class _MapScreenState extends State<MapScreen> {
       // Dibujamos fondo con borde rosado
       paint.color = pinkPrimary;
       canvas.drawRRect(
-        ui.RRect.fromRectAndRadius(rect, const ui.Radius.circular(borderRadius)),
+        ui.RRect.fromRectAndRadius(
+            rect, const ui.Radius.circular(borderRadius)),
         paint,
       );
 
@@ -457,150 +465,155 @@ class _MapScreenState extends State<MapScreen> {
 
   // Cargamos los recuerdos con marcadores personalizados
   Future<void> _loadMemories() async {
-  if (_isLoading) return;
-  setState(() => _isLoading = true);
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
 
-  try {
-    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
-    await categoryProvider.loadCategories();
-    
-    // 🔥 AGREGAR ESTO PARA DEPURAR
-    await categoryProvider.debugPrintAllPasswords();
+    try {
+      final categoryProvider =
+          Provider.of<CategoryProvider>(context, listen: false);
+      await categoryProvider.loadCategories();
 
-    final allMemories = await _memoryService.getMemories();
-    
-    // 🔥 VERIFICAR CADA CATEGORÍA
-    print('\n📋 VERIFICANDO CATEGORÍAS EXISTENTES:');
-    final uniqueCategories = allMemories.map((m) => m.category).toSet();
-    for (var cat in uniqueCategories) {
-      final isProtected = categoryProvider.isCategoryProtected(cat);
-      print('   📁 $cat: ${isProtected ? "🔒 PROTEGIDA" : "📂 PÚBLICA"}');
-      if (isProtected) {
-        final hash = categoryProvider.getCategoryHash(cat);
-        print('      Hash: ${hash != null ? hash.substring(0, 20) : "null"}...');
+      final allMemories = await _memoryService.getMemories();
+
+      // 🔥 VERIFICAR CADA CATEGORÍA
+      print('\n📋 VERIFICANDO CATEGORÍAS EXISTENTES:');
+      final uniqueCategories = allMemories.map((m) => m.category).toSet();
+      for (var cat in uniqueCategories) {
+        final isProtected = categoryProvider.isCategoryProtected(cat);
+        print('   📁 $cat: ${isProtected ? "🔒 PROTEGIDA" : "📂 PÚBLICA"}');
+        if (isProtected) {
+          final hash = categoryProvider.getPasswordHash(cat);
+          print(
+              '      Hash: ${hash != null ? hash.substring(0, 20) : "null"}...');
+        }
       }
-    }
 
-    List<Memory> finalMemories;
-    
-    if (_selectedCategory == 'Todas') {
-      if (_showPrivateInAll) {
-        finalMemories = allMemories.where((memory) {
-          final bool hasPassword = categoryProvider.isCategoryProtected(memory.category);
-          if (!hasPassword) return true;
-          return _unlockedCategories.contains(memory.category);
-        }).toList();
+      List<Memory> finalMemories;
+
+      if (_selectedCategory == 'Todas') {
+        if (_showPrivateInAll) {
+          finalMemories = allMemories.where((memory) {
+            final bool hasPassword =
+                categoryProvider.isCategoryProtected(memory.category);
+            if (!hasPassword) return true;
+            return _unlockedCategories.contains(memory.category);
+          }).toList();
+        } else {
+          finalMemories = allMemories.where((memory) {
+            return !categoryProvider.isCategoryProtected(memory.category);
+          }).toList();
+        }
       } else {
-        finalMemories = allMemories.where((memory) {
-          return !categoryProvider.isCategoryProtected(memory.category);
-        }).toList();
+        finalMemories =
+            allMemories.where((m) => m.category == _selectedCategory).toList();
       }
-    } else {
-      finalMemories = allMemories.where((m) => m.category == _selectedCategory).toList();
-    }
-    
-    print('\n RESULTADO FILTRADO: ${finalMemories.length} recuerdos visibles');
-    print('   Categoría seleccionada: $_selectedCategory');
-    print('   Mostrar privadas: $_showPrivateInAll');
-    print('   Desbloqueadas: $_unlockedCategories');
 
-    // Resto del código igual...
-    Set<Marker> newMarkers = {};
-    for (var memory in finalMemories) {
-      try {
-        final icon = await _getMarkerIconSquare(memory.imageAsset);
-        newMarkers.add(
-          Marker(
-            markerId: MarkerId(memory.id),
-            position: memory.toLatLng,
-            icon: icon,
-            anchor: const Offset(0.5, 0.5),
-            infoWindow: InfoWindow(
-              title: memory.title,
-              snippet: memory.category,
+      print(
+          '\n RESULTADO FILTRADO: ${finalMemories.length} recuerdos visibles');
+      print('   Categoría seleccionada: $_selectedCategory');
+      print('   Mostrar privadas: $_showPrivateInAll');
+      print('   Desbloqueadas: $_unlockedCategories');
+
+      // Resto del código igual...
+      Set<Marker> newMarkers = {};
+      for (var memory in finalMemories) {
+        try {
+          final icon = await _getMarkerIconSquare(memory.imageAsset);
+          newMarkers.add(
+            Marker(
+              markerId: MarkerId(memory.id),
+              position: memory.toLatLng,
+              icon: icon,
+              anchor: const Offset(0.5, 0.5),
+              infoWindow: InfoWindow(
+                title: memory.title,
+                snippet: memory.category,
+                onTap: () => _showMemoryDetails(memory),
+              ),
               onTap: () => _showMemoryDetails(memory),
             ),
-            onTap: () => _showMemoryDetails(memory),
-          ),
-        );
-      } catch (e) {
-        debugPrint("Error marcador: $e");
+          );
+        } catch (e) {
+          debugPrint("Error marcador: $e");
+        }
       }
-    }
 
-    setState(() {
-      _memories = allMemories;
-      _markers = newMarkers;
-      _dynamicCategories = categoryProvider.categories;
-      _isLoading = false;
-    });
-  } catch (e) {
-    setState(() => _isLoading = false);
-    _showErrorDialog('Error al cargar recuerdos: $e');
+      setState(() {
+        _memories = allMemories;
+        _markers = newMarkers;
+        _dynamicCategories = categoryProvider.categories;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showErrorDialog('Error al cargar recuerdos: $e');
+    }
   }
-}
 
   Widget _buildFiltersOverlay() {
-  final themeProvider = Provider.of<ThemeProvider>(context);
-  final categoryProvider = Provider.of<CategoryProvider>(context);
-  final isDarkMode = themeProvider.isDarkMode;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final categoryProvider = Provider.of<CategoryProvider>(context);
+    final isDarkMode = themeProvider.isDarkMode;
 
-  final listadoCategorias = categoryProvider.categories;
-  final categoriasConTodas = ['Todas', ...listadoCategorias];
+    final listadoCategorias = categoryProvider.categories;
+    final categoriasConTodas = ['Todas', ...listadoCategorias];
 
-  Color backgroundColor = isDarkMode ? cardDark : Colors.white;
-  Color textColor = isDarkMode ? textDarkMode : Colors.black87;
+    Color backgroundColor = isDarkMode ? cardDark : Colors.white;
+    Color textColor = isDarkMode ? textDarkMode : Colors.black87;
 
-  return Positioned(
-    top: 60,
-    left: 0,
-    right: 0,
-    child: SizedBox(
-      height: 45,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        itemCount: categoriasConTodas.length,
-        itemBuilder: (context, index) {
-          final cat = categoriasConTodas[index];
-          final isSelected = _selectedCategory == cat;
+    return Positioned(
+      top: 60,
+      left: 0,
+      right: 0,
+      child: SizedBox(
+        height: 45,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          itemCount: categoriasConTodas.length,
+          itemBuilder: (context, index) {
+            final cat = categoriasConTodas[index];
+            final isSelected = _selectedCategory == cat;
 
-          return GestureDetector(
-            onTap: () => _onCategoryTap(cat), // 👈 CAMBIAR: llamar a nuevo método
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 5),
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: isSelected ? pinkPrimary : backgroundColor,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all( 
-                  color: pinkPrimary,
-                  width: 1.5,
+            return GestureDetector(
+              onTap: () =>
+                  _onCategoryTap(cat), // 👈 CAMBIAR: llamar a nuevo método
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                decoration: BoxDecoration(
+                  color: isSelected ? pinkPrimary : backgroundColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: pinkPrimary,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    )
+                  ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  )
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  cat,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : pinkPrimary,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                child: Center(
+                  child: Text(
+                    cat,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : pinkPrimary,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
-    ),
-  );
+    );
   }
+
   // Función que crea un chip de filtro (ahora más grande)
   Widget _buildFilterChip(String label) {
     final bool isSelected = _selectedCategory == label;
@@ -643,102 +656,109 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onCategoryTap(String categoryName) async {
-  print('🖱️ TAP en categoría: "$categoryName"');
-  
-  if (categoryName == 'Todas') {
-    final bool? incluirPrivadas = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ver carpetas protegidas'),
-        content: const Text('¿Quieres ver los recuerdos de tus carpetas con contraseña?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('No, solo públicas'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sí, incluir privadas'),
-          ),
-        ],
-      ),
-    );
+    print('🖱️ TAP en categoría: "$categoryName"');
 
-    if (incluirPrivadas == null) return;
-    
-    if (incluirPrivadas) {
-      await _requestPinsForAllProtectedCategories();
-    }
-    
-    print('📌 Usuario eligió: ${incluirPrivadas ? "Incluir privadas" : "Solo públicas"}');
-    
-    setState(() {
-      _selectedCategory = 'Todas';
-      _showPrivateInAll = incluirPrivadas;
-      if (!incluirPrivadas) {
-        _unlockedCategories.clear();
+    if (categoryName == 'Todas') {
+      final bool? incluirPrivadas = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Ver carpetas protegidas'),
+          content: const Text(
+              '¿Quieres ver los recuerdos de tus carpetas con contraseña?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('No, solo públicas'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Sí, incluir privadas'),
+            ),
+          ],
+        ),
+      );
+
+      if (incluirPrivadas == null) return;
+
+      if (incluirPrivadas) {
+        await _requestPinsForAllProtectedCategories();
       }
-    });
-    _loadMemories();
-    return;
-  }
 
-  final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
-  
-  // 🔥 VERIFICAR ANTES DE CONTINUAR
-  print('🔍 Verificando si "$categoryName" está protegida...');
-  final bool hasPassword = categoryProvider.isCategoryProtected(categoryName);
-  print('   Resultado: ${hasPassword ? "🔒 PROTEGIDA" : "📂 PÚBLICA"}');
-  
-  if (hasPassword) {
-    if (_unlockedCategories.contains(categoryName)) {
-      print('   ✅ Ya desbloqueada en esta sesión');
+      print(
+          '📌 Usuario eligió: ${incluirPrivadas ? "Incluir privadas" : "Solo públicas"}');
+
       setState(() {
-        _selectedCategory = categoryName;
+        _selectedCategory = 'Todas';
+        _showPrivateInAll = incluirPrivadas;
+        if (!incluirPrivadas) {
+          _unlockedCategories.clear();
+        }
       });
       _loadMemories();
       return;
     }
-    
-    final String? passwordHash = categoryProvider.getCategoryHash(categoryName);
-    print('   Hash encontrado: ${passwordHash != null ? "SÍ (${passwordHash.substring(0, 20)}...)" : "NO"}');
-    
-    if (passwordHash != null) {
-      print('   🔓 Mostrando diálogo PIN...');
-      final bool? isAuthorized = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => PinDialog(
-          correctHash: passwordHash,
-          titulo: 'Carpeta Protegida: $categoryName',
-        ),
-      );
-      
-      print('   Autorización: ${isAuthorized == true ? "APROBADA" : "DENEGADA"}');
-      
-      if (isAuthorized == true) {
+
+    final categoryProvider =
+        Provider.of<CategoryProvider>(context, listen: false);
+
+    // 🔥 VERIFICAR ANTES DE CONTINUAR
+    print('🔍 Verificando si "$categoryName" está protegida...');
+    final bool hasPassword = categoryProvider.isCategoryProtected(categoryName);
+    print('   Resultado: ${hasPassword ? "🔒 PROTEGIDA" : "📂 PÚBLICA"}');
+
+    if (hasPassword) {
+      if (_unlockedCategories.contains(categoryName)) {
+        print('   ✅ Ya desbloqueada en esta sesión');
         setState(() {
-          _unlockedCategories.add(categoryName);
           _selectedCategory = categoryName;
         });
         _loadMemories();
-        _showSnackbar('Carpeta desbloqueada: $categoryName');
-      } else {
-        _showSnackbar('Acceso denegado a: $categoryName', isError: true);
+        return;
       }
+
+      final String? passwordHash =
+          categoryProvider.getPasswordHash(categoryName);
+      print(
+          '   Hash encontrado: ${passwordHash != null ? "SÍ (${passwordHash.substring(0, 20)}...)" : "NO"}');
+
+      if (passwordHash != null) {
+        print('   🔓 Mostrando diálogo PIN...');
+        final bool? isAuthorized = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => PinDialog(
+            correctHash: passwordHash,
+            titulo: 'Carpeta Protegida: $categoryName',
+          ),
+        );
+
+        print(
+            '   Autorización: ${isAuthorized == true ? "APROBADA" : "DENEGADA"}');
+
+        if (isAuthorized == true) {
+          setState(() {
+            _unlockedCategories.add(categoryName);
+            _selectedCategory = categoryName;
+          });
+          _loadMemories();
+          _showSnackbar('Carpeta desbloqueada: $categoryName');
+        } else {
+          _showSnackbar('Acceso denegado a: $categoryName', isError: true);
+        }
+      }
+    } else {
+      print('   📂 Carpeta sin protección, mostrando directamente');
+      setState(() {
+        _selectedCategory = categoryName;
+      });
+      _loadMemories();
     }
-  } else {
-    print('   📂 Carpeta sin protección, mostrando directamente');
-    setState(() {
-      _selectedCategory = categoryName;
-    });
-    _loadMemories();
   }
-}
 
   Future<void> _requestPinsForAllProtectedCategories() async {
-    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+    final categoryProvider =
+        Provider.of<CategoryProvider>(context, listen: false);
     final protectedCategories = categoryProvider.categories
         .where((cat) => categoryProvider.isCategoryProtected(cat))
         .toList();
@@ -759,7 +779,8 @@ class _MapScreenState extends State<MapScreen> {
         barrierDismissible: false,
         builder: (ctx) => PinDialog(
           correctHash: passwordHash,
-          titulo: 'PIN de: $categoryName (${i + 1}/${protectedCategories.length})',
+          titulo:
+              'PIN de: $categoryName (${i + 1}/${protectedCategories.length})',
         ),
       );
 
@@ -802,64 +823,66 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _goToAllMemories() async {
-  final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
-  
-  // Filtrar solo memorias visibles (públicas + privadas desbloqueadas)
-  final visibleMemories = _memories.where((memory) {
-    final bool hasPassword = categoryProvider.isCategoryProtected(memory.category);
-    if (!hasPassword) return true;
-    return _unlockedCategories.contains(memory.category);
-  }).toList();
-  
-  if (visibleMemories.length > 1) {
-    if (!_isWeb) {
-      // Calcular bounds con las memorias visibles
-      LatLngBounds bounds = _calculateBoundsForList(visibleMemories);
-      mapController.animateCamera(
-        CameraUpdate.newLatLngBounds(bounds, 100),
-      );
-      Navigator.pop(context);
-      _showSnackbar('Mostrando ${visibleMemories.length} recuerdos visibles');
+    final categoryProvider =
+        Provider.of<CategoryProvider>(context, listen: false);
+
+    // Filtrar solo memorias visibles (públicas + privadas desbloqueadas)
+    final visibleMemories = _memories.where((memory) {
+      final bool hasPassword =
+          categoryProvider.isCategoryProtected(memory.category);
+      if (!hasPassword) return true;
+      return _unlockedCategories.contains(memory.category);
+    }).toList();
+
+    if (visibleMemories.length > 1) {
+      if (!_isWeb) {
+        // Calcular bounds con las memorias visibles
+        LatLngBounds bounds = _calculateBoundsForList(visibleMemories);
+        mapController.animateCamera(
+          CameraUpdate.newLatLngBounds(bounds, 100),
+        );
+        Navigator.pop(context);
+        _showSnackbar('Mostrando ${visibleMemories.length} recuerdos visibles');
+      } else {
+        Navigator.pop(context);
+        _showSnackbar('Mostrando ${visibleMemories.length} recuerdos visibles');
+      }
+    } else if (visibleMemories.length == 1) {
+      final firstMemory = visibleMemories.first;
+      if (_isWeb) {
+        _showSnackbar('Centrado en: ${firstMemory.title}');
+        Navigator.pop(context);
+      } else {
+        mapController.animateCamera(
+          CameraUpdate.newLatLngZoom(firstMemory.toLatLng, 15),
+        );
+        Navigator.pop(context);
+        _showSnackbar('Centrado en: ${firstMemory.title}');
+      }
     } else {
-      Navigator.pop(context);
-      _showSnackbar('Mostrando ${visibleMemories.length} recuerdos visibles');
+      _showSnackbar('No hay recuerdos visibles', isError: true);
     }
-  } else if (visibleMemories.length == 1) {
-    final firstMemory = visibleMemories.first;
-    if (_isWeb) {
-      _showSnackbar('Centrado en: ${firstMemory.title}');
-      Navigator.pop(context);
-    } else {
-      mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(firstMemory.toLatLng, 15),
-      );
-      Navigator.pop(context);
-      _showSnackbar('Centrado en: ${firstMemory.title}');
-    }
-  } else {
-    _showSnackbar('No hay recuerdos visibles', isError: true);
   }
-}
 
 // Nuevo método auxiliar
-LatLngBounds _calculateBoundsForList(List<Memory> list) {
-  double minLat = list[0].toLatLng.latitude;
-  double maxLat = list[0].toLatLng.latitude;
-  double minLng = list[0].toLatLng.longitude;
-  double maxLng = list[0].toLatLng.longitude;
+  LatLngBounds _calculateBoundsForList(List<Memory> list) {
+    double minLat = list[0].toLatLng.latitude;
+    double maxLat = list[0].toLatLng.latitude;
+    double minLng = list[0].toLatLng.longitude;
+    double maxLng = list[0].toLatLng.longitude;
 
-  for (var memory in list) {
-    minLat = math.min(minLat, memory.toLatLng.latitude);
-    maxLat = math.max(maxLat, memory.toLatLng.latitude);
-    minLng = math.min(minLng, memory.toLatLng.longitude);
-    maxLng = math.max(maxLng, memory.toLatLng.longitude);
+    for (var memory in list) {
+      minLat = math.min(minLat, memory.toLatLng.latitude);
+      maxLat = math.max(maxLat, memory.toLatLng.latitude);
+      minLng = math.min(minLng, memory.toLatLng.longitude);
+      maxLng = math.max(maxLng, memory.toLatLng.longitude);
+    }
+
+    return LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
   }
-
-  return LatLngBounds(
-    southwest: LatLng(minLat, minLng),
-    northeast: LatLng(maxLat, maxLng),
-  );
-}
 
   // Función para centrar el mapa en la lista
   void _centerMapOnList(List<Memory> list) {
@@ -1036,15 +1059,18 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
   Future<void> _gestionarPdf() async {
     final List<Memory> listaCopia = List.from(_memories);
     final auth = Provider.of<AppAuthProvider>(context, listen: false);
-    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
-    final userName = auth.userMetadata?['full_name'] ?? auth.user?.email ?? 'Usuario';
+    final categoryProvider =
+        Provider.of<CategoryProvider>(context, listen: false);
+    final userName =
+        auth.userMetadata?['full_name'] ?? auth.user?.email ?? 'Usuario';
 
     if (listaCopia.isEmpty) {
       _showSnackbar('No hay recuerdos para exportar', isError: true);
       return;
     }
 
-    final categories = listaCopia.map((m) => m.category).toSet().toList()..sort();
+    final categories = listaCopia.map((m) => m.category).toSet().toList()
+      ..sort();
     final selectedCategories =
         await _showPdfCategorySelector(categories, categoryProvider);
 
@@ -1076,7 +1102,8 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
         barrierDismissible: false,
         builder: (ctx) => PinDialog(
           correctHash: hash,
-          titulo: 'PIN de: $category (${i + 1}/${privateSelectedCategories.length})',
+          titulo:
+              'PIN de: $category (${i + 1}/${privateSelectedCategories.length})',
         ),
       );
 
@@ -1093,14 +1120,16 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
     }).toList();
 
     if (exportList.isEmpty) {
-      _showSnackbar('No hay recuerdos autorizados para exportar', isError: true);
+      _showSnackbar('No hay recuerdos autorizados para exportar',
+          isError: true);
       return;
     }
 
     exportList.sort((a, b) => b.date.compareTo(a.date));
     PdfService().generarPdf(exportList, userName);
 
-    final omittedPrivate = privateSelectedCategories.length - unlockedForPdf.length;
+    final omittedPrivate =
+        privateSelectedCategories.length - unlockedForPdf.length;
     if (omittedPrivate > 0) {
       _showSnackbar(
         'PDF generado. Se omitieron $omittedPrivate carpetas privadas no verificadas.',
@@ -1292,9 +1321,7 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
               ),
           ],
         ),
-
         if (widget.isLibrary) _buildFiltersOverlay(),
-
         if (_isLoading)
           const Center(
             child: CircularProgressIndicator(color: pinkPrimary),
@@ -1304,21 +1331,25 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
   }
 
   List<fmap.Marker> _buildWebMarkers() {
-  final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
-  
-  // Filtrar según permisos
-  final visibleMemories = _memories.where((memory) {
-    final bool hasPassword = categoryProvider.isCategoryProtected(memory.category);
-    if (!hasPassword) return true;
-    return _unlockedCategories.contains(memory.category);
-  }).toList();
-  
-  // Aplicar filtro de categoría seleccionada
-  final filteredList = _selectedCategory == 'Todas'
-      ? visibleMemories
-      : visibleMemories.where((m) => m.category == _selectedCategory).toList();
+    final categoryProvider =
+        Provider.of<CategoryProvider>(context, listen: false);
 
-  return filteredList.map((memory) {
+    // Filtrar según permisos
+    final visibleMemories = _memories.where((memory) {
+      final bool hasPassword =
+          categoryProvider.isCategoryProtected(memory.category);
+      if (!hasPassword) return true;
+      return _unlockedCategories.contains(memory.category);
+    }).toList();
+
+    // Aplicar filtro de categoría seleccionada
+    final filteredList = _selectedCategory == 'Todas'
+        ? visibleMemories
+        : visibleMemories
+            .where((m) => m.category == _selectedCategory)
+            .toList();
+
+    return filteredList.map((memory) {
       return fmap.Marker(
         point: latlong2.LatLng(
           memory.toLatLng.latitude,
@@ -1355,13 +1386,14 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: pinkLighter,
-                          child:
-                              const Icon(Icons.photo, color: pinkPrimary, size: 30),
+                          child: const Icon(Icons.photo,
+                              color: pinkPrimary, size: 30),
                         ),
                       )
                     : Container(
                         color: pinkLighter,
-                        child: const Icon(Icons.photo, color: pinkPrimary, size: 30),
+                        child: const Icon(Icons.photo,
+                            color: pinkPrimary, size: 30),
                       ),
               ),
             ),
@@ -1399,7 +1431,7 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
     );
   }
 
-    // Widget principal
+  // Widget principal
   @override
   Widget build(BuildContext context) {
     // Obtenemos el estado del tema para configurar colores
@@ -1424,7 +1456,8 @@ LatLngBounds _calculateBoundsForList(List<Memory> list) {
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.all(12.0),
-              child: CircularProgressIndicator(color: pinkPrimary, strokeWidth: 2),
+              child:
+                  CircularProgressIndicator(color: pinkPrimary, strokeWidth: 2),
             ),
           // Botón de editar (solo si hay categoría seleccionada)
           if (_selectedCategory != 'Todas')

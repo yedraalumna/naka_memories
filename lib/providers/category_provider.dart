@@ -1,71 +1,45 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
-import '../services/MemoryService.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/MemoryService.dart';
 
+/// Proveedor encargado de gestionar el estado y la lógica de las categorías
+/// Además de manejar la creación, edición, eliminación y el sistema de protección por PIN de dichas categorías
 class CategoryProvider with ChangeNotifier {
   final MemoryService _memoryService = MemoryService();
-  
+
   List<String> _categories = ['General'];
   bool _isLoading = false;
-  
-  // Almacena los hashes de las categorías protegidas
+
+  /// Almacena los hashes de las contraseñas de cada categoría protegida
   Map<String, String?> _categoryPasswords = {};
-  
-  // Clave para SharedPreferences
+
+  /// Clave utilizada para guardar y recuperar los PINs en el almacenamiento local
   static const String _passwordsKey = 'category_passwords';
 
   List<String> get categories => _categories;
   bool get isLoading => _isLoading;
 
-  String? getCategoryHash(String categoryName) {
-    return _categoryPasswords[categoryName];
-  }
-
-  /// Alias para isCategoryProtected (por si prefieres el nombre más corto)
-bool hasPassword(String categoryName) {
-  return isCategoryProtected(categoryName);
-}
-
-  // Constructor
   CategoryProvider() {
-    _loadPasswords(); // Cargar los PINs guardados
-    loadCategories();
+    init();
   }
 
+  /// Inicializa el estado cargando los PINs guardados y las categorías existentes
   Future<void> init() async {
     await _loadPasswords();
     await loadCategories();
   }
 
-  // Cargar los PINs desde SharedPreferences
-  Future<void> _loadPasswords() async {
-    try {
-      // 1) Intentar recuperar desde recuerdos (Supabase + local)
-      final fromMemories = await _memoryService.getCategoryPasswordsFromMemories();
-
-      final prefs = await SharedPreferences.getInstance();
-      final passwordsJson = prefs.getString(_passwordsKey);
-      if (passwordsJson != null) {
-        final Map<String, dynamic> decoded = Map<String, dynamic>.from(
-          jsonDecode(passwordsJson) as Map
-        );
-        _categoryPasswords = decoded.map((key, value) => MapEntry(key, value as String?));
-      }
-
-      // 2) Lo que venga de recuerdos tiene prioridad para sincronizar entre dispositivos
-      _categoryPasswords.addAll(fromMemories);
-      await _savePasswords();
-    } catch (e) {
-      print('Error cargando contraseñas: $e');
-    }
+  /// Verifica si una categoría tiene pin (Alias de isCategoryProtected)
+  bool hasPassword(String categoryName) {
+    return isCategoryProtected(categoryName);
   }
 
-  /// Verifica si una categoría está protegida con PIN
+  /// Verifica si una categoría tiene PIN
   bool isCategoryProtected(String categoryName) {
-    return _categoryPasswords.containsKey(categoryName) && 
-           _categoryPasswords[categoryName] != null &&
-           _categoryPasswords[categoryName]!.isNotEmpty;
+    return _categoryPasswords.containsKey(categoryName) &&
+        _categoryPasswords[categoryName] != null &&
+        _categoryPasswords[categoryName]!.isNotEmpty;
   }
 
   /// Obtiene el hash de la contraseña de una categoría
@@ -73,54 +47,95 @@ bool hasPassword(String categoryName) {
     return _categoryPasswords[categoryName];
   }
 
-  /// Establece o elimina la protección de una categoría
-  Future<void> setCategoryPassword(String categoryName, String? passwordHash) async {
-  print('🔐 setCategoryPassword: $categoryName, hash: ${passwordHash != null ? "PROVIDED" : "NULL"}');
-  
-  if (passwordHash == null || passwordHash.isEmpty) {
-    _categoryPasswords.remove(categoryName);
-  } else {
-    _categoryPasswords[categoryName] = passwordHash;
+  /// Método que recupera los PINs guardados, combinando los datos locales con los sincronizados
+  Future<void> _loadPasswords() async {
+    try {
+      // Recuperar desde recuerdos (Supabase + local)
+      final fromMemories =
+          await _memoryService.getCategoryPasswordsFromMemories();
+
+      final prefs = await SharedPreferences.getInstance();
+      final passwordsJson = prefs.getString(_passwordsKey);
+
+      if (passwordsJson != null) {
+        final Map<String, dynamic> decoded =
+            Map<String, dynamic>.from(jsonDecode(passwordsJson) as Map);
+        _categoryPasswords =
+            decoded.map((key, value) => MapEntry(key, value as String?));
+      }
+
+      // Lo que venga de recuerdos tiene prioridad para sincronizar entre dispositivos
+      _categoryPasswords.addAll(fromMemories);
+      await _savePasswords();
+    } catch (e) {
+      if (kDebugMode) print('Error cargando contraseñas: $e');
+    }
   }
 
-  // Sincroniza el estado de protección en recuerdos (local + Supabase).
-  await _memoryService.applyCategoryPasswordToMemories(categoryName, passwordHash);
-  
-  print('📝 _categoryPasswords actual: $_categoryPasswords');
-  await _savePasswords();
-  notifyListeners();
-}
+  /// Métodos que guarda el estado actual de las contraseñas en el almacenamiento local
+  Future<void> _savePasswords() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final passwordsJson = jsonEncode(_categoryPasswords);
+      await prefs.setString(_passwordsKey, passwordsJson);
+    } catch (e) {
+      if (kDebugMode) print('Error guardando contraseñas: $e');
+    }
+  }
 
-  /// CARGAR CATEGORÍAS: Solo trae las que existen en la base de datos
+  /// Método que establece o elimina la protección por PIN de una categoría
+  /// Si el hash es null o vacío, se elimina la protección
+  Future<void> setCategoryPassword(
+      String categoryName, String? passwordHash) async {
+    if (passwordHash == null || passwordHash.isEmpty) {
+      _categoryPasswords.remove(categoryName);
+    } else {
+      _categoryPasswords[categoryName] = passwordHash;
+    }
+
+    // Sincroniza el estado de protección en la base de datos y de forma local
+    await _memoryService.applyCategoryPasswordToMemories(
+        categoryName, passwordHash);
+
+    await _savePasswords();
+    notifyListeners();
+  }
+
+  /// Obtiene las categorías desde la base de datos y las ordena,
+  /// manteniendo siempre "General" en la primera posición.
   Future<void> loadCategories() async {
     _isLoading = true;
-    notifyListeners();
-    
+
+    // Retraso de microsegundos para asegurar que el estado de carga se actualice antes de la consulta a la base de datos
+    Future.microtask(() => notifyListeners());
+
     try {
       final dbCategories = await _memoryService.getAllCategories();
       final Set<String> allCategories = {'General'};
       allCategories.addAll(dbCategories);
-      
+
       List<String> result = allCategories.toList();
       result.sort();
       result.remove('General');
       result.insert(0, 'General');
-      
+
       _categories = result;
     } catch (e) {
-      print('Error cargando categorías: $e');
-      _categories = ['General'];
+      if (kDebugMode) print('Error cargando categorías: $e');
+      _categories = ['General']; // Estado seguro en caso de error
     } finally {
       _isLoading = false;
-      notifyListeners();
+      // Usamos el mismo retraso de microsegundos por seguridad
+      Future.microtask(() => notifyListeners());
     }
   }
 
-  /// CREAR CATEGORÍA
+  /// Crea una nueva categoría y la sincroniza con la base de datos
   Future<void> createCategory(String categoryName, {String? memoryId}) async {
     if (categoryName.isEmpty) return;
-    
+
     try {
+      // Actualización local inmediata para que sea fluida, luego se sincroniza con la base de datos
       if (!_categories.contains(categoryName)) {
         _categories.add(categoryName);
         _categories.sort();
@@ -128,22 +143,22 @@ bool hasPassword(String categoryName) {
         _categories.insert(0, 'General');
         notifyListeners();
       }
-      
+
       await _memoryService.createCategory(categoryName, memoryId: memoryId);
-      await loadCategories(); 
+      await loadCategories();
     } catch (e) {
-      print('Error creando categoría: $e');
+      if (kDebugMode) print('Error creando categoría: $e');
     }
   }
 
-  /// RENOMBRAR CATEGORÍA
+  /// Método que cambia el nombre de una categoría existente
   Future<void> renameCategory(String oldName, String newName) async {
     if (oldName == 'General' || oldName == newName) return;
-    
+
     try {
       await _memoryService.renameCategory(oldName, newName);
-      
-      // Actualizar el hash si existe
+
+      // Actualizar la clave del hash si la categoría estaba protegida
       if (_categoryPasswords.containsKey(oldName)) {
         final hash = _categoryPasswords[oldName];
         _categoryPasswords.remove(oldName);
@@ -152,7 +167,8 @@ bool hasPassword(String categoryName) {
         }
         await _savePasswords();
       }
-      
+
+      // Actualización local
       final index = _categories.indexOf(oldName);
       if (index != -1) {
         _categories[index] = newName;
@@ -161,71 +177,46 @@ bool hasPassword(String categoryName) {
         _categories.insert(0, 'General');
         notifyListeners();
       }
-      
+
+      // Aseguramos sincronización completa
       await loadCategories();
     } catch (e) {
-      print("Error al renombrar: $e");
+      if (kDebugMode) print("Error al renombrar categoría: $e");
       rethrow;
     }
   }
 
-  /// ELIMINAR CATEGORÍA
+  /// Método que elimina una categoría y su contraseña (si tiene)
   Future<void> deleteCategory(String categoryName) async {
     if (categoryName == 'General') {
       throw Exception('No se puede eliminar la categoría "General"');
     }
-    
+
     try {
       await _memoryService.deleteCategory(categoryName);
-      
-      // Eliminar el hash si existe
+
+      // Limpiar protección si existía
       _categoryPasswords.remove(categoryName);
       await _savePasswords();
-      
+
       _categories.remove(categoryName);
       notifyListeners();
       await loadCategories();
     } catch (e) {
-      print("Error al borrar categoría: $e");
+      if (kDebugMode) print("Error al borrar categoría: $e");
       rethrow;
     }
   }
 
-  /// RESTAURAR CATEGORÍAS PREDETERMINADAS
-Future<void> restoreDefaultCategories() async {
-  print('🔄 Restaurando carpetas predeterminadas...');
-  
-  final List<String> defaultCategories = [
-    'General',
-    'Viajes',
-    'Amigos', 
-    'Familia',
-    'Comida',
-    'Estudio'
-  ];
-  
-  try {
-    // Crear cada categoría predeterminada si no existe
-    for (var category in defaultCategories) {
-      if (category != 'General' && !_categories.contains(category)) {
-        await _memoryService.createCategory(category);
-        print('Categoría creada: $category');
-      }
-    }
-    
-    // Recargar categorías
+  /// Método que mantiene la estructura base de categorías desactivando listas fijas
+  Future<void> restoreDefaultCategories() async {
     await loadCategories();
-    
-    print('Carpetas predeterminadas restauradas correctamente');
-  } catch (e) {
-    print('Error al restaurar carpetas predeterminadas: $e');
-    rethrow;
   }
-}
 
-  /// AÑADIR LOCALMENTE
+  /// Añade una categoría al estado local sin enviar petición al servidor/bd de inmediato
   void addCategoryLocally(String newCategory) {
     if (newCategory.isEmpty) return;
+
     if (!_categories.contains(newCategory)) {
       _categories.add(newCategory);
       _categories.sort();
@@ -235,34 +226,8 @@ Future<void> restoreDefaultCategories() async {
     }
   }
 
-  // sincronizar categorías
+  /// Método que obliga a recargar las categorías desde la base de datos
   Future<void> syncCategories() async {
     await loadCategories();
   }
-
-  // En CategoryProvider - Agrega este método
-Future<void> debugPrintAllPasswords() async {
-  print('CATEGORÍAS PROTEGIDAS');
-  print('Total en memoria: ${_categoryPasswords.length}');
-  _categoryPasswords.forEach((key, value) {
-    print('   📁 $key: ${value != null ? "HASH: ${value.substring(0, 10)}..." : "SIN HASH"}');
-  });
-  
-  // También verificar en SharedPreferences directamente
-  final prefs = await SharedPreferences.getInstance();
-  final savedJson = prefs.getString(_passwordsKey);
-  print('SharedPreferences: ${savedJson ?? "VACÍO"}');
-}
-
-Future<void> _savePasswords() async {
-  try {
-    print('Guardando contraseñas: $_categoryPasswords');
-    final prefs = await SharedPreferences.getInstance();
-    final passwordsJson = jsonEncode(_categoryPasswords);
-    await prefs.setString(_passwordsKey, passwordsJson);
-    print('Contraseñas guardadas correctamente');
-  } catch (e) {
-    print('Error guardando contraseñas: $e');
-  }
-}
 }
