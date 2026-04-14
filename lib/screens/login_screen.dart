@@ -25,11 +25,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final authProvider = Provider.of<AppAuthProvider>(context);
 
-    // Usar el error del provider en lugar de manejar errores localmente
+    // Usamos el error del provider en lugar de manejar errores localmente
+      //MODIFICAMOS AQUI
     final error = authProvider.errorMessage ?? '';
-
-    Color backgroundColor =
-        themeProvider.isDarkMode ? backgroundDark : textLight;
+    Color backgroundColor = themeProvider.isDarkMode ? backgroundDark : textLight;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -43,54 +42,53 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Image.asset(
-                    'assets/images/logo.png',
+                  child: Image.asset('assets/images/logo.png',
                     height: 250,
                     width: 400,
                   ),
                 ),
 
-                // Mostrar error del provider
+                // Mostramos el error del provider
                 if (error.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: themeProvider.isDarkMode
-                            ? Colors.red[900]?.withOpacity(0.3)
-                            : Colors.red[50],
+                        
+                        //MODIFICAMOS AQUI
+                        color: themeProvider.isDarkMode ? Colors.red[900]?.withOpacity(0.3) : Colors.red[50],
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: themeProvider.isDarkMode
-                              ? Colors.red[700]!
-                              : Colors.red,
+                          
+                          //MODIFICAMOS AQUI
+                          color: themeProvider.isDarkMode ? Colors.red[700]! : Colors.red,
                         ),
                       ),
                       child: Row(
                         children: [
                           Icon(Icons.error,
-                              color: themeProvider.isDarkMode
-                                  ? Colors.red[300]
-                                  : Colors.red,
+
+                                //MODIFICAMOS AQUI
+                              color: themeProvider.isDarkMode ? Colors.red[300] : Colors.red,
                               size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               error,
                               style: TextStyle(
-                                  color: themeProvider.isDarkMode
-                                      ? Colors.red[300]
-                                      : Colors.red,
+
+                                  //MODIFICAMOS AQUI
+                                  color: themeProvider.isDarkMode ? Colors.red[300] : Colors.red,
                                   fontSize: 14),
                             ),
                           ),
                           IconButton(
                             icon: Icon(Icons.close,
                                 size: 18,
-                                color: themeProvider.isDarkMode
-                                    ? Colors.red[300]
-                                    : Colors.red),
+
+                                  //MODIFICAMOS AQUI
+                                color: themeProvider.isDarkMode ? Colors.red[300] : Colors.red),
                             onPressed: () => authProvider.clearError(),
                           ),
                         ],
@@ -103,34 +101,28 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: formulario(themeProvider),
                 ),
 
-                const SizedBox(
-                    height: 15), //MIRAR SI SE HA CAMBIADO BIEN EL ESPACIO
-
-                botonLogin(),
+                const SizedBox( height: 15), botonLogin(),
                 const SizedBox(height: 20),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     TextButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              authProvider
-                                  .clearError(); // Limpiar errores antes de navegar
 
+                        //MODIFICAMOS AQUI
+                      onPressed: _isLoading ? null : () {
+                              authProvider.clearError(); // Limpiar¡mos los errores antes de navegar
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      const ChangePasswordScreen(),
+
+                                    //MODIFICAMOS AQUI
+                                  builder: (context) => const ChangePasswordScreen(),
                                 ),
                               );
                             },
-                      child: const Text(
-                        '¿Olvidaste tu contraseña?',
-                        style: TextStyle(
-                            color: pinkAccent, fontWeight: FontWeight.bold),
+                      child: const Text('¿Olvidaste la contraseña?',
+                        style: TextStyle( color: pinkAccent, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -139,30 +131,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      '¿No tienes cuenta?',
+                    Text('¿No tienes cuenta?',
                       style: TextStyle(
-                        color: themeProvider.isDarkMode
-                            ? textLight
-                            : Colors.black87,
+
+                          //MODIFICAMOS AQUI
+                        color: themeProvider.isDarkMode ? textLight : Colors.black87,
                       ),
                     ),
                     TextButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              authProvider
-                                  .clearError(); // Limpiar errores antes de navegar
-                              Navigator.push(
-                                context,
+
+                        //MODIFICAMOS AQUI
+                      onPressed: _isLoading ? null : () {
+                              authProvider.clearError(); 
+                              Navigator.push( context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      const RegisterScreen(), // QUITA EL CONST
+
+                                     //MODIFICAMOS AQUI
+                                  builder: (context) => const RegisterScreen(),
                                 ),
                               );
                             },
-                      child: const Text(
-                        'Regístrate aquí',
+                      child: const Text('Regístrate aquí',
                         style: TextStyle(
                             color: pinkAccent, fontWeight: FontWeight.bold),
                       ),
@@ -177,6 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  //MODIFICAMOS AQUI
   Widget formulario(ThemeProvider themeProvider) {
     return Form(
       key: _formKey,
@@ -190,12 +180,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+    //MODIFICAMOS AQUI
   Widget buildEmail(ThemeProvider themeProvider) {
+
+    //MODIFICAMOS AQUI
     Color textColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
-    Color borderColor =
-        themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
-    Color focusedBorderColor =
-        themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    Color borderColor = themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
+    Color focusedBorderColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
     Color iconColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
 
     return TextFormField(
@@ -217,9 +208,14 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         prefixIcon: Icon(Icons.email, color: iconColor),
         filled: themeProvider.isDarkMode,
+
+
+          //MODIFICAMOS AQUI
         fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
       ),
       keyboardType: TextInputType.emailAddress,
+
+        //MODIFICAMOS AQUI
       onSaved: (String? value) {
         email = value!;
       },
@@ -236,11 +232,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget buildPassword(ThemeProvider themeProvider) {
+
+    //MODIFICAMOS AQUI
     Color textColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
-    Color borderColor =
-        themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
-    Color focusedBorderColor =
-        themeProvider.isDarkMode ? Colors.white : pinkPrimary;
+    Color borderColor = themeProvider.isDarkMode ? Colors.grey[700]! : pinkLight;
+    Color focusedBorderColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
     Color iconColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
 
     return TextFormField(
@@ -265,6 +261,8 @@ class _LoginScreenState extends State<LoginScreen> {
         // Boton del ojito para mostrar contraseña
         suffixIcon: IconButton(
           icon: Icon(
+
+            //MODIFICAMOS AQUI
             _ocultarPassword ? Icons.visibility_off : Icons.visibility,
             color: iconColor,
           ),
@@ -276,6 +274,8 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
 
         filled: themeProvider.isDarkMode,
+
+          //MODIFICAMOS AQUI
         fillColor: themeProvider.isDarkMode ? cardDark : Colors.transparent,
       ),
       obscureText: _ocultarPassword, // dinamico
@@ -284,16 +284,19 @@ class _LoginScreenState extends State<LoginScreen> {
           return "Este campo es obligatorio";
         }
         if (value.length < 6) {
-          return "Mínimo 6 caracteres";
+          return "Mínimo debes introducir 6 caracteres";
         }
         return null;
       },
+
+        //MODIFICAMOS AQUI
       onSaved: (String? value) {
         password = value!;
       },
     );
   }
 
+  //MODIFICAMOS AQUI añadimos comentarios del funcionamiento
   Widget botonLogin() {
     return FractionallySizedBox(
       widthFactor: 0.6,
@@ -302,13 +305,9 @@ class _LoginScreenState extends State<LoginScreen> {
           backgroundColor: pinkPrimary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),),
         ),
-        onPressed: _isLoading
-            ? null
-            : () async {
+        onPressed: _isLoading ? null : () async {
                 if (_formKey.currentState!.validate()) {
                   _formKey.currentState!.save();
 
@@ -316,13 +315,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     _isLoading = true;
                   });
 
-                  final authProvider =
-                      Provider.of<AppAuthProvider>(context, listen: false);
+                  final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
                   authProvider.clearError();
 
                   final success = await authProvider.login(email, password);
 
-                  // COMPROBACIÓN CRUCIAL AQUÍ
                   if (!mounted) return;
 
                   setState(() {
@@ -332,15 +329,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (success) {
                     Navigator.pushAndRemoveUntil(
                       context,
-                      MaterialPageRoute(
-                          builder: (context) => const HomeScreen()),
-                      (Route<dynamic> route) => false,
+
+                        //MODIFICAMOS AQUI
+                      MaterialPageRoute(builder: (context) => const HomeScreen()), (Route<dynamic> route) => false,
                     );
                   }
                 }
               },
-        child: _isLoading
-            ? const SizedBox(
+
+                //MODIFICAMOS AQUI
+        child: _isLoading ? const SizedBox(
                 height: 20,
                 width: 20,
                 child: CircularProgressIndicator(
@@ -348,10 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: Colors.white,
                 ),
               )
-            : const Text(
-                "Iniciar Sesión",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
+            : const Text("Iniciar Sesión", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),),
       ),
     );
   }

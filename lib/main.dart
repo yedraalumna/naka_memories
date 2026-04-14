@@ -16,9 +16,6 @@ import 'package:app_links/app_links.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await SharedPreferences.getInstance();
-  print('✅ SharedPreferences inicializado');
-
   await Supabase.initialize(
     url: 'https://bbpqvckqycllhklqxjis.supabase.co',
     anonKey: 'sb_publishable_B2UiEGYTG1-OfhVcuTMBzg_5SPe__-a',

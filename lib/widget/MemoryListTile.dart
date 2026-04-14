@@ -28,6 +28,8 @@ class MemoryListTile extends StatelessWidget {
 
     return Card(
       elevation: 2,
+
+       //MODIFCAMOS AQUI
       color: themeProvider.isDarkMode ? cardDark : Colors.white,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
@@ -47,22 +49,24 @@ class MemoryListTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontWeight: FontWeight.bold,
+
+             //MODIFCAMOS AQUI
             color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
           ),
         ),
         subtitle: Text(
           memory.date,
           style: TextStyle(
-            color:
-                themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+
+             //MODIFCAMOS AQUI
+            color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
             fontSize: 12,
           ),
         ),
         trailing: IconButton(
-          icon: Icon(
-            isFav ? Icons.favorite : Icons.favorite_border,
-            color: isFav ? pinkPrimary : Colors.grey,
-          ),
+
+           //MODIFCAMOS AQUI
+          icon: Icon( isFav ? Icons.favorite : Icons.favorite_border, color: isFav ? pinkPrimary : Colors.grey,),
           onPressed: () {
             context.read<FavoriteProvider>().toggleFavorite(memory.id);
           },

@@ -15,6 +15,7 @@ class PinDialog extends StatefulWidget {
     this.titulo,
   });
 
+   //MODIFCAMOS AQUI
   @override
   State<PinDialog> createState() => _PinDialogState();
 }
@@ -24,16 +25,17 @@ class _PinDialogState extends State<PinDialog> {
   String errorMessage = "";
   bool isVerifying = false;
 
+
+   //MODIFCAMOS AQUI PONER PARA QUE SIRVE
   @override
   void dispose() {
-    // Retrasamos un frame la destrucción para que pin_code_fields
-    // termine sus animaciones internas sin lanzar error.
     Future.microtask(() {
       controller.dispose();
     });
     super.dispose();
   }
 
+  //verificamos si el PIN es correcto
   void _verifyPin(String pin) async {
     if (isVerifying) return;
 
@@ -46,12 +48,12 @@ class _PinDialogState extends State<PinDialog> {
     final hashInput = sha256.convert(utf8.encode(pin)).toString();
 
     if (hashInput == widget.correctHash) {
-      // PIN correcto: cerramos devolviendo TRUE
+      // PIN correcto, devuelve true
       if (mounted) {
         Navigator.pop(context, true);
       }
     } else {
-      // PIN incorrecto: mostramos error, NO cerramos
+      // PIN incorrecto devuelve false
       if (mounted) {
         setState(() {
           errorMessage = "PIN incorrecto";
@@ -72,6 +74,8 @@ class _PinDialogState extends State<PinDialog> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
+
+               //MODIFCAMOS AQUI
               widget.titulo ?? "Carpeta Protegida",
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -82,10 +86,7 @@ class _PinDialogState extends State<PinDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            "Introduce el PIN de 6 dígitos para acceder",
-            textAlign: TextAlign.center,
-          ),
+          const Text("Introduce el PIN de 6 dígitos para acceder", textAlign: TextAlign.center,),
           const SizedBox(height: 20),
           PinCodeTextField(
             appContext: context,
@@ -114,6 +115,8 @@ class _PinDialogState extends State<PinDialog> {
             enabled: !isVerifying,
             onChanged: (value) {
               if (errorMessage.isNotEmpty) {
+
+                 //MODIFCAMOS AQUI
                 setState(() => errorMessage = "");
               }
             },
@@ -121,26 +124,18 @@ class _PinDialogState extends State<PinDialog> {
               _verifyPin(value);
             },
           ),
-          if (errorMessage.isNotEmpty) ...[
+          if (errorMessage.isNotEmpty) ...[ // con los ... conseguimos que se recojan todos los datos y asi no tengamos que volver a declararlo
             const SizedBox(height: 10),
-            Text(
-              errorMessage,
-              style: const TextStyle(color: Colors.red, fontSize: 12),
-            ),
+            Text(errorMessage, style: const TextStyle(color: Colors.red, fontSize: 12),),
           ],
         ],
       ),
       actions: [
         TextButton(
-          onPressed: isVerifying
-              ? null
-              : () {
-                  Navigator.pop(context, false);
-                },
-          child: const Text(
-            "Cancelar",
-            style: TextStyle(color: Colors.grey, fontSize: 16),
-          ),
+
+          //MODIFCAMOS AQUI
+          onPressed: isVerifying ? null : () { Navigator.pop(context, false);},
+          child: const Text("Cancelar", style: TextStyle(color: Colors.grey, fontSize: 16),),
         ),
       ],
     );

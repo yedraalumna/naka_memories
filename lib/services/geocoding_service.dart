@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class GeocodingService {
-  // Usamos Nominatim de OpenStreetMap (gratuito y sin API key)
+  // Usamos nominatim de openStreetMap ya que es gratis y sin necesidad de una API key)
   final String _baseUrl = 'https://nominatim.openstreetmap.org/reverse';
   
-  // Mapa de continentes por país (simplificado pero ampliado)
+  // Mapa de continentes por pais
   final Map<String, String> _continentesPorPais = {
     // Europa
     'España': 'Europa',
@@ -134,12 +134,15 @@ class GeocodingService {
   Future<Map<String, String>?> getPlaceFromCoordinates(
     double lat, 
     double lng
+
   ) async {
     try {
+
+      //MODIFICAMOS AQUI
       final url = '$_baseUrl?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1';
       
-      final response = await http.get(
-        Uri.parse(url),
+      //MODIFICAMOS AQUI
+      final response = await http.get(Uri.parse(url),
         headers: {
           'User-Agent': 'MemoryPlaces/1.0', // Obligatorio para Nominatim
         },
@@ -147,9 +150,13 @@ class GeocodingService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+
+          //MODIFICAMOS AQUI
         final address = data['address'] ?? {};
         
-        // Obtener el país
+        // Obtenemos el país
+
+        //MODIFICAMOS AQUI
         String? pais = 'Desconocido';
         if (address['country'] != null) {
         pais = address['country'];
@@ -157,7 +164,8 @@ class GeocodingService {
         pais = address['country_code'].toString().toUpperCase();
         }
 
-        // Obtener la ciudad
+        // Obtenemos la ciudad
+          //MODIFICAMOS AQUI
         String? ciudad = 'Desconocido';
         if (address['city'] != null) {
         ciudad = address['city'];
@@ -173,16 +181,20 @@ class GeocodingService {
         ciudad = address['county'];
         }
         
-        // Limpiar nombres de países (convertir códigos a nombres)
+        // Limpiar nombres de países, es decir convertimos códigos a nombres)
+          //MODIFICAMOS AQUI
         if (pais != 'Desconocido' && pais?.length == 2) {
           // Si es un código de país, intentamos convertirlo
           pais = _codigoANombrePais(pais!);
         }
         
-        // Determinar continente
+        // determinamos el continente
+          //MODIFICAMOS AQUI
         String continente = _determinarContinente(pais ?? '');
         
         return {
+          
+          //MODIFICAMOS AQUI
           'pais': pais ?? 'Desconocido',
           'ciudad': ciudad ?? 'Desconocido',
           'continente': continente,
@@ -248,6 +260,7 @@ class GeocodingService {
       'AQ': 'Antártida',
     };
     
+    //MODIFICAMOS AQUI
     return codigosPais[codigo.toUpperCase()] ?? codigo;
   }
 }

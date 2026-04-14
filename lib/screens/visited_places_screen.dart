@@ -12,7 +12,7 @@ class VisitedPlacesScreen extends StatefulWidget {
 }
 
 class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
-  // Control para alternar entre vista de países o ciudades
+  // con esto alternamos entre vista de países o ciudades
   bool _mostrarPaises = true;
 
   // Colores por continente
@@ -31,29 +31,39 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final memoryProvider = Provider.of<MemoryProvider>(context);
 
-    // Obtener datos agrupados
+    // Obtenemos los datos agrupados
     final paisesPorContinente = memoryProvider.paisesPorContinente;
     final ciudadesPorContinente = memoryProvider.ciudadesPorContinente;
 
-    // Obtener lista de continentes con datos
+    // Obtenemos la lista de continentes con datos
     List<String> continentesConDatos;
     if (_mostrarPaises) {
       continentesConDatos = paisesPorContinente.keys.toList();
     } else {
       continentesConDatos = ciudadesPorContinente.keys.toList();
     }
-    continentesConDatos.sort(); // Ordenar alfabéticamente
+    continentesConDatos.sort(); // Ordenamos alfabéticamente
 
+    Color colorFondoPantalla;
+    if (themeProvider.isDarkMode == true) {
+      colorFondoPantalla = backgroundDark;
+    } else {
+      colorFondoPantalla = textLight;
+    }
+
+
+    //MODIFICAMOS ESTO PARA DEJARLO BIEN
     return Scaffold(
-      backgroundColor: themeProvider.isDarkMode ? backgroundDark : textLight,
+      backgroundColor: colorFondoPantalla,
       appBar: AppBar(
         title: const Text('Mis lugares visitados'),
         backgroundColor: pinkPrimary,
         foregroundColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.pop(context);
+            }),
         // Botones para cambiar entre vista de países y ciudades
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
@@ -66,7 +76,11 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
                     titulo: 'Países',
                     icon: Icons.flag,
                     isSelected: _mostrarPaises,
-                    onTap: () => setState(() => _mostrarPaises = true),
+                    onTap: () {
+                      setState(() {
+                        _mostrarPaises = true;
+                      });
+                    },
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -75,7 +89,11 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
                     titulo: 'Ciudades',
                     icon: Icons.location_city,
                     isSelected: !_mostrarPaises,
-                    onTap: () => setState(() => _mostrarPaises = false),
+                    onTap: () {
+                      setState(() {
+                        _mostrarPaises = false;
+                      });
+                    },
                   ),
                 ),
               ],
@@ -83,8 +101,7 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
           ),
         ),
       ),
-      body: memoryProvider.isLoading
-          ? const Center(child: CircularProgressIndicator(color: pinkPrimary))
+      body: memoryProvider.isLoading ? const Center(child: CircularProgressIndicator(color: pinkPrimary))
           : continentesConDatos.isEmpty
               ? _buildEmptyState(themeProvider)
               : ListView.builder(
@@ -92,14 +109,13 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
                   itemCount: continentesConDatos.length,
                   itemBuilder: (context, index) {
                     final continente = continentesConDatos[index];
+
+                    //MODIFCAMOS AQUI
                     final color = _coloresContinentes[continente] ?? Colors.grey;
-                    
-                    // Obtener datos según la vista seleccionada
-                    final datos = _mostrarPaises
-                        ? paisesPorContinente[continente]?.toList() ?? []
-                        : ciudadesPorContinente[continente]?.toList() ?? [];
-                    
-                    // Ordenar alfabéticamente
+                    // Obtenemos los datos según la vista seleccionada
+                    final datos = _mostrarPaises ? paisesPorContinente[continente]?.toList() ?? [] : ciudadesPorContinente[continente]?.toList() ?? [];
+
+                    // Ordenamos alfabéticamente
                     datos.sort();
 
                     return _buildContinenteCard(
@@ -126,9 +142,13 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
+
+            //MODIFICAMOS AQUI
           color: isSelected ? Colors.white : Colors.white.withOpacity(0.3),
           borderRadius: BorderRadius.circular(25),
           border: Border.all(
+
+            //MODIFCAMOS AQUI
             color: isSelected ? Colors.white : Colors.transparent,
             width: 1,
           ),
@@ -138,6 +158,8 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
           children: [
             Icon(
               icon,
+
+                //MODIFICAMOS AQUI
               color: isSelected ? pinkPrimary : Colors.white,
               size: 18,
             ),
@@ -145,6 +167,9 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
             Text(
               titulo,
               style: TextStyle(
+
+
+                //MODIFCAMOS AQUI
                 color: isSelected ? pinkPrimary : Colors.white,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 fontSize: 14,
@@ -167,9 +192,10 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),),
+
+
+      //MODIFCAMOS AQUI
       color: themeProvider.isDarkMode ? cardDark : Colors.white,
       child: ExpansionTile(
         leading: Container(
@@ -195,13 +221,21 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
+
+            //MODIFCAMOS AQUI
             color: themeProvider.isDarkMode ? textLight : Colors.black87,
           ),
         ),
         subtitle: Text(
+
+          
+          //MODIFCAMOS AQUI
           '${datos.length} ${mostrarPaises ? 'países' : 'ciudades'} visitados',
           style: TextStyle(
             fontSize: 13,
+
+
+            //MODIFCAMOS AQUI
             color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
           ),
         ),
@@ -211,6 +245,9 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
             child: Column(
               children: datos.map((lugar) {
                 return _buildLugarItem(
+
+
+                  //MODIFCAMOS AQUI
                   lugar: lugar,
                   color: color,
                   themeProvider: themeProvider,
@@ -224,7 +261,7 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
     );
   }
 
-  // Elemento individual (país o ciudad)
+  // //MODIFCAMOS AQUI
   Widget _buildLugarItem({
     required String lugar,
     required Color color,
@@ -235,19 +272,22 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: themeProvider.isDarkMode 
-            ? Colors.grey[800] 
-            : Colors.grey[50],
+
+        //MODIFCAMOS AQUI
+        color: themeProvider.isDarkMode ? Colors.grey[800] : Colors.grey[50],
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: themeProvider.isDarkMode 
-              ? Colors.grey[700]! 
-              : Colors.grey[200]!,
+
+
+          //MODIFCAMOS AQUI
+          color: themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[200]!,
         ),
       ),
       child: Row(
         children: [
           Icon(
+
+            //MODIFCAMOS AQUI
             mostrarPaises ? Icons.flag : Icons.location_on,
             size: 16,
             color: color,
@@ -258,6 +298,8 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
               lugar,
               style: TextStyle(
                 fontSize: 15,
+
+                //MODIFCAMOS AQUI
                 color: themeProvider.isDarkMode ? textLight : Colors.black87,
               ),
             ),
@@ -276,16 +318,20 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
           Icon(
             _mostrarPaises ? Icons.flag : Icons.location_city,
             size: 80,
-            color: themeProvider.isDarkMode ? Colors.grey[700] : Colors.grey[300],
+            color:
+                themeProvider.isDarkMode ? Colors.grey[700] : Colors.grey[300],
           ),
           const SizedBox(height: 16),
           Text(
-            _mostrarPaises 
-                ? 'No has visitado ningún país aún' 
-                : 'No has visitado ninguna ciudad aún',
+
+            //MODIFCAMOS AQUI
+            _mostrarPaises ? 'No has visitado ningún país aún' : 'No has visitado ninguna ciudad aún',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w500,
+
+
+              //MODIFCAMOS AQUI
               color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
             ),
           ),
@@ -294,6 +340,8 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
             'Comienza a añadir recuerdos para ver tu progreso',
             style: TextStyle(
               fontSize: 14,
+              
+               //MODIFCAMOS AQUI
               color: themeProvider.isDarkMode ? Colors.grey[600] : Colors.grey[400],
             ),
             textAlign: TextAlign.center,

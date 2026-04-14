@@ -9,7 +9,6 @@ import '../providers/theme_provider.dart';
 class MenuDialog extends StatefulWidget {
   final List<Memory> memories;
   final LatLng currentPosition;
-
   final VoidCallback onShowAllMemories;
   final VoidCallback onSaveCurrentCoordinates;
   final VoidCallback onCreateNewMemory;
@@ -42,22 +41,24 @@ class _MenuDialogState extends State<MenuDialog> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      
+      //MODIFCAMOS AQUI ( QUE ES CTX)
       builder: (ctx) {
         return DraggableScrollableSheet(
           initialChildSize: 0.8,
           maxChildSize: 0.95,
           minChildSize: 0.5,
           builder: (ctx2, scrollController) {
+            
+            //MODIFCAMOS AQUI
             Color backgroundColor = isDarkMode ? backgroundDark : Colors.white;
             Color textColor = isDarkMode ? Colors.white : Colors.black;
-            Color primaryColor =
-                theme.brightness == Brightness.dark ? pinkLight : pinkPrimary;
+            Color primaryColor = theme.brightness == Brightness.dark ? pinkLight : pinkPrimary;
 
             return Container(
               decoration: BoxDecoration(
                 color: backgroundColor,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
                 children: [
@@ -74,12 +75,10 @@ class _MenuDialogState extends State<MenuDialog> {
                     ),
                   ),
                   Expanded(
-                    child: list.isEmpty
-                        ? Center(
-                            child: Text(
-                              'No se encontraron recuerdos.',
-                              style: TextStyle(color: textColor),
-                            ),
+
+                     //MODIFCAMOS AQUI
+                    child: list.isEmpty ? Center(
+                            child: Text( 'No se encontraron recuerdos.', style: TextStyle(color: textColor),),
                           )
                         : ListView.builder(
                             controller: scrollController,
@@ -97,19 +96,20 @@ class _MenuDialogState extends State<MenuDialog> {
                                   style: TextStyle(color: textColor),
                                 ),
                                 subtitle: Text(
+
+
+                                   //MODIFCAMOS AQUI
                                   '${memory.date} | ${memory.location['latitude']?.toStringAsFixed(4)}, ${memory.location['longitude']?.toStringAsFixed(4)}',
                                   style: TextStyle(
-                                      color: theme.brightness == Brightness.dark
-                                          ? Colors.grey[400]
-                                          : Colors.grey[700]),
+                                      color: theme.brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[700]),
                                 ),
                                 onTap: () {
                                   Navigator.pop(ctx3);
                                   widget.onShowMemoryDetails(memory);
                                 },
-                                tileColor: theme.brightness == Brightness.dark
-                                    ? cardDark.withOpacity(0.5)
-                                    : null,
+
+                                 //MODIFCAMOS AQUI
+                                tileColor: theme.brightness == Brightness.dark ? cardDark.withOpacity(0.5) : null,
                               );
                             },
                           ),
@@ -123,6 +123,8 @@ class _MenuDialogState extends State<MenuDialog> {
     );
   }
 
+
+   //MODIFCAMOS AQUI
   void _showSortedByDate(ThemeData theme, bool isDarkMode) {
     Navigator.pop(context);
     final sortedMemories = List<Memory>.from(widget.memories)
@@ -143,6 +145,7 @@ class _MenuDialogState extends State<MenuDialog> {
       isDarkMode = themeProvider.themeMode == ThemeMode.dark;
     }
 
+     //MODIFCAMOS AQUI
     Color backgroundColor = isDarkMode ? backgroundDark : Colors.white;
     Color dividerColor = isDarkMode ? Colors.grey[700]! : pinkLighter;
 
@@ -204,8 +207,7 @@ class _MenuDialogState extends State<MenuDialog> {
             color: pinkPrimary,
             onTap: () {
               Navigator.pop(context);
-              _showMemoryListModal(
-                  widget.memories, 'Todos los Recuerdos', theme, isDarkMode);
+              _showMemoryListModal(widget.memories, 'Todos los Recuerdos', theme, isDarkMode);
             },
             isDarkMode: isDarkMode,
           ),
@@ -226,6 +228,8 @@ class _MenuDialogState extends State<MenuDialog> {
             icon: Icons.date_range,
             title: 'Listar por fecha (Recientes)',
             color: pinkPrimary,
+
+             //MODIFCAMOS AQUI
             onTap: () => _showSortedByDate(theme, isDarkMode),
             isDarkMode: isDarkMode,
           ),
@@ -268,6 +272,8 @@ class _MenuDialogState extends State<MenuDialog> {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
+
+           //MODIFCAMOS AQUI
           color: color.withOpacity(isDarkMode ? 0.2 : 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
@@ -276,6 +282,8 @@ class _MenuDialogState extends State<MenuDialog> {
       title: Text(
         title,
         style: TextStyle(
+
+           //MODIFCAMOS AQUI
           color: isDarkMode ? Colors.white : Colors.black87,
           fontSize: 16,
           fontWeight: FontWeight.w500,
@@ -284,6 +292,8 @@ class _MenuDialogState extends State<MenuDialog> {
       trailing: Icon(Icons.chevron_right, color: color),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+
+       //MODIFCAMOS AQUI
       tileColor: isDarkMode ? cardDark.withOpacity(0.3) : null,
     );
   }

@@ -26,6 +26,8 @@ class _CategoryManagerState extends State<CategoryManager> {
     _loadCategories();
   }
 
+
+  //MODIFICAMOS AQUI
   Future<void> _loadCategories() async {
     setState(() => _isLoading = true);
     try {
@@ -45,6 +47,8 @@ class _CategoryManagerState extends State<CategoryManager> {
 
     final result = await showDialog<String>(
       context: context,
+
+      //MODIFICAMOS AQUI
       builder: (context) => AlertDialog(
         backgroundColor: isDarkMode ? cardDark : Colors.white,
         title: const Text('Nueva Carpeta'),
@@ -52,6 +56,8 @@ class _CategoryManagerState extends State<CategoryManager> {
           controller: controller,
           autofocus: true,
           style: TextStyle(
+
+              //MODIFICAMOS AQUI
             color: isDarkMode ? textDarkMode : Colors.black87,
           ),
           decoration: InputDecoration(
@@ -67,6 +73,8 @@ class _CategoryManagerState extends State<CategoryManager> {
         ),
         actions: [
           TextButton(
+
+            //MODIFICAMOS AQUI
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancelar'),
           ),
@@ -87,6 +95,8 @@ class _CategoryManagerState extends State<CategoryManager> {
     );
 
     if (result != null) {
+
+        //MODIFICAMOS AQUI
       setState(() => _isLoading = true);
       try {
         final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
@@ -95,6 +105,8 @@ class _CategoryManagerState extends State<CategoryManager> {
         _showSuccess('Carpeta "$result" creada');
       } catch (e) {
         _showError('Error al crear carpeta: $e');
+
+          //MODIFICAMOS AQUI
         setState(() => _isLoading = false);
       }
     }
@@ -107,6 +119,8 @@ class _CategoryManagerState extends State<CategoryManager> {
 
   final result = await showDialog<String>(
     context: context,
+
+    //MODIFICAMOS AQUI
     builder: (context) => AlertDialog(
       backgroundColor: isDarkMode ? cardDark : Colors.white,
       title: const Text('Renombrar Carpeta'),
@@ -114,6 +128,8 @@ class _CategoryManagerState extends State<CategoryManager> {
         controller: controller,
         autofocus: true,
         style: TextStyle(
+
+            //MODIFICAMOS AQUI
           color: isDarkMode ? textDarkMode : Colors.black87,
         ),
         decoration: InputDecoration(
@@ -129,11 +145,15 @@ class _CategoryManagerState extends State<CategoryManager> {
       ),
       actions: [
         TextButton(
+
+            //MODIFICAMOS AQUI
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancelar'),
         ),
         ElevatedButton(
           onPressed: () {
+
+            //MODIFICAMOS AQUI
             final newName = controller.text.trim();
             if (newName.isNotEmpty && newName != oldName) {
               Navigator.pop(context, newName);
@@ -148,6 +168,8 @@ class _CategoryManagerState extends State<CategoryManager> {
     ),
   );
 
+
+    //MODIFICAMOS AQUI
   if (result != null) {
     setState(() => _isLoading = true);
     try {
@@ -157,6 +179,8 @@ class _CategoryManagerState extends State<CategoryManager> {
     } catch (e) {
       _showError('Error al renombrar: $e');
     } finally {
+
+        //MODIFICAMOS AQUI
       setState(() => _isLoading = false);
     }
   }
@@ -174,18 +198,24 @@ class _CategoryManagerState extends State<CategoryManager> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+
+        //MODIFICAMOS AQUI
         backgroundColor: isDarkMode ? cardDark : Colors.white,
         title: const Text('Eliminar Carpeta'),
         content: Text(
           '¿Estás seguro de eliminar la carpeta "$categoryName"?\n\n'
-          'Todos los recuerdos de esta carpeta se moverán a "General".',
+          'Todos los recuerdos de esta carpeta se moverán a "General"',
         ),
         actions: [
           TextButton(
+
+            //MODIFICAMOS AQUI
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
+
+              //MODIFICAMOS AQUI
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -197,6 +227,8 @@ class _CategoryManagerState extends State<CategoryManager> {
     );
 
     if (confirm == true) {
+
+      //MODIFICAMOS AQUI
       setState(() => _isLoading = true);
       try {
         final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
@@ -239,22 +271,29 @@ class _CategoryManagerState extends State<CategoryManager> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Gestionar Carpetas'),
+
+          //MODIFICAMOS AQUI
         backgroundColor: isDarkMode ? backgroundDark : backgroundLight,
         elevation: 1,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: pinkPrimary),
+
+            //MODIFICAMOS AQUI
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.restore, color: pinkPrimary),
+
+              //MODIFICAMOS AQUI
             onPressed: () => _showRestoreDialog(),
             tooltip: 'Restaurar carpetas predeterminadas',
           ),
         ],
       ),
-      body: categoryProvider.isLoading || _isLoading
-          ? const Center(
+
+        //MODIFICAMOS AQUI
+      body: categoryProvider.isLoading || _isLoading ? const Center(
               child: CircularProgressIndicator(color: pinkPrimary),
             )
           : Column(
@@ -275,23 +314,28 @@ class _CategoryManagerState extends State<CategoryManager> {
                         Expanded(
                           child: Text(
                             'Puedes crear, editar o eliminar carpetas.\n'
-                            'Las carpetas predeterminadas también se pueden eliminar.',
+                            'Las carpetas predeterminadas también se pueden eliminar',
                             style: TextStyle(
                               fontSize: 12,
+
+                                //MODIFICAMOS AQUI
                               color: isDarkMode ? textDarkMode : Colors.black87,
                             ),
                           ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.close, size: 16, color: pinkPrimary),
+
+                            //MODIFICAMOS AQUI
                           onPressed: () => setState(() => _showDefaultHint = false),
                         ),
                       ],
                     ),
                   ),
                 Expanded(
-                  child: categoryProvider.categories.isEmpty
-                      ? Center(
+
+                  //MODIFICAMOS AQUI
+                  child: categoryProvider.categories.isEmpty ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -305,6 +349,9 @@ class _CategoryManagerState extends State<CategoryManager> {
                                 'No hay carpetas',
                                 style: TextStyle(
                                   fontSize: 18,
+
+                                    
+                                  //MODIFICAMOS AQUI
                                   color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                 ),
                               ),
@@ -313,6 +360,8 @@ class _CategoryManagerState extends State<CategoryManager> {
                                 'Toca el botón + para crear una',
                                 style: TextStyle(
                                   fontSize: 14,
+
+                                    //MODIFICAMOS AQUI
                                   color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
                                 ),
                               ),
@@ -329,10 +378,15 @@ class _CategoryManagerState extends State<CategoryManager> {
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
                               elevation: 2,
+
+
+                                //MODIFICAMOS AQUI
                               color: isDarkMode ? cardDark : Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 side: BorderSide(
+
+                                    //MODIFICAMOS AQUI
                                   color: isDarkMode ? Colors.grey[700]! : Colors.grey[200]!,
                                 ),
                               ),
@@ -355,6 +409,8 @@ class _CategoryManagerState extends State<CategoryManager> {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w500,
+
+                                      //MODIFICAMOS AQUI
                                     color: isDarkMode ? textDarkMode : Colors.black87,
                                   ),
                                 ),
@@ -363,25 +419,29 @@ class _CategoryManagerState extends State<CategoryManager> {
                                   children: [
                                     IconButton(
                                       icon: Icon(
-                                        categoryProvider.isCategoryProtected(category)
-                                            ? Icons.lock
-                                            : Icons.lock_open,
-                                        color: categoryProvider.isCategoryProtected(category)
-                                          ? lilaMedio
-                                          : Colors.grey,
+
+                                          //MODIFICAMOS AQUI
+                                        categoryProvider.isCategoryProtected(category) ? Icons.lock : Icons.lock_open,
+                                        color: categoryProvider.isCategoryProtected(category) ? lilaMedio : Colors.grey,
                                       ),
+
+                                        //MODIFICAMOS AQUI
                                       onPressed: () => _manageCategoryPin(category),
                                       tooltip: 'Proteger con PIN',
                                     ),
                                     if (!isGeneral)
                                       IconButton(
                                         icon: const Icon(Icons.edit, color: lilaClarito),
+
+                                          //MODIFICAMOS AQUI
                                         onPressed: () => _renameCategory(category),
                                         tooltip: 'Renombrar',
                                       ),
                                     if (!isGeneral)
                                       IconButton(
                                         icon: const Icon(Icons.delete, color: lilaFuerte),
+
+                                          //MODIFICAMOS AQUI
                                         onPressed: () => _deleteCategory(category),
                                         tooltip: 'Eliminar',
                                       ),
@@ -416,9 +476,12 @@ class _CategoryManagerState extends State<CategoryManager> {
       return;
     }
 
+      //MODIFICAMOS AQUI
     final bool? authorized = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
+
+        //MODIFICAMOS AQUI
       builder: (context) => PinDialog(
         correctHash: currentHash,
         titulo: 'Verificar PIN para eliminar',
@@ -428,18 +491,22 @@ class _CategoryManagerState extends State<CategoryManager> {
     if (authorized != true) {
       final bool? forgotPin = await showDialog<bool>(
         context: context,
+
+          //MODIFICAMOS AQUI
         builder: (context) => AlertDialog(
           backgroundColor: isDarkMode ? cardDark : Colors.white,
           title: const Text('PIN incorrecto'),
-          content: const Text(
-            'Si no recuerdas el PIN, puedes verificar tu contraseña de inicio de sesión para cambiarlo.',
-          ),
+          content: const Text('Si no recuerdas el PIN, puedes verificar tu contraseña de inicio de sesión para cambiarlo.',),
           actions: [
             TextButton(
+
+                //MODIFICAMOS AQUI
               onPressed: () => Navigator.pop(context, false),
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
+
+                //MODIFICAMOS AQUI
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(backgroundColor: pinkPrimary),
               child: const Text('Olvidé mi PIN'),
@@ -462,15 +529,21 @@ class _CategoryManagerState extends State<CategoryManager> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+
+          //MODIFICAMOS AQUI
         backgroundColor: isDarkMode ? cardDark : Colors.white,
         title: const Text('Eliminar PIN'),
         content: Text('¿Quieres eliminar el PIN de la carpeta "$categoryName"?'),
         actions: [
           TextButton(
+
+              //MODIFICAMOS AQUI
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
+
+              //MODIFICAMOS AQUI
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Eliminar'),
@@ -491,7 +564,10 @@ class _CategoryManagerState extends State<CategoryManager> {
     
     final result = await showDialog<bool>(
       context: context,
+
+      //MODIFICAMOS AQUI
       builder: (context) => AlertDialog(
+        //MODIFICAMOS AQUI
         backgroundColor: isDarkMode ? cardDark : Colors.white,
         title: const Text('Proteger Carpeta con PIN'),
         content: Column(
@@ -532,13 +608,15 @@ class _CategoryManagerState extends State<CategoryManager> {
         ),
         actions: [
           TextButton(
+
+              //MODIFICAMOS AQUI
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () {
-              final pin = pinController.text.trim();
-              final confirm = confirmController.text.trim();
+              final pin = pinController.text;
+              final confirm = confirmController.text;
               
               if (pin.length != 6) {
                 _showError('El PIN debe tener 6 dígitos');
@@ -558,6 +636,8 @@ class _CategoryManagerState extends State<CategoryManager> {
     );
     
     // En _manageCategoryPin, después de setCategoryPassword
+
+      //MODIFICAMOS AQUI QUE COJONE ES SHA256 Y UTF8
     if (result == true) {
       final pin = pinController.text.trim();
       final hash = sha256.convert(utf8.encode(pin)).toString();
@@ -575,6 +655,7 @@ class _CategoryManagerState extends State<CategoryManager> {
     required bool isDarkMode,
   }) async {
     final currentUser = _supabase.auth.currentUser;
+      //MODIFICAMOS AQUI
     final userEmail = currentUser?.email;
 
     if (currentUser == null || userEmail == null || userEmail.isEmpty) {
@@ -584,10 +665,13 @@ class _CategoryManagerState extends State<CategoryManager> {
 
     final TextEditingController passwordController = TextEditingController();
 
+      //MODIFICAMOS AQUI
     final bool? passwordOk = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
+
+          //MODIFICAMOS AQUI
         backgroundColor: isDarkMode ? cardDark : Colors.white,
         title: const Text('Verificar identidad'),
         content: Column(
@@ -614,6 +698,7 @@ class _CategoryManagerState extends State<CategoryManager> {
         ),
         actions: [
           TextButton(
+              //MODIFICAMOS AQUI
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancelar'),
           ),
@@ -652,10 +737,14 @@ class _CategoryManagerState extends State<CategoryManager> {
     final TextEditingController newPinController = TextEditingController();
     final TextEditingController confirmPinController = TextEditingController();
 
+    //MODIFICAMOS AQUI
     final bool? changeOk = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
+
+      //MODIFICAMOS AQUI
       builder: (context) => AlertDialog(
+        //MODIFICAMOS AQUI
         backgroundColor: isDarkMode ? cardDark : Colors.white,
         title: const Text('Cambiar PIN de carpeta'),
         content: Column(
@@ -696,13 +785,15 @@ class _CategoryManagerState extends State<CategoryManager> {
         ),
         actions: [
           TextButton(
+
+            //MODIFICAMOS AQUI
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () {
-              final newPin = newPinController.text.trim();
-              final confirmPin = confirmPinController.text.trim();
+              final newPin = newPinController.text;
+              final confirmPin = confirmPinController.text;
 
               if (newPin.length != 6) {
                 _showError('El PIN debe tener 6 dígitos');
@@ -722,13 +813,16 @@ class _CategoryManagerState extends State<CategoryManager> {
       ),
     );
 
+
+      //MODIFICAMOS AQUI
     if (changeOk == true) {
-      final hash = sha256.convert(utf8.encode(newPinController.text.trim())).toString();
+      final hash = sha256.convert(utf8.encode(newPinController.text)).toString();
       await categoryProvider.setCategoryPassword(categoryName, hash);
       _showSuccess('PIN actualizado para "$categoryName"');
       if (mounted) setState(() {});
     }
   }
+
 
   Future<void> _showRestoreDialog() async {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
@@ -742,14 +836,18 @@ class _CategoryManagerState extends State<CategoryManager> {
         content: const Text(
           '¿Quieres restaurar las carpetas predeterminadas?\n\n'
           'Esto añadirá: Viajes, Amigos, Familia, Comida, Estudio\n\n'
-          'Nota: NO se eliminarán tus carpetas personalizadas.',
+          'Además, no se eliminarán tus carpetas personalizadas',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
+
+              //MODIFICAMOS AQUI
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
+
+              //MODIFICAMOS AQUI
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: pinkPrimary,
@@ -761,6 +859,8 @@ class _CategoryManagerState extends State<CategoryManager> {
     );
     
     if (confirm == true) {
+
+        //MODIFICAMOS AQUI
       setState(() => _isLoading = true);
       try {
         final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
@@ -769,6 +869,8 @@ class _CategoryManagerState extends State<CategoryManager> {
       } catch (e) {
         _showError('Error al restaurar: $e');
       } finally {
+
+          //MODIFICAMOS AQUI
         setState(() => _isLoading = false);
       }
     }

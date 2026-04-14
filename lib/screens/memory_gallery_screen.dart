@@ -748,9 +748,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.9,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.9
       ),
       itemCount: categories.length,
       itemBuilder: (context, index) {

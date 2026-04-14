@@ -11,17 +11,20 @@ class MemoryProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
-  // Cache para geocoding (para no hacer peticiones repetidas)
+  // Cache para  el geocoding para que no haga peticiones repetidas
+
+    //MODIFICAMOS AQUI
   final Map<String, String> _paisCache = {};
   final Map<String, String> _ciudadCache = {};
   final Map<String, String> _continenteCache = {};
 
   // Getters
+  //MODIFICAMOS AQUI
   List<Memory> get memories => _memories;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   
-  // Países únicos visitados (sin repetir)
+  // Países que se han visitados   //MODIFICAMOS AQUI hacemos mas secillo el metodo
   int get paisesUnicos {
     final paises = <String>{};
     for (var memory in _memories) {
@@ -34,7 +37,7 @@ class MemoryProvider extends ChangeNotifier {
     return paises.length;
   }
 
-  // Ciudades únicas visitadas (sin repetir)
+  // Ciudades que han sido visitadas
   int get ciudadesUnicas {
     final ciudades = <String>{};
     for (var memory in _memories) {
@@ -72,8 +75,8 @@ class MemoryProvider extends ChangeNotifier {
       final ciudad = _ciudadCache[key];
       final continente = _continenteCache[key];
       
-      if (ciudad != null && ciudad.isNotEmpty && 
-          continente != null && continente.isNotEmpty) {
+      if (ciudad != null && ciudad.isNotEmpty &&  continente != null && continente.isNotEmpty) {
+        //MODIFICAMOS AQUI
         mapa.putIfAbsent(continente, () => <String>{});
         mapa[continente]!.add(ciudad);
       }
@@ -94,6 +97,8 @@ class MemoryProvider extends ChangeNotifier {
       );
       
       if (lugar != null) {
+
+          //MODIFICAMOS AQUI
         _paisCache[key] = lugar['pais'] ?? 'Desconocido';
         _ciudadCache[key] = lugar['ciudad'] ?? 'Desconocido';
         _continenteCache[key] = lugar['continente'] ?? 'Desconocido';
@@ -110,7 +115,7 @@ class MemoryProvider extends ChangeNotifier {
     }
   }
 
-  // Geocodificar todos los recuerdos
+  // Geocodificamos todos los recuerdos
   Future<void> _geocodeAllMemories() async {
     for (var memory in _memories) {
       await _geocodeMemory(memory);
@@ -118,7 +123,7 @@ class MemoryProvider extends ChangeNotifier {
     notifyListeners();
   }
   
-  // Cargar todos los recuerdos del usuario
+  // Cargamos todos los recuerdos del usuario
   Future<void> loadMemories() async {
     _isLoading = true;
     _errorMessage = null;
@@ -140,13 +145,13 @@ class MemoryProvider extends ChangeNotifier {
     }
   }
 
-  // Limpiar error
+  // Limpiamos el error
   void clearError() {
     _errorMessage = null;
     notifyListeners();
   }
 
-  // Limpiar caché (útil cuando se cierra sesión)
+  // Limpiar caché ya aue es util cuando se cierra sesión
   void clearCache() {
     _paisCache.clear();
     _ciudadCache.clear();

@@ -9,10 +9,12 @@ class ThemeProvider with ChangeNotifier {
     _loadThemeMode();
   }
 
+    //MODIFICAMOS AQUI
   ThemeMode get themeMode => _themeMode;
   bool get isDarkMode => _themeMode == ThemeMode.dark;
   bool get isLoading => _isLoading;
 
+  //MODIFICAMOS AQUI añadir de q va
   Future<void> _loadThemeMode() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -20,12 +22,13 @@ class ThemeProvider with ChangeNotifier {
 
       if (themeModeString != null) {
         _themeMode = ThemeMode.values.firstWhere(
-          (element) => element.toString() == themeModeString,
-          orElse: () => ThemeMode.system,
+
+            //MODIFICAMOS AQUI
+          (element) => element.toString() == themeModeString, orElse: () => ThemeMode.system,
         );
       }
     } catch (e) {
-      // Si hay error, usar el modo por defecto
+      // Si hay error, usamos el modo por defecto
       _themeMode = ThemeMode.system;
     } finally {
       _isLoading = false;
@@ -41,20 +44,21 @@ class ThemeProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('themeMode', mode.toString());
     } catch (e) {
-      // Si hay error al guardar, revertir cambios
+      // Si hay error al guardar, revertimos los cambios
       _themeMode = ThemeMode.system;
       notifyListeners();
       rethrow;
     }
   }
 
+    //MODIFICAMOS AQUI añadir de q va
   Future<void> toggleTheme() async {
     if (_themeMode == ThemeMode.dark) {
       await setThemeMode(ThemeMode.light);
     } else if (_themeMode == ThemeMode.light) {
       await setThemeMode(ThemeMode.dark);
     } else {
-      // Si está en system, usar dark
+      // Si está en system, se usara dark
       await setThemeMode(ThemeMode.dark);
     }
   }

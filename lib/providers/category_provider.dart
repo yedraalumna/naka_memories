@@ -191,11 +191,37 @@ bool hasPassword(String categoryName) {
     }
   }
 
-  /// RESTAURAR CATEGORÍAS
-  Future<void> restoreDefaultCategories() async {
-    print("Las categorías predeterminadas fijas han sido desactivadas.");
+  /// RESTAURAR CATEGORÍAS PREDETERMINADAS
+Future<void> restoreDefaultCategories() async {
+  print('🔄 Restaurando carpetas predeterminadas...');
+  
+  final List<String> defaultCategories = [
+    'General',
+    'Viajes',
+    'Amigos', 
+    'Familia',
+    'Comida',
+    'Estudio'
+  ];
+  
+  try {
+    // Crear cada categoría predeterminada si no existe
+    for (var category in defaultCategories) {
+      if (category != 'General' && !_categories.contains(category)) {
+        await _memoryService.createCategory(category);
+        print('Categoría creada: $category');
+      }
+    }
+    
+    // Recargar categorías
     await loadCategories();
+    
+    print('Carpetas predeterminadas restauradas correctamente');
+  } catch (e) {
+    print('Error al restaurar carpetas predeterminadas: $e');
+    rethrow;
   }
+}
 
   /// AÑADIR LOCALMENTE
   void addCategoryLocally(String newCategory) {
@@ -216,7 +242,7 @@ bool hasPassword(String categoryName) {
 
   // En CategoryProvider - Agrega este método
 Future<void> debugPrintAllPasswords() async {
-  print('🔐 ==== CATEGORÍAS PROTEGIDAS ====');
+  print('CATEGORÍAS PROTEGIDAS');
   print('Total en memoria: ${_categoryPasswords.length}');
   _categoryPasswords.forEach((key, value) {
     print('   📁 $key: ${value != null ? "HASH: ${value.substring(0, 10)}..." : "SIN HASH"}');
@@ -225,19 +251,18 @@ Future<void> debugPrintAllPasswords() async {
   // También verificar en SharedPreferences directamente
   final prefs = await SharedPreferences.getInstance();
   final savedJson = prefs.getString(_passwordsKey);
-  print('📦 SharedPreferences: ${savedJson ?? "VACÍO"}');
-  print('================================');
+  print('SharedPreferences: ${savedJson ?? "VACÍO"}');
 }
 
 Future<void> _savePasswords() async {
   try {
-    print('💾 Guardando contraseñas: $_categoryPasswords');
+    print('Guardando contraseñas: $_categoryPasswords');
     final prefs = await SharedPreferences.getInstance();
     final passwordsJson = jsonEncode(_categoryPasswords);
     await prefs.setString(_passwordsKey, passwordsJson);
-    print('✅ Contraseñas guardadas correctamente');
+    print('Contraseñas guardadas correctamente');
   } catch (e) {
-    print('❌ Error guardando contraseñas: $e');
+    print('Error guardando contraseñas: $e');
   }
 }
 }

@@ -3,8 +3,6 @@ import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/category_provider.dart';
 import '../constants/colors.dart';
-
-// Importamos las pantallas que usará el menú inferior
 import 'memory_gallery_screen.dart';
 import 'map_screen.dart';
 import 'profile_screen.dart';
@@ -12,10 +10,12 @@ import 'profile_screen.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  //MODIFICAMOS AQUI
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+  //MODIFICAMOS AQUI añadimos comentarios
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
@@ -63,10 +63,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: pinkPrimary,
-        unselectedItemColor:
-            themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
-        backgroundColor:
-            themeProvider.isDarkMode ? backgroundDark : Colors.white,
+
+          //MODIFICAMOS AQUI
+        unselectedItemColor: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+          //MODIFICAMOS AQUI
+        backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
+          //MODIFICAMOS AQUI ns q fixed
         type: BottomNavigationBarType.fixed,
         elevation: 5,
         onTap: _onItemTapped,

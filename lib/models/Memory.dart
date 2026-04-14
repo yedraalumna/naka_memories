@@ -11,13 +11,15 @@ class Memory {
   final bool isFavorite;
   final List<String> sharedWith;
   final bool hasPassword;
+
+    //MODIFICAMOS AQUI
   final String? passwordHash;
   final String? creatorId;
   final Map<String, dynamic>? sharedRoles;
   final Map<String, dynamic>? pendingRoles;
   final String? creatorEmail;
 
-  // Lista de las categorias
+  // Lista de las categorias predeterminadas
   static const List<String> categoriesList = [
     'General',
     'Viajes',
@@ -54,10 +56,11 @@ class Memory {
     'Estudio',
   ];
 
-  // getters SEGUROS
+  // getters
+
+    //MODIFICAMOS AQUI
   double get latitude => location['latitude'] ?? 0.0;
   double get longitude => location['longitude'] ?? 0.0;
-
   LatLng get toLatLng => LatLng(latitude, longitude);
 
   // Getter para verificar si el asset es un video
@@ -92,7 +95,7 @@ class Memory {
     return 'unknown';
   }
 
-  // Convertimos el objeto Memory a un Map para ser almacenado
+  // Convertimos el objeto memory a un map para que se almacene
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -114,37 +117,19 @@ class Memory {
     };
   }
 
-  // Creamos una instancia de Memory a partir de un Map
+  // Creamos una instancia de memory a partir de un map
   factory Memory.fromMap(Map<String, dynamic> map) {
     try {
-      // ID - siempre convertir a String, con valor por defecto
-      final id = _safeString(map['id'],
-          defaultValue: DateTime.now().millisecondsSinceEpoch.toString());
-
-      // Title - con valor por defecto
+        //MODIFICAMOS AQUI revisamos xq algunos estan raros
+      final id = _safeString(map['id'],defaultValue: DateTime.now().millisecondsSinceEpoch.toString());
       final title = _safeString(map['title'], defaultValue: 'Sin título');
-
-      // Description - puede ser null
       final description = _safeString(map['description']);
-
-      // Date - con valor por defecto
-      final date = _safeString(map['date'],
-          defaultValue: DateTime.now().toIso8601String());
-
-      // Latitude y Longitude - manejar nulls y tipos
+      final date = _safeString(map['date'],defaultValue: DateTime.now().toIso8601String());
       final latitude = _safeDouble(map['latitude']);
       final longitude = _safeDouble(map['longitude']);
-
-      // ImageAsset - puede ser null
       final imageAsset = map['imageAsset']?.toString();
-
-      // Category - con valor por defecto
-      final category =
-          _safeString(map['category'], defaultValue: 'Sin categoría');
-
-      // isFavorite - con valor por defecto
-      final isFavorite =
-          (map['isFavorite'] == true) || (map['is_favorite'] == true);
+      final category = _safeString(map['category'], defaultValue: 'Sin categoría');
+      final isFavorite = (map['isFavorite'] == true) || (map['is_favorite'] == true);
 
       // sharedRaw -Extraemos la lista de compartidos de forma segura
       final sharedRaw = map['shared_with'] ?? map['sharedWith'];
@@ -153,26 +138,25 @@ class Memory {
         parsedSharedWith = sharedRaw.map((e) => e.toString()).toList();
       }
 
-      // hasPassword y passwordHash, con valor por defecto
-      final hasPassword =
-          (map['has_password'] == true) || (map['hasPassword'] == true);
-      final passwordHash =
-          map['password_hash']?.toString() ?? map['passwordHash']?.toString();
+      // hasPassword y passwordHash, con un valor por defecto
+      final hasPassword =(map['has_password'] == true) || (map['hasPassword'] == true);
 
-      // Lectura correcta de la propiedad creatorId (del userId) y sharedRoles
+      //MODIFICAMOS AQUI
+      final passwordHash = map['password_hash']?.toString() ?? map['passwordHash']?.toString();
+      // Lectura correcta de la propiedad creatorId, del userId y sharedRoles
       final creatorId = _safeString(map['user_id'] ?? map['creatorId']);
-
       // Lectura correcta de la propiedad creatorEmail
-      final creatorEmail =
-          _safeString(map['creator_email'] ?? map['creatorEmail']);
-
+      final creatorEmail = _safeString(map['creator_email'] ?? map['creatorEmail']);
       Map<String, dynamic>? parsedSharedRoles;
       final rolesRaw = map['shared_roles'] ?? map['sharedRoles'];
+      
+
+        //MODIFICAMOS AQUI
       if (rolesRaw is Map) {
         parsedSharedRoles = Map<String, dynamic>.from(rolesRaw);
       }
 
-      // Extraemos los pendientes de supabase
+      //MODIFICAMOS AQUI
       Map<String, dynamic>? parsedPendingRoles;
       final pendingRaw = map['pending_roles'] ?? map['pendingRoles'];
       if (pendingRaw is Map) {
@@ -193,6 +177,8 @@ class Memory {
         isFavorite: isFavorite,
         sharedWith: parsedSharedWith,
         hasPassword: hasPassword,
+
+          //MODIFICAMOS AQUI
         passwordHash: passwordHash?.isEmpty == true ? null : passwordHash,
         creatorId: creatorId.isEmpty ? null : creatorId,
         sharedRoles: parsedSharedRoles ?? {},
@@ -200,8 +186,10 @@ class Memory {
         creatorEmail: creatorEmail.isEmpty ? null : creatorEmail,
       );
     } catch (e) {
-      print('ERROR en Memory.fromMap: $e');
+      print('Error en Memory.fromMap: $e');
       return Memory(
+
+          //MODIFICAMOS AQUI
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           title: 'Recuerdo con error',
           description: 'Error al cargar este recuerdo',
@@ -221,6 +209,7 @@ class Memory {
   }
 
   // Helper para convertir a String de forma segura
+    //MODIFICAMOS AQUI
   static String _safeString(dynamic value, {String defaultValue = ''}) {
     if (value == null) return defaultValue;
     if (value is String) return value;
@@ -228,6 +217,7 @@ class Memory {
   }
 
   // Helper para convertir a double de forma segura
+    //MODIFICAMOS AQUI
   static double _safeDouble(dynamic value, {double defaultValue = 0.0}) {
     if (value == null) return defaultValue;
     if (value is double) return value;
@@ -243,6 +233,7 @@ class Memory {
   }
 
   // Método para crear una copia con valores actualizados
+    //MODIFICAMOS AQUI
   Memory copyWith({
     String? id,
     String? title,
@@ -280,6 +271,7 @@ class Memory {
   }
 
   // Método opcional para debug
+    //MODIFICAMOS AQUI
   @override
   String toString() {
     return 'Memory{id: $id, title: $title, category: $category, sharedWith: $sharedWith, sharedRoles: $sharedRoles, pendingRoles: $pendingRoles}';
@@ -295,6 +287,7 @@ class Memory {
         other.date == date;
   }
 
+  //MODIFICAMOS AQUI
   @override
   int get hashCode => id.hashCode ^ title.hashCode ^ date.hashCode;
 }

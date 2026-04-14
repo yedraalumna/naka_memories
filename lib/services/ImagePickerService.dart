@@ -2,39 +2,45 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
+/// Este servicio se encarga de manejar la cámara, galería y explorador de archivos, asimismo la selección de fotos y videos.
+/// Funciona como un asistente que se comunica con la cámara y galería del dispositivo
 class ImagePickerService {
   final ImagePicker _picker = ImagePicker();
 
-  // Para elegir la imagen de la galería
+  /// Método que abre la galería del teléfono (o el explorador de archivos en web) para elegir una foto
+  /// Devuelve la "ruta" donde está guardada la imagen
   Future<String?> pickImageFromGallery() async {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 80,
-        maxWidth: 1200,
+        imageQuality:
+            80, // Bajamos la calidad un poco para que no tarde en subir
+        maxWidth:
+            1200, // Limitamos el tamaño para evitar que la app se quede sin memoria
         maxHeight: 1200,
       );
-      
-      if (kIsWeb && image != null) {
-        return image.path;
-      }
-      
+
+      // Retornamos el 'path.' Esto funciona tanto en móvil (ruta física)
+      // como en web (que devuelve un "blob URL")
       return image?.path;
     } catch (e) {
       if (kDebugMode) {
+        // Sirve para mostrar el error en 'modo debug' para no saturar los logs en producción
         print('Error en pickImageFromGallery: $e');
       }
       return null;
     }
   }
 
-  // Para subir una foto directamente sacada con la cámara
+  /// Método que abre la cámara del dispositivo para tomar una foto al momento
   Future<String?> pickImageFromCamera() async {
     try {
+      // En web la cámara es un poco especial, así que para evitar errores
+      // se lleva al usuario al explorador de archivos directamente
       if (kIsWeb) {
         return pickImageFromGallery();
       }
-      
+
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: 80,
@@ -50,91 +56,66 @@ class ImagePickerService {
     }
   }
 
-  // Método específico para web
-  Future<String?> pickImageForWeb() async {
-    try {
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
-        maxWidth: 1200,
-        maxHeight: 1200,
-      );
-      return image?.path;
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error en pickImageForWeb: $e');
-      }
-      return null;
-    }
-  }
-
-// Seleccionar video desde la galeria
+  /// Método que abre la galería de videos, o en web el explorador de archivos
   Future<String?> pickVideoFromGallery() async {
     try {
       final XFile? video = await _picker.pickVideo(
         source: ImageSource.gallery,
-        maxDuration: const Duration(seconds: 20), // Límite de 20 segundos
+        maxDuration: const Duration(
+            seconds: 20), // Cortamos en 20 segundos, formato reels
       );
       return video?.path;
     } catch (e) {
-      if (kDebugMode) print('Error en pickVideoFromGallery: $e');
+      if (kDebugMode) {
+        print('Error en pickVideoFromGallery: $e');
+      }
       return null;
     }
   }
 
-  // Grabar video con la cámara
+  /// Método que abre la cámara para grabar un vídeo
   Future<String?> pickVideoFromCamera() async {
     try {
       final XFile? video = await _picker.pickVideo(
         source: ImageSource.camera,
-        maxDuration: const Duration(seconds: 20), // Límite de 20 segundos
-        preferredCameraDevice: CameraDevice.rear,
+        maxDuration: const Duration(seconds: 20),
+        preferredCameraDevice:
+            CameraDevice.rear, // Abrimos la cámara trasera por defecto
       );
       return video?.path;
     } catch (e) {
-      if (kDebugMode) print('Error en pickVideoFromCamera: $e');
-      return null;
-    }
-  }
-
-  // Método para obtener bytes tanto de imágenes como de videos
-  Future<Uint8List?> getFileBytes(String path) async {
-    try {
-      // Si es Web, el path suele ser un Blob URL o similar,pero para subir necesitamos leer el XFile original. 
-      // Como no guardamos el XFile en el estado global, en Web la subida de video requiere un truco extra en el formulario,
-      // pero para móvil esto funciona perfecto:
-      if (!kIsWeb) {
-        final file = File(path);
-        if (await file.exists()) {
-          return await file.readAsBytes();
-        }
+      if (kDebugMode) {
+        print('Error en pickVideoFromCamera: $e');
       }
       return null;
-    } catch (e) {
-      print('Error obteniendo bytes: $e');
-      return null;
     }
   }
 
-  // Método necesario pq en web no existe File(path)
+  /// Método para subir videos desde la web
+  /// como en web no sigue el mismo método que en movil/app, ya que no hay un disco duro real al que acceder
+  /// este método pide el video y lo transforma en bytes para mandar al servidor o base de datos
   Future<Uint8List?> pickVideoBytesForWeb() async {
     try {
       final XFile? video = await _picker.pickVideo(
         source: ImageSource.gallery,
         maxDuration: const Duration(seconds: 20),
       );
-      
+
       if (video != null) {
         return await video.readAsBytes();
       }
       return null;
     } catch (e) {
-      print('Error en pickVideoBytesForWeb: $e');
+      if (kDebugMode) {
+        print('Error en pickVideoBytesForWeb: $e');
+      }
       return null;
     }
   }
 
-  Future<Uint8List?> pickImageBytesForWeb() async {
+  /// Método que abre la galería (explorador de archivos), deja elegir una foto y devuelve los bytes
+  /// Funciona en web, Android e ios.
+  Future<Uint8List?> pickImageAsBytes() async {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
@@ -142,30 +123,9 @@ class ImagePickerService {
         maxWidth: 1200,
         maxHeight: 1200,
       );
-      
+
       if (image != null) {
         return await image.readAsBytes();
-      }
-      return null;
-    } catch (e) {
-      if (kDebugMode) print('Error en pickImageBytesForWeb: $e');
-      return null;
-    }
-  }
-
-  // Método universal que devuelve bytes para cualquier plataforma
-  Future<Uint8List?> pickImageAsBytes() async {
-    try {
-      final XFile? image = await _picker.pickImage(
-        source: kIsWeb ? ImageSource.gallery : ImageSource.gallery,
-        imageQuality: 80,
-        maxWidth: 1200,
-        maxHeight: 1200,
-      );
-      
-      if (image != null) {
-        final bytes = await image.readAsBytes();
-        return bytes;
       }
       return null;
     } catch (e) {
@@ -176,14 +136,14 @@ class ImagePickerService {
     }
   }
 
-  // Método para convertir path a bytes (para mobile/desktop)
+  /// Método que lee un archivo guardado en el teléfono y lo convierte a "bytes" (datos crudos)
+  /// Esto es obligatorio antes de mandar cualquier archivo a un servidor o base de datos
   Future<Uint8List?> getBytesFromPath(String path) async {
     try {
-      if (kIsWeb) {
-        // En web, no podemos leer archivos del sistema
-        return null;
-      }
-      
+      // Como en la web no hay un disco duro real al que acceder,
+      // esto solo se ejecuta si estamos en una app (móvil o escritorio)
+      if (kIsWeb) return null;
+
       final file = File(path);
       if (await file.exists()) {
         return await file.readAsBytes();

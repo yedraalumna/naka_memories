@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/Memory.dart';
 import '../constants/colors.dart';
 import '../providers/theme_provider.dart';
-import '../services/ImagePickerService.dart';
+import '../services/imagePickerService.dart';
 import '../services/MemoryService.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -261,7 +261,7 @@ class _MemoryFormState extends State<MemoryForm> {
                             color: isDarkMode ? textDarkMode : Colors.black87)),
                     onTap: () async {
                       Navigator.pop(context);
-                      await _pickImageForWeb();
+                      await _pickImageFromGallery();
                     },
                   ),
                   ListTile(
@@ -370,19 +370,39 @@ class _MemoryFormState extends State<MemoryForm> {
     }
   }
 
+  /// Abre la galería, selecciona una imagen y la guarda lista para subir o mostrar.
+  /// Funciona de manera inteligente tanto en Web como en Móvil.
   Future<void> _pickImageFromGallery() async {
     setState(() => _isLoadingMedia = true);
+
     try {
-      final path = await _pickerService.pickImageFromGallery();
-      if (path != null) {
-        final bytes = await File(path).readAsBytes();
-        setState(() {
-          _selectedAsset = path;
-          _selectedBytes = bytes;
-          _isVideo = false; // Es foto
-        });
+      if (kIsWeb) {
+        // --- LÓGICA PARA WEB ---
+        final bytes = await _pickerService.pickImageAsBytes();
+        if (bytes != null && bytes.isNotEmpty) {
+          setState(() {
+            // En web creamos una URL de datos (Base64) para poder previsualizarla
+            _selectedAsset = 'data:image/jpeg;base64,${base64.encode(bytes)}';
+            _selectedBytes = bytes;
+            _isVideo = false;
+          });
+        }
+      } else {
+        // --- LÓGICA PARA MÓVIL/ESCRITORIO ---
+        final path = await _pickerService.pickImageFromGallery();
+        if (path != null) {
+          // En móvil sí podemos leer el archivo desde el disco
+          final bytes = await File(path).readAsBytes();
+          setState(() {
+            _selectedAsset = path; // Guardamos la ruta física
+            _selectedBytes = bytes;
+            _isVideo = false; // Es foto
+          });
+        }
       }
     } catch (e) {
+      if (!mounted)
+        return; // Buena práctica: asegurar que el widget sigue vivo antes de mostrar un snackbar
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al seleccionar imagen: $e'),
@@ -390,7 +410,9 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       );
     } finally {
-      setState(() => _isLoadingMedia = false);
+      if (mounted) {
+        setState(() => _isLoadingMedia = false);
+      }
     }
   }
 
@@ -435,29 +457,6 @@ class _MemoryFormState extends State<MemoryForm> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al seleccionar el video: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() => _isLoadingMedia = false);
-    }
-  }
-
-  Future<void> _pickImageForWeb() async {
-    setState(() => _isLoadingMedia = true);
-    try {
-      final bytes = await _pickerService.pickImageBytesForWeb();
-      if (bytes != null && bytes.isNotEmpty) {
-        setState(() {
-          _selectedAsset = 'data:image/jpeg;base64,${base64.encode(bytes)}';
-          _selectedBytes = bytes;
-          _isVideo = false;
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al subir imagen: $e'),
           backgroundColor: Colors.red,
         ),
       );
