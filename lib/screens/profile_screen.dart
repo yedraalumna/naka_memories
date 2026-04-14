@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_auth_provider.dart';
@@ -10,7 +9,10 @@ import 'visited_places_screen.dart';
 import '../constants/colors.dart';
 import '../services/image_picker_service.dart';
 import '../services/MemoryService.dart';
+import 'package:flutter/foundation.dart';
 
+/// Widget que crea una tarjeta de navegación (botón grande)
+/// para los menús de configuración, notificaciones y metas del perfil
 class TarjetaNavegacion extends StatelessWidget {
   final IconData icono;
   final Color colorIcono;
@@ -57,6 +59,8 @@ class TarjetaNavegacion extends StatelessWidget {
   }
 }
 
+/// Pantalla principal del perfil encargada de gestionar la info de la cuenta, foto de perfil,
+/// notificaciones (invitaciones) y ajustes como el modo oscuro o eliminar la cuenta
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -69,20 +73,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final MemoryService _memoryService = MemoryService();
   bool _isUploading = false;
 
-  // VARIABLES PARA NOTIFICACIONES
+  // Variables para gestionar el estado de las notificaciones
   List<Map<String, dynamic>> _invitaciones = [];
   bool _cargandoInvitaciones = true;
 
   @override
   void initState() {
     super.initState();
-    // Cargar invitaciones después de dibujar la pantalla por primera vez
+    // Cargar invitaciones de forma segura después de abrir la pantalla por primera vez
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _cargarInvitaciones();
     });
   }
 
-  // LÓGICA DE NOTIFICACIONES
+  /// Método que consulta a la base de datos si el usuario tiene invitaciones pendientes y actualiza la lista local
   Future<void> _cargarInvitaciones() async {
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
     if (authProvider.userEmail != null) {
@@ -97,13 +101,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Método que procesa la respuesta del usuario (Aceptar/Rechazar) a una invitación
+  /// Borra localmente rápido y luego confirma en la base de datos
   Future<void> _responderInvitacion(
       Map<String, dynamic> inv, bool aceptar) async {
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
     final email = authProvider.userEmail;
-    if (email == null) return;
 
-    // Actualizamos la UI inmediatamente para que sea rápido (quitamos la invitación de la lista)
+    if (email == null) {
+      return;
+    }
+
+    // se elimina la invitación de la lista
     setState(() {
       _invitaciones.remove(inv);
     });
@@ -114,24 +123,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await _memoryService.respondToInvitation(
           inv['category'], inv['owner_id'], email, aceptar);
+
+      if (!mounted) {
+        return; // si el usuario ha navegado fuera de la pantalla, no se actualiza ni se muestra mensajes
+      }
+
       _mostrarSnackbar(
           aceptar ? 'Ahora tienes acceso a la carpeta' : 'Invitación rechazada',
           isError: !aceptar && false);
-      // Forzar recarga de memorias si estamos en la galería
+
+      // fuerza recarga de memorias si está en la galería
       await _memoryService.getMemories();
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       _mostrarSnackbar('Error al procesar la invitación', isError: true);
-      _cargarInvitaciones(); // Recargamos por si hubo error
+      _cargarInvitaciones(); // recarga para evitar errores
     }
   }
 
-  // actualizamos foto de perfil
+  /// Método que abre la galería/cámara, procesa la imagen seleccionada, la sube a Storage
+  /// y actualiza la URL del avatar en el perfil del usuario
   Future<void> _cambiarFoto(AppAuthProvider auth) async {
     try {
-      // 1. Seleccionar imagen
+      // Seleccionar imagen
       final Uint8List? imageBytes = await _pickerService.pickImageAsBytes();
 
-      if (imageBytes == null) return;
+      if (imageBytes == null) {
+        return;
+      }
 
       if (auth.userId == null) {
         _mostrarSnackbar('Error: Usuario no autenticado', isError: true);
@@ -140,28 +161,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       setState(() => _isUploading = true);
 
-      // 2. Subir imagen a Supabase Storage
+      // Subir imagen a Supabase Storage
       final String? url = await _memoryService.uploadAvatar(
         imageBytes,
         auth.userId!,
       );
 
+      if (!mounted) {
+        return; // si el usuario ha navegado fuera de la pantalla, no se actualiza ni se muestra mensajes
+      }
+
       if (url != null) {
-        // 3. Actualizar metadatos en Supabase
+        // Actualizar URL del avatar en el perfil del usuario
         final success = await auth.updateProfilePhoto(url);
 
         if (success && mounted) {
-          // 4. forzamos la actualización de la UI para reflejar el cambio inmediatamente
+          // se fuerza la actualización de la UI para reflejar el cambio inmediatamente
           setState(() {});
-
           _mostrarSnackbar('Foto de perfil actualizada');
         }
       } else {
         _mostrarSnackbar('Error al subir la imagen', isError: true);
       }
     } catch (e) {
-      print('Error en _cambiarFoto: $e');
-      _mostrarSnackbar('Error: $e', isError: true);
+      debugPrint('Error en _cambiarFoto: $e');
+      if (mounted) {
+        _mostrarSnackbar('Error: $e', isError: true);
+      }
     } finally {
       if (mounted) {
         setState(() => _isUploading = false);
@@ -169,7 +195,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // eliminamos foto de perfil
+  /// Muestra un dialogo para confirmar o cancelar el eliminar la foto de perfil
+  /// Si se confirma, elimina la foto del Storage y actualiza el perfil para ver el cambio
   Future<void> _eliminarFoto(AppAuthProvider auth) async {
     try {
       final confirm = await showDialog<bool>(
@@ -195,18 +222,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final success = await auth.removeProfilePhoto();
 
         if (success && mounted) {
-          // forzamos la actualización de la UI para reflejar el cambio inmediatamente
+          // se fuerza la actualización de la UI para reflejar el cambio inmediatamente
           setState(() {});
-
           _mostrarSnackbar('Foto de perfil eliminada');
         }
       }
     } catch (e) {
-      print('Error eliminando foto: $e');
+      debugPrint('Error eliminando foto: $e');
     }
   }
 
-  // eliminamos cuenta
+  /// Muestra un diálogo de advertencia y, si se confirma, elimina la cuenta del usuario y redirige al Login
   Future<void> _eliminarCuenta(AppAuthProvider auth) async {
     try {
       final confirm = await showDialog<bool>(
@@ -233,7 +259,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final success = await auth.deleteAccount();
 
         if (success && mounted) {
-          // al eliminar la cuenta, automaticamente se abrirá la pantalla de login
+          // validación segura para evitar errores si el usuario navega fuera de la pantalla durante el proceso
+          if (!context.mounted) {
+            return;
+          }
+          // al eliminar la cuenta, automaticamente se redirige al login y se evita que el usuario pueda volver al perfil con la cuenta eliminada
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -252,11 +282,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     } catch (e) {
-      print('Error eliminando la cuenta: $e');
+      debugPrint('Error eliminando la cuenta: $e');
     }
   }
 
-  // mostrar snackbar
+  /// Método reutilizable para mostrar mensajes de éxito o error al usuario mediante Snackbars
   void _mostrarSnackbar(String mensaje, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -268,21 +298,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Método que cierra la sesión del usuario
   Future<void> _logout(BuildContext context) async {
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
     await authProvider.logout();
 
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
+    // validación segura para evitar errores si el usuario navega fuera de la pantalla durante el proceso
+    if (!context.mounted) {
+      return;
     }
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (route) => false,
+    );
   }
 
+  /// Parsea la fecha de la base de datos al formato DD/MM/YYYY
   String _formatDate(String dateString) {
-    if (dateString.isEmpty) return 'Desconocido';
+    if (dateString.isEmpty) {
+      return 'Desconocido';
+    }
+
     try {
       final date = DateTime.parse(dateString);
       return '${date.day}/${date.month}/${date.year}';
@@ -296,7 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final authProvider = Provider.of<AppAuthProvider>(context);
 
-    // Obtenemos los datos del usuario
+    // Se obtienen los datos del usuario
     String userEmail = authProvider.userEmail ?? 'Usuario';
     String avatarUrl = authProvider.avatarUrl ?? '';
     bool hasAvatar = authProvider.hasAvatar;
@@ -330,7 +368,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Stack(
                         children: [
-                          // circle avatar con key para forzar recarga
+                          // imagen de perfil o avatar si no tiene foto
                           CircleAvatar(
                             radius: 50,
                             backgroundColor: pinkLighter,
@@ -360,7 +398,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
 
-                          // botón de cámara
+                          // botón de la camara para cambiar foto de perfil
                           Positioned(
                             bottom: 0,
                             right: 0,
@@ -394,7 +432,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       const SizedBox(height: 20),
 
-                      // email del usuario
+                      // email del usuario en la tarjeta
                       Text(
                         userEmail,
                         style: TextStyle(
@@ -407,7 +445,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
-                      // fecha de registro del usuario
+                      // fecha de registro del usuario en la tarjeta
                       Text(
                         'Miembro desde: ${_formatDate(registeredAt)}',
                         style: TextStyle(
@@ -424,7 +462,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 20),
 
-              // tarjeta de notificaciones
+              // tarjeta de notificaciones (invitaciones)
               Card(
                 color: themeProvider.isDarkMode ? cardDark : Colors.white,
                 elevation: 3,
@@ -491,7 +529,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       else
                         ListView.builder(
                           shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
+                          physics:
+                              const NeverScrollableScrollPhysics(), // para evitar conflictos de scroll
                           itemCount: _invitaciones.length,
                           itemBuilder: (context, index) {
                             final inv = _invitaciones[index];
@@ -520,7 +559,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                       children: [
                                         TextSpan(
-                                          text: '${inv['owner_email']}',
+                                          text:
+                                              '${inv['owner_email']}', // se muestra el email del usuario que envió la invitación
                                           style: const TextStyle(
                                               fontWeight: FontWeight.bold),
                                         ),
@@ -719,7 +759,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 10),
 
-              // configuración
+              // configuración del perfil
               Card(
                 color: themeProvider.isDarkMode ? cardDark : Colors.white,
                 elevation: 3,
@@ -812,7 +852,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         },
                       ),
 
-                      // eliminar foto de perfil (solo si tiene avatar)
+                      // eliminar foto de perfil si ya tiene una foto
                       if (hasAvatar) ...[
                         const Divider(),
                         ListTile(
@@ -829,7 +869,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
 
-                      // línea divisoria antes de eliminar cuenta
+                      // separador entre la sección de eliminar cuenta y el resto de opciones para darle más énfasis
                       const Divider(),
 
                       // eliminar cuenta
