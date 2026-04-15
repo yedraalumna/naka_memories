@@ -7,7 +7,7 @@ import 'register_screen.dart';
 import '../constants/colors.dart';
 import 'change_password_screen.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends StatefulWidget { //Se usa lo de stateful porque el formulario tiene campos que cambian y un botón de carga
   const LoginScreen({super.key});
 
   @override
@@ -26,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = Provider.of<AppAuthProvider>(context);
 
     // Usamos el error del provider en lugar de manejar errores localmente
-      //MODIFICAMOS AQUI
     final error = authProvider.errorMessage ?? '';
     Color backgroundColor = themeProvider.isDarkMode ? backgroundDark : textLight;
 

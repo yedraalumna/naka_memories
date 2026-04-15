@@ -9,26 +9,47 @@ class ThemeProvider with ChangeNotifier {
     _loadThemeMode();
   }
 
-    //MODIFICAMOS AQUI
-  ThemeMode get themeMode => _themeMode;
-  bool get isDarkMode => _themeMode == ThemeMode.dark;
-  bool get isLoading => _isLoading;
+  ThemeMode get themeMode {
+    return _themeMode;
+  }
 
-  //MODIFICAMOS AQUI añadir de q va
+  bool get isDarkMode {
+    if (_themeMode == ThemeMode.dark) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  bool get isLoading {
+    return _isLoading;
+  }
+
+  //Cargamos el tema, es decir si modo claro o oscuro que el usuario había guardado
   Future<void> _loadThemeMode() async {
     try {
+      // Abrimos el almacenamiento local del dispositivo
       final prefs = await SharedPreferences.getInstance();
+
+      // Buscamos el tema guardado con la clave 'themeMode'
       final themeModeString = prefs.getString('themeMode');
 
+      // Si hay un tema guardado, lo usamos
       if (themeModeString != null) {
+        // Buscamos cuál de los temas coincide con el texto guardado
         _themeMode = ThemeMode.values.firstWhere(
-
-            //MODIFICAMOS AQUI
-          (element) => element.toString() == themeModeString, orElse: () => ThemeMode.system,
+          // Comparamos cada tema con el texto guardado
+          (element) {
+            return element.toString() == themeModeString;
+          },
+          // Si no encuentra ninguno, usamos 'system' que es el modo automático
+          orElse: () {
+            return ThemeMode.system;
+          },
         );
       }
     } catch (e) {
-      // Si hay error, usamos el modo por defecto
+      // Si algo sale mal, usamos el modo automático
       _themeMode = ThemeMode.system;
     } finally {
       _isLoading = false;
@@ -36,6 +57,7 @@ class ThemeProvider with ChangeNotifier {
     }
   }
 
+  // Guardamos el tema claro, oscuro o automático que el usuario elige
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
     notifyListeners();
@@ -51,7 +73,7 @@ class ThemeProvider with ChangeNotifier {
     }
   }
 
-    //MODIFICAMOS AQUI añadir de q va
+  // Cambia entre modo claro y modo oscuro
   Future<void> toggleTheme() async {
     if (_themeMode == ThemeMode.dark) {
       await setThemeMode(ThemeMode.light);

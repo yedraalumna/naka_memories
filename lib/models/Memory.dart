@@ -11,8 +11,7 @@ class Memory {
   final bool isFavorite;
   final List<String> sharedWith;
   final bool hasPassword;
-
-    //MODIFICAMOS AQUI
+  // los siguientes campos son opcionales y pueden ser nulos, por eso los marcamos con '?'
   final String? passwordHash;
   final String? creatorId;
   final Map<String, dynamic>? sharedRoles;
@@ -57,11 +56,25 @@ class Memory {
   ];
 
   // getters
+  double get latitude {
+    final valor = location['latitude'];
+    if (valor != null) {
+      return valor;
+    }
+    return 0.0;
+  }
 
-    //MODIFICAMOS AQUI
-  double get latitude => location['latitude'] ?? 0.0;
-  double get longitude => location['longitude'] ?? 0.0;
-  LatLng get toLatLng => LatLng(latitude, longitude);
+  double get longitude {
+    final valor = location['longitude'];
+    if (valor != null) {
+      return valor;
+    }
+    return 0.0;
+  }
+
+  LatLng get toLatLng {
+    return LatLng(latitude, longitude);
+  }
 
   // Getter para verificar si el asset es un video
   bool get isVideo {
@@ -120,45 +133,90 @@ class Memory {
   // Creamos una instancia de memory a partir de un map
   factory Memory.fromMap(Map<String, dynamic> map) {
     try {
-        //MODIFICAMOS AQUI revisamos xq algunos estan raros
-      final id = _safeString(map['id'],defaultValue: DateTime.now().millisecondsSinceEpoch.toString());
+      //datos básicos
+      final id = _safeString(map['id'],
+          defaultValue: DateTime.now().millisecondsSinceEpoch.toString());
       final title = _safeString(map['title'], defaultValue: 'Sin título');
       final description = _safeString(map['description']);
-      final date = _safeString(map['date'],defaultValue: DateTime.now().toIso8601String());
+      final date = _safeString(map['date'],
+          defaultValue: DateTime.now().toIso8601String());
       final latitude = _safeDouble(map['latitude']);
       final longitude = _safeDouble(map['longitude']);
-      final imageAsset = map['imageAsset']?.toString();
-      final category = _safeString(map['category'], defaultValue: 'Sin categoría');
-      final isFavorite = (map['isFavorite'] == true) || (map['is_favorite'] == true);
 
-      // sharedRaw -Extraemos la lista de compartidos de forma segura
-      final sharedRaw = map['shared_with'] ?? map['sharedWith'];
-      List<String> parsedSharedWith = [];
-      if (sharedRaw is List) {
-        parsedSharedWith = sharedRaw.map((e) => e.toString()).toList();
+      // imageAsset puede ser null
+      String? imageAsset;
+      if (map['imageAsset'] != null) {
+        imageAsset = map['imageAsset'].toString();
       }
 
-      // hasPassword y passwordHash, con un valor por defecto
-      final hasPassword =(map['has_password'] == true) || (map['hasPassword'] == true);
+      final category =
+          _safeString(map['category'], defaultValue: 'Sin categoría');
+      final isFavorite =
+          (map['isFavorite'] == true) || (map['is_favorite'] == true);
 
-      //MODIFICAMOS AQUI
-      final passwordHash = map['password_hash']?.toString() ?? map['passwordHash']?.toString();
-      // Lectura correcta de la propiedad creatorId, del userId y sharedRoles
-      final creatorId = _safeString(map['user_id'] ?? map['creatorId']);
-      // Lectura correcta de la propiedad creatorEmail
-      final creatorEmail = _safeString(map['creator_email'] ?? map['creatorEmail']);
+      // Buscamos la lista de usuarios compartidos
+      dynamic sharedRaw = map['shared_with'];
+      if (sharedRaw == null) {
+        sharedRaw = map['sharedWith'];
+      }
+
+      List<String> parsedSharedWith = [];
+      if (sharedRaw is List) {
+        for (var item in sharedRaw) {
+          parsedSharedWith.add(item.toString());
+        }
+      }
+
+      // la contraseña se determina por el hash, si el hash existe y no es vacío, entonces hay contraseña
+      final hasPassword =
+          (map['has_password'] == true) || (map['hasPassword'] == true);
+
+      // Buscamos el hash de la contraseña
+      String? passwordHash;
+      dynamic hash1 = map['password_hash'];
+      dynamic hash2 = map['passwordHash'];
+
+      if (hash1 != null) {
+        passwordHash = hash1.toString();
+      } else {
+        if (hash2 != null) {
+          passwordHash = hash2.toString();
+        }
+      }
+
+      // Buscamos el ID del creador
+      dynamic creador = map['user_id'];
+      if (creador == null) {
+        creador = map['creatorId'];
+      }
+      final creatorId = _safeString(creador);
+
+      // Buscamos el email del creador
+      dynamic emailCreador = map['creator_email'];
+      if (emailCreador == null) {
+        emailCreador = map['creatorEmail'];
+      }
+
+      final creatorEmail = _safeString(emailCreador);
+
+      // Buscamos los roles compartidos
+      dynamic rolesRaw = map['shared_roles'];
+      if (rolesRaw == null) {
+        rolesRaw = map['sharedRoles'];
+      }
+
       Map<String, dynamic>? parsedSharedRoles;
-      final rolesRaw = map['shared_roles'] ?? map['sharedRoles'];
-      
-
-        //MODIFICAMOS AQUI
       if (rolesRaw is Map) {
         parsedSharedRoles = Map<String, dynamic>.from(rolesRaw);
       }
 
-      //MODIFICAMOS AQUI
+      // Buscamos los roles pendientes
+      dynamic pendingRaw = map['pending_roles'];
+      if (pendingRaw == null) {
+        pendingRaw = map['pendingRoles'];
+      }
+
       Map<String, dynamic>? parsedPendingRoles;
-      final pendingRaw = map['pending_roles'] ?? map['pendingRoles'];
       if (pendingRaw is Map) {
         parsedPendingRoles = Map<String, dynamic>.from(pendingRaw);
       }
@@ -177,63 +235,89 @@ class Memory {
         isFavorite: isFavorite,
         sharedWith: parsedSharedWith,
         hasPassword: hasPassword,
-
-          //MODIFICAMOS AQUI
-        passwordHash: passwordHash?.isEmpty == true ? null : passwordHash,
-        creatorId: creatorId.isEmpty ? null : creatorId,
-        sharedRoles: parsedSharedRoles ?? {},
-        pendingRoles: parsedPendingRoles ?? {},
-        creatorEmail: creatorEmail.isEmpty ? null : creatorEmail,
+        passwordHash: passwordHash,
+        creatorId: creatorId,
+        sharedRoles: parsedSharedRoles,
+        pendingRoles: parsedPendingRoles,
+        creatorEmail: creatorEmail,
       );
     } catch (e) {
       print('Error en Memory.fromMap: $e');
       return Memory(
-
-          //MODIFICAMOS AQUI
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          title: 'Recuerdo con error',
-          description: 'Error al cargar este recuerdo',
-          date: DateTime.now().toIso8601String(),
-          location: {'latitude': 0.0, 'longitude': 0.0},
-          imageAsset: null,
-          category: 'General',
-          isFavorite: false,
-          sharedWith: [],
-          hasPassword: false,
-          passwordHash: null,
-          creatorId: null,
-          sharedRoles: {},
-          pendingRoles: {},
-          creatorEmail: null);
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: 'Recuerdo con error',
+        description: 'Error al cargar este recuerdo',
+        date: DateTime.now().toIso8601String(),
+        location: {'latitude': 0.0, 'longitude': 0.0},
+        imageAsset: null,
+        category: 'General',
+        isFavorite: false,
+        sharedWith: [],
+        hasPassword: false,
+        passwordHash: null,
+        creatorId: null,
+        sharedRoles: null,
+        pendingRoles: null,
+        creatorEmail: null,
+      );
     }
   }
 
   // Helper para convertir a String de forma segura
-    //MODIFICAMOS AQUI
   static String _safeString(dynamic value, {String defaultValue = ''}) {
-    if (value == null) return defaultValue;
-    if (value is String) return value;
+    // Si el valor es null, devolvemos el valor por defecto
+    if (value == null) {
+      return defaultValue;
+    }
+
+    // Si ya es un texto, lo devolvemos tal cual
+    if (value is String) {
+      return value;
+    }
+
+    // Si es otro tipo como número, booleano, etc, lo convertimos a texto
     return value.toString();
   }
 
   // Helper para convertir a double de forma segura
-    //MODIFICAMOS AQUI
   static double _safeDouble(dynamic value, {double defaultValue = 0.0}) {
-    if (value == null) return defaultValue;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
+    // miramos si esta vacio
+    if (value == null) {
+      return defaultValue; // Si sí, devuelve 0
+    }
+
+    // miramos si es un numero decimal
+    if (value is double) {
+      return value; // Lo devuelve tal cual
+    }
+
+    // miramos si es un numero entero
+    if (value is int) {
+      return value.toDouble(); // Lo convierte a decimal (40 → 40.0)
+    }
+
+    // miramos si es un texto que representa un número
     if (value is String) {
       try {
         return double.parse(value);
       } catch (e) {
-        return defaultValue;
+        return defaultValue; // Si no es número, devuelve 0
       }
     }
+
+    // Cualquier otro caso, devuelve 0
     return defaultValue;
   }
 
-  // Método para crear una copia con valores actualizados
-    //MODIFICAMOS AQUI
+  //Devuelve el nuevo valor si no es nulo, si no, devuelve el valor actual
+  T _valor<T>(T? nuevo, T actual) {
+    if (nuevo != null) {
+      return nuevo;
+    } else {
+      return actual;
+    }
+  }
+
   Memory copyWith({
     String? id,
     String? title,
@@ -252,42 +336,63 @@ class Memory {
     String? creatorEmail,
   }) {
     return Memory(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      date: date ?? this.date,
-      location: location ?? this.location,
-      imageAsset: imageAsset ?? this.imageAsset,
-      category: category ?? this.category,
-      isFavorite: isFavorite ?? this.isFavorite,
-      sharedWith: sharedWith ?? this.sharedWith,
-      hasPassword: hasPassword ?? this.hasPassword,
-      passwordHash: passwordHash ?? this.passwordHash,
-      creatorId: creatorId ?? this.creatorId,
-      sharedRoles: sharedRoles ?? this.sharedRoles,
-      pendingRoles: pendingRoles ?? this.pendingRoles,
-      creatorEmail: creatorEmail ?? this.creatorEmail,
+      id: _valor(id, this.id),
+      title: _valor(title, this.title),
+      description: _valor(description, this.description),
+      date: _valor(date, this.date),
+      location: _valor(location, this.location),
+      imageAsset: _valor(imageAsset, this.imageAsset),
+      category: _valor(category, this.category),
+      isFavorite: _valor(isFavorite, this.isFavorite),
+      sharedWith: _valor(sharedWith, this.sharedWith),
+      hasPassword: _valor(hasPassword, this.hasPassword),
+      passwordHash: _valor(passwordHash, this.passwordHash),
+      creatorId: _valor(creatorId, this.creatorId),
+      sharedRoles: _valor(sharedRoles, this.sharedRoles),
+      pendingRoles: _valor(pendingRoles, this.pendingRoles),
+      creatorEmail: _valor(creatorEmail, this.creatorEmail),
     );
-  }
-
-  // Método opcional para debug
-    //MODIFICAMOS AQUI
-  @override
-  String toString() {
-    return 'Memory{id: $id, title: $title, category: $category, sharedWith: $sharedWith, sharedRoles: $sharedRoles, pendingRoles: $pendingRoles}';
   }
 
   // Método para comparar dos memorias
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is Memory &&
-        other.id == id &&
-        other.title == title &&
-        other.date == date;
+    //miramos si es el mismo objeto
+    if (identical(this, other) == true) {
+      return true;
+    }
+
+    // miramos si es del mismo tipo
+    if (other is Memory) {
+      // camparamos el id
+      if (other.id != id) {
+        return false;
+      }
+      // camparamos el titulo
+      if (other.title != title) {
+        return false;
+      }
+      // camparamos la fecha
+      if (other.date != date) {
+        return false;
+      }
+      // Si pasó todas las comparaciones, son iguales
+      return true;
+    }
+
+    // Si no es un Memory, son diferentes
+    return false;
   }
 
-  //MODIFICAMOS AQUI
   @override
-  int get hashCode => id.hashCode ^ title.hashCode ^ date.hashCode;
+  int get hashCode {
+    // Obtenemos el código de cada parte
+    int codigoId = id.hashCode;
+    int codigoTitulo = title.hashCode;
+    int codigoFecha = date.hashCode;
+
+    // Los combinamos de forma sencilla
+    int resultado = codigoId + codigoTitulo + codigoFecha;
+    return resultado;
+  }
 }
