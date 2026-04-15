@@ -5,9 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import '../constants/colors.dart';
 
+/// Diálogo para pedir PIN de 6 dígitos y verificar acceso a carpeta protegida
 class PinDialog extends StatefulWidget {
-  final String correctHash;
-  final String? titulo;
+  final String correctHash;   // Hash del PIN correcto
+  final String? titulo;       // Título opcional
 
   const PinDialog({
     super.key,
@@ -15,9 +16,10 @@ class PinDialog extends StatefulWidget {
     this.titulo,
   });
 
-   //MODIFCAMOS AQUI
   @override
-  State<PinDialog> createState() => _PinDialogState();
+  State<PinDialog> createState() {
+    return _PinDialogState();
+  }
 }
 
 class _PinDialogState extends State<PinDialog> {
@@ -25,19 +27,16 @@ class _PinDialogState extends State<PinDialog> {
   String errorMessage = "";
   bool isVerifying = false;
 
-
-   //MODIFCAMOS AQUI PONER PARA QUE SIRVE
+  // Liberamos los recursos al cerrar
   @override
   void dispose() {
-    Future.microtask(() {
-      controller.dispose();
-    });
+    controller.dispose();
     super.dispose();
   }
 
-  //verificamos si el PIN es correcto
+  // Verificamos si el PIN es correcto
   void _verifyPin(String pin) async {
-    if (isVerifying) return;
+    if (isVerifying == true) return;
 
     setState(() {
       isVerifying = true;
@@ -45,16 +44,17 @@ class _PinDialogState extends State<PinDialog> {
 
     await Future.delayed(const Duration(milliseconds: 100));
 
+    // Convertimos el PIN a hash SHA-256
     final hashInput = sha256.convert(utf8.encode(pin)).toString();
 
     if (hashInput == widget.correctHash) {
-      // PIN correcto, devuelve true
-      if (mounted) {
+      // si el pin es correcto, cerramos devolviendo true
+      if (mounted == true) {
         Navigator.pop(context, true);
       }
     } else {
-      // PIN incorrecto devuelve false
-      if (mounted) {
+      // si el pin es incorrecto, mostramos error
+      if (mounted == true) {
         setState(() {
           errorMessage = "PIN incorrecto";
           isVerifying = false;
@@ -66,6 +66,14 @@ class _PinDialogState extends State<PinDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // Determinamos el título
+    String tituloDialogo;
+    if (widget.titulo != null) {
+      tituloDialogo = widget.titulo!;
+    } else {
+      tituloDialogo = "Carpeta protegida";
+    }
+
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(
@@ -74,9 +82,7 @@ class _PinDialogState extends State<PinDialog> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-
-               //MODIFCAMOS AQUI
-              widget.titulo ?? "Carpeta Protegida",
+              tituloDialogo,
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
@@ -86,7 +92,7 @@ class _PinDialogState extends State<PinDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text("Introduce el PIN de 6 dígitos para acceder", textAlign: TextAlign.center,),
+          const Text("Introduce el PIN de 6 dígitos para poder acceder", textAlign: TextAlign.center),
           const SizedBox(height: 20),
           PinCodeTextField(
             appContext: context,
@@ -112,30 +118,35 @@ class _PinDialogState extends State<PinDialog> {
             cursorColor: pinkPrimary,
             enableActiveFill: true,
             autoFocus: true,
-            enabled: !isVerifying,
+            enabled: isVerifying == false,
             onChanged: (value) {
               if (errorMessage.isNotEmpty) {
-
-                 //MODIFCAMOS AQUI
-                setState(() => errorMessage = "");
+                setState(() {
+                  errorMessage = "";
+                });
               }
             },
             onCompleted: (value) {
               _verifyPin(value);
             },
           ),
-          if (errorMessage.isNotEmpty) ...[ // con los ... conseguimos que se recojan todos los datos y asi no tengamos que volver a declararlo
+          if (errorMessage.isNotEmpty) 
             const SizedBox(height: 10),
-            Text(errorMessage, style: const TextStyle(color: Colors.red, fontSize: 12),),
-          ],
+          if (errorMessage.isNotEmpty)
+            Text(
+              errorMessage,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
         ],
       ),
       actions: [
         TextButton(
-
-          //MODIFCAMOS AQUI
-          onPressed: isVerifying ? null : () { Navigator.pop(context, false);},
-          child: const Text("Cancelar", style: TextStyle(color: Colors.grey, fontSize: 16),),
+          onPressed: () {
+            if (isVerifying == false) {
+              Navigator.pop(context, false);
+            }
+          },
+          child: const Text("Cancelar", style: TextStyle(color: Colors.grey, fontSize: 16)),
         ),
       ],
     );
