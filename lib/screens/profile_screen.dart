@@ -539,11 +539,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: themeProvider.isDarkMode
-                                    ? cardLight
+                                    ? cardDark
                                     : pinkLighter.withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                    color: pinkLight.withValues(alpha: 0.5)),
+                                    color: themeProvider.isDarkMode
+                                        ? Colors.grey[700]!
+                                        : pinkLight.withValues(alpha: 0.5)),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,10 +594,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   const SizedBox(height: 6),
                                   Text(
                                     'Rol otorgado: ${inv['role'].toString().toUpperCase()}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
-                                        color: pinkDark),
+                                        color: themeProvider.isDarkMode
+                                            ? pinkLight
+                                            : pinkDark),
                                   ),
                                   const SizedBox(height: 16),
                                   Row(
@@ -609,18 +613,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         label: const Text('Rechazar',
                                             style: TextStyle(
                                                 color: Colors.red,
-                                                fontSize: 16)),
+                                                fontSize: 15)),
                                         style: TextButton.styleFrom(
                                           backgroundColor:
                                               Colors.red.withValues(alpha: 0.1),
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 16, vertical: 12),
+                                              horizontal: 14, vertical: 12),
                                           shape: RoundedRectangleBorder(
                                               borderRadius:
                                                   BorderRadius.circular(10)),
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
+                                      const SizedBox(width: 8),
                                       ElevatedButton.icon(
                                         onPressed: () =>
                                             _responderInvitacion(inv, true),
@@ -629,12 +633,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         label: const Text('Aceptar',
                                             style: TextStyle(
                                                 color: Colors.white,
-                                                fontSize: 16)),
+                                                fontSize: 15)),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.green,
                                           elevation: 0,
                                           padding: const EdgeInsets.symmetric(
-                                              horizontal: 16, vertical: 12),
+                                              horizontal: 14, vertical: 12),
                                           shape: RoundedRectangleBorder(
                                               borderRadius:
                                                   BorderRadius.circular(10)),

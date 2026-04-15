@@ -287,91 +287,83 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget buildPassword(ThemeProvider themeProvider) {
+    Color textColor;
+    Color borderColor;
+    Color focusedBorderColor;
+    Color iconColor;
+    Color fillColor;
 
+    if (themeProvider.isDarkMode) {
+      textColor = Colors.white;
+      borderColor = Colors.grey[700]!;
+      focusedBorderColor = Colors.white;
+      iconColor = Colors.white;
+      fillColor = cardDark;
+    } else {
+      textColor = pinkPrimary;
+      borderColor = pinkLight;
+      focusedBorderColor = pinkPrimary;
+      iconColor = pinkPrimary;
+      fillColor = Colors.transparent;
+    }
 
-
-
-
-Widget buildPassword(ThemeProvider themeProvider) {
-  Color textColor;
-  Color borderColor;
-  Color focusedBorderColor;
-  Color iconColor;
-  Color fillColor;
-  
-  if (themeProvider.isDarkMode) {
-    textColor = Colors.white;
-    borderColor = Colors.grey[700]!;
-    focusedBorderColor = Colors.white;
-    iconColor = Colors.white;
-    fillColor = cardDark;
-  } else {
-    textColor = pinkPrimary;
-    borderColor = pinkLight;
-    focusedBorderColor = pinkPrimary;
-    iconColor = pinkPrimary;
-    fillColor = Colors.transparent;
-  }
-
-  return TextFormField(
-    style: TextStyle(color: textColor),
-    decoration: InputDecoration(
-      labelText: "Contraseña",
-      labelStyle: TextStyle(color: textColor),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: borderColor),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: focusedBorderColor),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: borderColor),
-      ),
-      prefixIcon: Icon(Icons.lock, color: iconColor),
-
-      // Boton del ojito para mostrar contraseña
-      suffixIcon: IconButton(
-        icon: Icon(
-
-          () {
-            if (_ocultarPassword) {
-              return Icons.visibility_off;
-            } else {
-              return Icons.visibility;
-            }
-          }(),
-          color: iconColor,
+    return TextFormField(
+      style: TextStyle(color: textColor),
+      decoration: InputDecoration(
+        labelText: "Contraseña",
+        labelStyle: TextStyle(color: textColor),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: borderColor),
         ),
-        onPressed: () {
-          setState(() {
-            _ocultarPassword = !_ocultarPassword;
-          });
-        },
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: focusedBorderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        prefixIcon: Icon(Icons.lock, color: iconColor),
+
+        // Boton del ojito para mostrar contraseña
+        suffixIcon: IconButton(
+          icon: Icon(
+            () {
+              if (_ocultarPassword) {
+                return Icons.visibility_off;
+              } else {
+                return Icons.visibility;
+              }
+            }(),
+            color: iconColor,
+          ),
+          onPressed: () {
+            setState(() {
+              _ocultarPassword = !_ocultarPassword;
+            });
+          },
+        ),
+
+        filled: themeProvider.isDarkMode,
+        fillColor: fillColor,
       ),
-
-      filled: themeProvider.isDarkMode,
-      fillColor: fillColor,
-    ),
-    obscureText: _ocultarPassword,
-    validator: (value) {
-      if (value!.isEmpty) {
-        return "Este campo es obligatorio";
-      }
-      if (value.length < 6) {
-        return "Mínimo debes introducir 6 caracteres";
-      }
-      return null;
-    },
-
-    onSaved: (String? value) {
-      password = value!;
-    },
-  );
-}
-
+      obscureText: _ocultarPassword,
+      validator: (value) {
+        if (value!.isEmpty) {
+          return "Este campo es obligatorio";
+        }
+        if (value.length < 6) {
+          return "Mínimo debes introducir 6 caracteres";
+        }
+        return null;
+      },
+      onSaved: (String? value) {
+        password = value!;
+      },
+    );
+  }
 
   Widget botonLogin() {
     return FractionallySizedBox(
@@ -397,7 +389,8 @@ Widget buildPassword(ThemeProvider themeProvider) {
                   _isLoading = true;
                 });
 
-                final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+                final authProvider =
+                    Provider.of<AppAuthProvider>(context, listen: false);
                 authProvider.clearError();
 
                 final success = await authProvider.login(email, password);
@@ -411,7 +404,6 @@ Widget buildPassword(ThemeProvider themeProvider) {
                 if (success) {
                   Navigator.pushAndRemoveUntil(
                     context,
-    
                     MaterialPageRoute(builder: (context) => const HomeScreen()),
                     (Route<dynamic> route) => false,
                   );
@@ -420,7 +412,6 @@ Widget buildPassword(ThemeProvider themeProvider) {
             };
           }
         }(),
-        
         child: () {
           if (_isLoading) {
             return const SizedBox(
@@ -441,3 +432,4 @@ Widget buildPassword(ThemeProvider themeProvider) {
       ),
     );
   }
+}

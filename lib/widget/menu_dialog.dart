@@ -325,7 +325,7 @@ class _MenuDialogState extends State<MenuDialog> {
 
           Divider(color: colorDivisor),
 
-          // pata generar el PDF
+          // para generar el PDF
           _buildMenuItem(
             icon: Icons.picture_as_pdf,
             title: 'Generar PDF de recuerdos',
@@ -352,7 +352,7 @@ class _MenuDialogState extends State<MenuDialog> {
     );
   }
 
-  /// Construimos un elemento del menú, icono + texto + flecha
+  // Construimos un elemento del menú, icono + texto + flecha
   Widget _buildMenuItem({
     required IconData icon,
     required String title,
@@ -360,7 +360,7 @@ class _MenuDialogState extends State<MenuDialog> {
     required Color color,
     required bool isDarkMode,
   }) {
-    // Color de fondo del icono, según modo oscuro 
+    // Color de fondo del icono según el modo
     Color colorFondoIcono;
     if (isDarkMode == true) {
       colorFondoIcono = color.withOpacity(0.2);
@@ -368,7 +368,7 @@ class _MenuDialogState extends State<MenuDialog> {
       colorFondoIcono = color.withOpacity(0.1);
     }
     
-    // Color del texto según modo oscuro)
+    // Color del texto según el modo
     Color colorTexto;
     if (isDarkMode == true) {
       colorTexto = Colors.white;
@@ -376,7 +376,7 @@ class _MenuDialogState extends State<MenuDialog> {
       colorTexto = Colors.black87;
     }
     
-    // Color de fondo del ListTile (según modo oscuro)
+    // Color de fondo del ListTile, según modo oscuro
     Color? colorTile;
     if (isDarkMode == true) {
       colorTile = cardDark.withOpacity(0.3);

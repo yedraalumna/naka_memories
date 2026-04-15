@@ -11,7 +11,7 @@ import 'package:http/http.dart' as http;
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import '../widget/memory_form.dart';
-import '../widget/MemoryDetailScreen.dart';
+import '../widget/memory_detail_screen.dart';
 import '../widget/menu_dialog.dart';
 import '../services/MemoryService.dart';
 import '../models/Memory.dart';
@@ -19,7 +19,7 @@ import '../constants/colors.dart';
 import '../constants/map_style.dart';
 import '../screens/coordinate_input_screen.dart';
 import '../providers/theme_provider.dart';
-import 'package:video_thumbnail/video_thumbnail.dart'; // pa la miniatura del video
+import 'package:video_thumbnail/video_thumbnail.dart';
 import '../providers/favorite_provider.dart';
 import '../services/pdfService.dart';
 import '../providers/app_auth_provider.dart';
@@ -27,6 +27,9 @@ import '../widget/pin_dialog.dart';
 import '../widget/CategoryManager.dart';
 import '../providers/category_provider.dart';
 
+/// Pantalla principal que renderiza el mapa (Google Maps en móvil, FlutterMap en Web)
+/// gestiona la visualización de los recuerdos, filtrado por categorías,
+/// y navegación hacia la creación/edición de memorias
 class MapScreen extends StatefulWidget {
   final bool isLibrary;
   final Set<Marker>? initialMarkers;
@@ -54,21 +57,17 @@ class _MapScreenState extends State<MapScreen> {
   List<Memory> _memories = [];
   final MemoryService _memoryService = MemoryService();
   bool _isLoading = false;
-  String _selectedCategory = 'Todas'; // Filtros
-  List<String> _dynamicCategories = []; // Lista de categorias
-  final Set<String> _unlockedCategories =
-      {}; // Almacena categorías desbloqueadas
-  bool _showPrivateInAll = false; // Para controlar "Ver todos" con privados
-
-  // Detectar si es web
+  String _selectedCategory = 'Todas';
+  final Set<String> _unlockedCategories = {};
+  bool _showPrivateInAll = false;
   bool get _isWeb => kIsWeb;
 
   @override
   void initState() {
     super.initState();
-    // 1. Cargar recuerdos
+    // Cargar recuerdos
     _loadMemories().then((_) {
-      // 2. Una vez cargados, sincronizar el provider
+      // Cuando se cargan, sincronizar el provider
       if (mounted) {
         Provider.of<FavoriteProvider>(context, listen: false)
             .loadFavorites(_memories);
@@ -76,6 +75,7 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  /// Abre el gestor de categorías y recarga el mapa al volver para que se vean los cambios
   void _openCategoryManager() {
     Navigator.push(
       context,
@@ -83,11 +83,11 @@ class _MapScreenState extends State<MapScreen> {
         builder: (context) => const CategoryManager(),
       ),
     ).then((_) {
-      // Cuando vuelva del gestor, recargar los recuerdos y categorías
       _loadMemories();
     });
   }
 
+  /// Muestra un modal con las opciones disponibles para la categoría seleccionada (renombrar/eliminar)
   void _showCategoryOptions(String categoryName) {
     showModalBottomSheet(
       context: context,
@@ -115,7 +115,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Opción Renombrar
+              // Opción renombrar
               ListTile(
                 leading: const Icon(Icons.drive_file_rename_outline,
                     color: Colors.blue),
@@ -126,7 +126,7 @@ class _MapScreenState extends State<MapScreen> {
                 },
               ),
 
-              // Opción Eliminar (excepto para "General")
+              // Opción eliminar (excepto para "General" que es la carpeta por defecto)
               if (categoryName != 'General')
                 ListTile(
                   leading: const Icon(Icons.delete_sweep, color: Colors.red),
@@ -146,11 +146,15 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  /// Método que muestra el cuadro de diálogo para introducir un nuevo nombre para una categoría existente
   Future<void> _showRenameCategoryDialog(String oldName) async {
     final TextEditingController controller =
         TextEditingController(text: oldName);
-    final isDarkMode =
-        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+
+    // Capturar temas para usarlos dentro del diálogo
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final catProvider = Provider.of<CategoryProvider>(context, listen: false);
+    final isDarkMode = themeProvider.isDarkMode;
 
     final result = await showDialog<String>(
       context: context,
@@ -198,26 +202,30 @@ class _MapScreenState extends State<MapScreen> {
     if (result != null) {
       setState(() => _isLoading = true);
       try {
-        // LLAMA AL PROVIDER, NO AL SERVICE DIRECTAMENTE
-        final catProvider =
-            Provider.of<CategoryProvider>(context, listen: false);
         await catProvider.renameCategory(oldName, result);
 
+        if (!mounted) return;
+
         setState(() {
-          _selectedCategory =
-              result; // Actualizamos la selección al nuevo nombre
+          _selectedCategory = result;
         });
 
-        await _loadMemories(); // Esto ahora cargará las categorías correctas
+        await _loadMemories();
+
+        if (!mounted) return;
         _showSnackbar('Carpeta actualizada con éxito');
       } catch (e) {
+        if (!mounted) return;
         _showSnackbar('Error: $e', isError: true);
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }
 
+  /// Método que confirma con el usuario si desea eliminar una categoría y, de ser así, la elimina moviendo sus recuerdos a "General"
   Future<void> _confirmDeleteCategory(String categoryName) async {
     if (categoryName == 'General') {
       _showSnackbar('No se puede eliminar la carpeta "General"', isError: true);
@@ -256,26 +264,31 @@ class _MapScreenState extends State<MapScreen> {
       setState(() => _isLoading = true);
       try {
         await _memoryService.deleteCategory(categoryName);
+
+        if (!mounted) return;
+
         setState(() {
           _selectedCategory = 'Todas';
         });
         await _loadMemories();
+
+        if (!mounted) return;
         _showSnackbar('Carpeta "$categoryName" eliminada');
       } catch (e) {
+        if (!mounted) return;
         _showSnackbar('Error al eliminar: $e', isError: true);
         setState(() => _isLoading = false);
       }
     }
   }
 
-  // crea marcador cuadrado con bordes redondeados
+  /// Método que transforma la imagen (o la miniatura del video) en un icono de mapa cuadrado personalizado
   Future<BitmapDescriptor> _getMarkerIconSquare(String? path) async {
     const int targetWidth = 80;
     const double borderRadius = 12.0;
     const double borderWidth = 3.0;
 
-    Uint8List?
-        bytes; // el "?" es pa que permita nulos pq crea confrontacion con la miniatura del video
+    Uint8List? bytes;
     bool isVideo = path != null && path.toLowerCase().contains('.mp4');
 
     if (path == null || path.isEmpty) {
@@ -283,7 +296,6 @@ class _MapScreenState extends State<MapScreen> {
     }
     try {
       if (isVideo) {
-        // En WEB saltamos directo al fallback (cuadrado negro) porque video_thumbnail suele fallar
         if (!_isWeb) {
           try {
             bytes = await VideoThumbnail.thumbnailData(
@@ -293,11 +305,10 @@ class _MapScreenState extends State<MapScreen> {
               quality: 50,
             );
           } catch (e) {
-            debugPrint("Fallo miniatura (usando icono por defecto): $e");
+            debugPrint("Fallo en la miniatura (usando icono por defecto): $e");
           }
         }
       } else {
-        // carga de imagenes normal
         if (path.startsWith('assets/')) {
           ByteData data = await rootBundle.load(path);
           bytes = data.buffer.asUint8List();
@@ -310,13 +321,12 @@ class _MapScreenState extends State<MapScreen> {
         }
       }
 
-      // Si bytes sigue siendo null (falló miniatura o carga),
-      // devolvemos el marcador genérico
+      // Si no se pudieron cargar los bytes, usar el icono por defecto
       if (bytes == null) {
         return await _createDefaultMarkerIconSquare(isVideo: isVideo);
       }
 
-      // 2. Redimensionamos la imagen
+      // Si se pudieron cargar los bytes, crear el icono personalizado
       ui.Codec codec =
           await ui.instantiateImageCodec(bytes, targetWidth: targetWidth);
       ui.FrameInfo fi = await codec.getNextFrame();
@@ -330,7 +340,6 @@ class _MapScreenState extends State<MapScreen> {
       const innerRect = ui.Rect.fromLTWH(borderWidth, borderWidth,
           targetWidth - (borderWidth * 2), targetWidth - (borderWidth * 2));
 
-      // Dibujamos fondo con borde rosado
       paint.color = pinkPrimary;
       canvas.drawRRect(
         ui.RRect.fromRectAndRadius(
@@ -338,7 +347,6 @@ class _MapScreenState extends State<MapScreen> {
         paint,
       );
 
-      // Dibujamos fondo interior blanco
       paint.color = Colors.white;
       canvas.drawRRect(
         ui.RRect.fromRectAndRadius(
@@ -346,14 +354,12 @@ class _MapScreenState extends State<MapScreen> {
         paint,
       );
 
-      // Recortamos con bordes redondeados
       final clipPath = ui.Path()
         ..addRRect(ui.RRect.fromRectAndRadius(
             innerRect, const ui.Radius.circular(borderRadius - borderWidth)));
 
       canvas.clipPath(clipPath);
 
-      // Dibujamos la imagen
       canvas.drawImageRect(
         fi.image,
         ui.Rect.fromLTWH(
@@ -362,7 +368,6 @@ class _MapScreenState extends State<MapScreen> {
         ui.Paint()..filterQuality = ui.FilterQuality.high,
       );
 
-      // Icono Play si es video
       if (isVideo) {
         paint.color = Colors.black45;
         canvas.drawRect(innerRect, paint);
@@ -374,7 +379,7 @@ class _MapScreenState extends State<MapScreen> {
             style: TextStyle(
               fontSize: targetWidth * 0.4,
               fontFamily: iconPlay.fontFamily,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
           textDirection: TextDirection.ltr,
@@ -391,13 +396,13 @@ class _MapScreenState extends State<MapScreen> {
       final ByteData? byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
 
-      return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+      return BitmapDescriptor.bytes(byteData!.buffer.asUint8List());
     } catch (e) {
-      // Fallback final
       return await _createDefaultMarkerIconSquare(isVideo: isVideo);
     }
   }
 
+  /// Método que crea un marcador cuadrado por defecto si no hay imagen o falla la carga
   Future<BitmapDescriptor> _createDefaultMarkerIconSquare(
       {bool isVideo = false}) async {
     const double size = 80.0;
@@ -412,22 +417,19 @@ class _MapScreenState extends State<MapScreen> {
     const innerRect = ui.Rect.fromLTWH(borderWidth, borderWidth,
         size - (borderWidth * 2), size - (borderWidth * 2));
 
-    // Fondo con borde rosado
     paint.color = pinkPrimary;
     canvas.drawRRect(
       ui.RRect.fromRectAndRadius(rect, const ui.Radius.circular(borderRadius)),
       paint,
     );
 
-    // Fondo interior blanco (o negro si es video, para que destaque)
-    paint.color = isVideo ? Colors.black87 : Colors.white; // CAMBIO
+    paint.color = isVideo ? Colors.black87 : Colors.white;
     canvas.drawRRect(
       ui.RRect.fromRectAndRadius(
           innerRect, const ui.Radius.circular(borderRadius - borderWidth)),
       paint,
     );
 
-    // Si es video ponemos Play, si no, Foto
     final iconData = isVideo ? Icons.play_arrow : Icons.photo;
 
     final textStyle = ui.TextStyle(
@@ -460,10 +462,10 @@ class _MapScreenState extends State<MapScreen> {
       return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
     }
 
-    return BitmapDescriptor.fromBytes(byteData.buffer.asUint8List());
+    return BitmapDescriptor.bytes(byteData.buffer.asUint8List());
   }
 
-  // Cargamos los recuerdos con marcadores personalizados
+  /// Método que carga los recuerdos desde la base de datos, aplicando los filtros de categoría, acceso, y genera los marcadores para el mapa
   Future<void> _loadMemories() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
@@ -475,15 +477,13 @@ class _MapScreenState extends State<MapScreen> {
 
       final allMemories = await _memoryService.getMemories();
 
-      // 🔥 VERIFICAR CADA CATEGORÍA
-      print('\n📋 VERIFICANDO CATEGORÍAS EXISTENTES:');
       final uniqueCategories = allMemories.map((m) => m.category).toSet();
       for (var cat in uniqueCategories) {
         final isProtected = categoryProvider.isCategoryProtected(cat);
-        print('   📁 $cat: ${isProtected ? "🔒 PROTEGIDA" : "📂 PÚBLICA"}');
+        debugPrint('$cat: ${isProtected ? "PROTEGIDA" : "PÚBLICA"}');
         if (isProtected) {
           final hash = categoryProvider.getPasswordHash(cat);
-          print(
+          debugPrint(
               '      Hash: ${hash != null ? hash.substring(0, 20) : "null"}...');
         }
       }
@@ -508,13 +508,6 @@ class _MapScreenState extends State<MapScreen> {
             allMemories.where((m) => m.category == _selectedCategory).toList();
       }
 
-      print(
-          '\n RESULTADO FILTRADO: ${finalMemories.length} recuerdos visibles');
-      print('   Categoría seleccionada: $_selectedCategory');
-      print('   Mostrar privadas: $_showPrivateInAll');
-      print('   Desbloqueadas: $_unlockedCategories');
-
-      // Resto del código igual...
       Set<Marker> newMarkers = {};
       for (var memory in finalMemories) {
         try {
@@ -538,18 +531,22 @@ class _MapScreenState extends State<MapScreen> {
         }
       }
 
-      setState(() {
-        _memories = allMemories;
-        _markers = newMarkers;
-        _dynamicCategories = categoryProvider.categories;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _memories = allMemories;
+          _markers = newMarkers;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showErrorDialog('Error al cargar recuerdos: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showErrorDialog('Error al cargar recuerdos: $e');
+      }
     }
   }
 
+  /// Método que construye la barra superior horizontal deslizable con las categorías disponibles
   Widget _buildFiltersOverlay() {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final categoryProvider = Provider.of<CategoryProvider>(context);
@@ -559,7 +556,6 @@ class _MapScreenState extends State<MapScreen> {
     final categoriasConTodas = ['Todas', ...listadoCategorias];
 
     Color backgroundColor = isDarkMode ? cardDark : Colors.white;
-    Color textColor = isDarkMode ? textDarkMode : Colors.black87;
 
     return Positioned(
       top: 60,
@@ -576,8 +572,7 @@ class _MapScreenState extends State<MapScreen> {
             final isSelected = _selectedCategory == cat;
 
             return GestureDetector(
-              onTap: () =>
-                  _onCategoryTap(cat), // 👈 CAMBIAR: llamar a nuevo método
+              onTap: () => _onCategoryTap(cat),
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 5),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -590,7 +585,7 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     )
@@ -614,50 +609,8 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // Función que crea un chip de filtro (ahora más grande)
-  Widget _buildFilterChip(String label) {
-    final bool isSelected = _selectedCategory == label;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6.0),
-      child: FilterChip(
-        label: Text(label),
-        // AUMENTAMOS EL PADDING PARA FACILITAR EL TOQUE (Dedos gruesos)
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        selected: isSelected,
-        onSelected: (bool selected) {
-          setState(() {
-            // Si desmarcan el actual, volvemos a 'Todas', si no, ponemos la categoría
-            if (!selected && label != 'Todas') {
-              _selectedCategory = 'Todas';
-            } else {
-              _selectedCategory = label;
-            }
-          });
-          // Recargamos los marcadores con el nuevo filtro
-          _loadMemories();
-        },
-        backgroundColor: Colors.white,
-        selectedColor: pinkPrimary,
-        checkmarkColor: Colors.white,
-        labelStyle: TextStyle(
-          fontSize: 16, // Letra un poco más grande
-          color: isSelected ? Colors.white : pinkPrimary,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(25), // Bordes más suaves
-          side: const BorderSide(color: pinkPrimary, width: 1.5),
-        ),
-        elevation: 2,
-        pressElevation: 4,
-      ),
-    );
-  }
-
+  /// Método de gestión de acceso al tocar una categoría (validación de PIN si tiene)
   void _onCategoryTap(String categoryName) async {
-    print('🖱️ TAP en categoría: "$categoryName"');
-
     if (categoryName == 'Todas') {
       final bool? incluirPrivadas = await showDialog<bool>(
         context: context,
@@ -680,36 +633,33 @@ class _MapScreenState extends State<MapScreen> {
       );
 
       if (incluirPrivadas == null) return;
+      if (!mounted) return;
 
       if (incluirPrivadas) {
         await _requestPinsForAllProtectedCategories();
       }
 
-      print(
-          '📌 Usuario eligió: ${incluirPrivadas ? "Incluir privadas" : "Solo públicas"}');
-
-      setState(() {
-        _selectedCategory = 'Todas';
-        _showPrivateInAll = incluirPrivadas;
-        if (!incluirPrivadas) {
-          _unlockedCategories.clear();
-        }
-      });
-      _loadMemories();
+      if (mounted) {
+        setState(() {
+          _selectedCategory = 'Todas';
+          _showPrivateInAll = incluirPrivadas;
+          if (!incluirPrivadas) {
+            _unlockedCategories.clear();
+          }
+        });
+        _loadMemories();
+      }
       return;
     }
 
     final categoryProvider =
         Provider.of<CategoryProvider>(context, listen: false);
 
-    // 🔥 VERIFICAR ANTES DE CONTINUAR
-    print('🔍 Verificando si "$categoryName" está protegida...');
     final bool hasPassword = categoryProvider.isCategoryProtected(categoryName);
-    print('   Resultado: ${hasPassword ? "🔒 PROTEGIDA" : "📂 PÚBLICA"}');
 
     if (hasPassword) {
       if (_unlockedCategories.contains(categoryName)) {
-        print('   ✅ Ya desbloqueada en esta sesión');
+        debugPrint('   Ya desbloqueada en esta sesión');
         setState(() {
           _selectedCategory = categoryName;
         });
@@ -719,11 +669,9 @@ class _MapScreenState extends State<MapScreen> {
 
       final String? passwordHash =
           categoryProvider.getPasswordHash(categoryName);
-      print(
-          '   Hash encontrado: ${passwordHash != null ? "SÍ (${passwordHash.substring(0, 20)}...)" : "NO"}');
 
       if (passwordHash != null) {
-        print('   🔓 Mostrando diálogo PIN...');
+        debugPrint('   Mostrando diálogo PIN...');
         final bool? isAuthorized = await showDialog<bool>(
           context: context,
           barrierDismissible: false,
@@ -733,8 +681,7 @@ class _MapScreenState extends State<MapScreen> {
           ),
         );
 
-        print(
-            '   Autorización: ${isAuthorized == true ? "APROBADA" : "DENEGADA"}');
+        if (!mounted) return;
 
         if (isAuthorized == true) {
           setState(() {
@@ -748,7 +695,6 @@ class _MapScreenState extends State<MapScreen> {
         }
       }
     } else {
-      print('   📂 Carpeta sin protección, mostrando directamente');
       setState(() {
         _selectedCategory = categoryName;
       });
@@ -756,6 +702,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  /// Método que despliega cuadros de diálogo consecutivos para desbloquear todas las categorías privadas
   Future<void> _requestPinsForAllProtectedCategories() async {
     final categoryProvider =
         Provider.of<CategoryProvider>(context, listen: false);
@@ -801,32 +748,15 @@ class _MapScreenState extends State<MapScreen> {
   void _openMemoryFormDirectly() {
     if (Navigator.canPop(context)) Navigator.pop(context);
 
-    _showMemoryForm(_currentCameraPosition); // Usa la posición actual del mapa
+    _showMemoryForm(_currentCameraPosition);
   }
 
-  void _goToFirstMemory() {
-    if (_memories.isNotEmpty) {
-      final firstMemory = _memories.first;
-      if (_isWeb) {
-        _showSnackbar('Centrado en: ${firstMemory.title}');
-        Navigator.pop(context);
-      } else {
-        mapController.animateCamera(
-          CameraUpdate.newLatLngZoom(firstMemory.toLatLng, 15),
-        );
-        Navigator.pop(context);
-        _showSnackbar('Centrado en: ${firstMemory.title}');
-      }
-    } else {
-      _showSnackbar('No hay recuerdos guardados', isError: true);
-    }
-  }
-
+  /// Método que enfoca la cámara del mapa para que se vean todos los recuerdos visibles
   void _goToAllMemories() async {
     final categoryProvider =
         Provider.of<CategoryProvider>(context, listen: false);
 
-    // Filtrar solo memorias visibles (públicas + privadas desbloqueadas)
+    // filtrar solo memorias visibles (públicas y privadas desbloqueadas)
     final visibleMemories = _memories.where((memory) {
       final bool hasPassword =
           categoryProvider.isCategoryProtected(memory.category);
@@ -864,7 +794,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-// Nuevo método auxiliar
+  // Función que calcula los límites (bounds) de una lista específica de recuerdos para centrar el mapa en ellos
   LatLngBounds _calculateBoundsForList(List<Memory> list) {
     double minLat = list[0].toLatLng.latitude;
     double maxLat = list[0].toLatLng.latitude;
@@ -889,7 +819,7 @@ class _MapScreenState extends State<MapScreen> {
     if (list.isEmpty) return;
 
     if (!_isWeb) {
-      // 1. Calculamos los límites (bounds) de esta lista específica
+      // calcular los límites (bounds) de esta lista específica
       double minLat = list.first.latitude;
       double maxLat = list.first.latitude;
       double minLng = list.first.longitude;
@@ -902,7 +832,7 @@ class _MapScreenState extends State<MapScreen> {
         maxLng = math.max(maxLng, m.longitude);
       }
 
-      // 2. Movemos la cámara del mapa
+      // mover la cámara del mapa
       mapController.animateCamera(
         CameraUpdate.newLatLngBounds(
           LatLngBounds(
@@ -916,25 +846,7 @@ class _MapScreenState extends State<MapScreen> {
     _showSnackbar('Centrando en ${list.length} recuerdos');
   }
 
-  LatLngBounds _calculateBounds() {
-    double minLat = _memories[0].toLatLng.latitude;
-    double maxLat = _memories[0].toLatLng.latitude;
-    double minLng = _memories[0].toLatLng.longitude;
-    double maxLng = _memories[0].toLatLng.longitude;
-
-    for (var memory in _memories) {
-      minLat = math.min(minLat, memory.toLatLng.latitude);
-      maxLat = math.max(maxLat, memory.toLatLng.latitude);
-      minLng = math.min(minLng, memory.toLatLng.longitude);
-      maxLng = math.max(maxLng, memory.toLatLng.longitude);
-    }
-
-    return LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
-    );
-  }
-
+  /// Método que navega a la pantalla de selección manual de coordenadas para crear un nuevo recuerdo en esa ubicación
   Future<void> _navigateToCoordinateInput() async {
     final LatLng? selectedLocation = await Navigator.of(context).push<LatLng>(
       MaterialPageRoute(
@@ -947,6 +859,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  /// Despliega el menú principal inferior con las opciones de gestión de los recuerdos y categorías
   void _showMenuDialog() {
     showModalBottomSheet(
       context: context,
@@ -968,6 +881,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  /// Cuadro de diálogo para seleccionar qué categorías exportar a PDF
   Future<Set<String>?> _showPdfCategorySelector(
     List<String> categories,
     CategoryProvider categoryProvider,
@@ -1056,6 +970,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  /// Método que prepara y autoriza los datos necesarios para generar un PDF de los recuerdos
   Future<void> _gestionarPdf() async {
     final List<Memory> listaCopia = List.from(_memories);
     final auth = Provider.of<AppAuthProvider>(context, listen: false);
@@ -1137,6 +1052,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  /// Método que se ejecuta al mantener presionado el mapa móvil
   void _onMapLongPress(LatLng position) {
     if (!_isWeb) {
       mapController.animateCamera(CameraUpdate.newLatLng(position));
@@ -1144,6 +1060,7 @@ class _MapScreenState extends State<MapScreen> {
     _showMemoryForm(position);
   }
 
+  /// Método que muestra el formulario para crear o editar un recuerdo en una ubicación específica
   void _showMemoryForm(LatLng location, {Memory? existingMemory}) {
     showDialog(
       context: context,
@@ -1154,11 +1071,8 @@ class _MapScreenState extends State<MapScreen> {
           existingMemory: existingMemory,
           onSave: (memory) async {
             try {
-              // Borramos: await _memoryService.saveMemory(memory);
-              // El formulario ya lo guardó, si lo dejamos aqui se guarda dos veces
-
-              Navigator.of(context).pop(); // Cierra el diálogo
-              _loadMemories(); // Recarga los marcadores
+              Navigator.of(context).pop();
+              _loadMemories();
 
               _showSnackbar(existingMemory == null
                   ? 'Recuerdo creado'
@@ -1173,7 +1087,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // edicion de solo ubicación desde el detalle del recuerdo
+  // Método de edición de solo ubicación desde el detalle del recuerdo
   Future<void> _editOnlyLocation(Memory memory) async {
     if (Navigator.canPop(context)) Navigator.pop(context);
 
@@ -1186,11 +1100,13 @@ class _MapScreenState extends State<MapScreen> {
 
     if (result != null && result is Memory) {
       await _memoryService.saveMemory(result);
+      if (!mounted) return;
       _loadMemories();
       _showSnackbar('Ubicación actualizada');
     }
   }
 
+  /// Método que levanta la hoja de detalle completa al pulsar sobre un marcador del mapa
   void _showMemoryDetails(Memory memory) {
     if (Navigator.canPop(context)) Navigator.pop(context);
 
@@ -1208,6 +1124,9 @@ class _MapScreenState extends State<MapScreen> {
           },
           onUpdate: (updatedMemory) async {
             await _memoryService.saveMemory(updatedMemory);
+
+            if (!mounted) return;
+
             _loadMemories();
             _showSnackbar('Recuerdo actualizado');
           },
@@ -1216,6 +1135,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  /// Método de diálogo de confirmación antes de eliminar un recuerdo de la base de datos
   Future<void> _confirmDeleteMemory(Memory memory) async {
     final bool? result = await showDialog<bool>(
       context: context,
@@ -1241,14 +1161,19 @@ class _MapScreenState extends State<MapScreen> {
     if (result == true) {
       try {
         await _memoryService.deleteMemory(memory.id);
+
+        if (!mounted) return;
+
         _loadMemories();
         _showSnackbar('${memory.title} eliminado');
       } catch (e) {
+        if (!mounted) return;
         _showSnackbar('Error al eliminar: $e', isError: true);
       }
     }
   }
 
+  /// Método de diálogo de advertencia extrema para limpiar por completo el mapa del usuario
   Future<void> _confirmClearAllMemories() async {
     if (Navigator.canPop(context)) Navigator.pop(context);
 
@@ -1281,9 +1206,13 @@ class _MapScreenState extends State<MapScreen> {
     if (result == true) {
       try {
         await _memoryService.clearAllMemories();
+
+        if (!mounted) return;
+
         _loadMemories();
         _showSnackbar('Todos los recuerdos eliminados');
       } catch (e) {
+        if (!mounted) return;
         _showSnackbar('Error al eliminar: $e', isError: true);
       }
     }
@@ -1291,7 +1220,6 @@ class _MapScreenState extends State<MapScreen> {
 
   // mapa para web usando flutter_map
   Widget _buildWebMap() {
-    // Quitamos el Scaffold de aquí, porque ya hay uno envolviéndolo en el build()
     return Stack(
       children: [
         fmap.FlutterMap(
@@ -1314,7 +1242,6 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ],
             ),
-            // Agregamos marcadores para web usando MarkerLayer
             if (_memories.isNotEmpty)
               fmap.MarkerLayer(
                 markers: _buildWebMarkers(),
@@ -1330,11 +1257,12 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  /// Lista de los pines interactivos del mapa específico para la versión web
   List<fmap.Marker> _buildWebMarkers() {
     final categoryProvider =
         Provider.of<CategoryProvider>(context, listen: false);
 
-    // Filtrar según permisos
+    // filtrar según permisos
     final visibleMemories = _memories.where((memory) {
       final bool hasPassword =
           categoryProvider.isCategoryProtected(memory.category);
@@ -1342,7 +1270,7 @@ class _MapScreenState extends State<MapScreen> {
       return _unlockedCategories.contains(memory.category);
     }).toList();
 
-    // Aplicar filtro de categoría seleccionada
+    // aplicar filtro de categoría seleccionada
     final filteredList = _selectedCategory == 'Todas'
         ? visibleMemories
         : visibleMemories
@@ -1365,7 +1293,7 @@ class _MapScreenState extends State<MapScreen> {
               border: Border.all(color: pinkPrimary, width: 3),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   blurRadius: 5,
                   offset: const Offset(0, 3),
                 ),
@@ -1403,7 +1331,7 @@ class _MapScreenState extends State<MapScreen> {
     }).toList();
   }
 
-  // metodos para mostrar mensajes al usuario
+  // métodos para mostrar mensajes al usuario
   void _showSnackbar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1415,6 +1343,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  /// Método que muestra un modal nativo de error general en caso de excepciones graves
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -1431,19 +1360,15 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // Widget principal
   @override
   Widget build(BuildContext context) {
-    // Obtenemos el estado del tema para configurar colores
     final themeProvider = Provider.of<ThemeProvider>(context);
     final bool isDarkMode = themeProvider.isDarkMode;
 
-    // Configuramos colores dinámicos para la UI
     final Color appBarBg = isDarkMode ? backgroundDark : backgroundLight;
     final Color titleColor = isDarkMode ? textDarkMode : textDark;
     const Color iconColor = pinkPrimary;
 
-    // Función compartida para el AppBar (evita duplicar código)
     AppBar buildAppBar() {
       return AppBar(
         title: Text(
@@ -1466,15 +1391,15 @@ class _MapScreenState extends State<MapScreen> {
               onPressed: () => _showCategoryOptions(_selectedCategory),
               tooltip: 'Opciones de carpeta',
             ),
-          // Botón gestor de carpetas
+          // Botón para gestionar carpetas
           IconButton(
-            icon: Icon(Icons.folder, color: iconColor),
+            icon: const Icon(Icons.folder, color: iconColor),
             onPressed: _openCategoryManager,
             tooltip: 'Gestionar carpetas',
           ),
-          // Botón menú
+          // Botón menú principal
           IconButton(
-            icon: Icon(Icons.menu, color: iconColor),
+            icon: const Icon(Icons.menu, color: iconColor),
             onPressed: _showMenuDialog,
             tooltip: 'Menú principal',
           ),
@@ -1482,7 +1407,7 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
-    // Si es web y estamos en modo biblioteca
+    // Si es web y estamos en modo biblioteca, mostramos el mapa con la barra de filtros
     if (_isWeb && widget.isLibrary) {
       return Scaffold(
         appBar: buildAppBar(),
@@ -1495,20 +1420,21 @@ class _MapScreenState extends State<MapScreen> {
       return _buildWebMap();
     }
 
-    // Para móvil - Modo biblioteca
+    // Si es movil en modo biblioteca (mapa con filtros y gestión de recuerdos)
     if (widget.isLibrary) {
       return Scaffold(
         appBar: buildAppBar(),
         body: Stack(
           children: [
             GoogleMap(
+              style: mapStyle,
               initialCameraPosition: const CameraPosition(
                 target: LatLng(40.4168, -3.7038),
                 zoom: 15,
               ),
               onMapCreated: (controller) {
                 mapController = controller;
-                mapController.setMapStyle(mapStyle);
+
                 if (widget.onMapCreatedCallback != null) {
                   widget.onMapCreatedCallback!(controller);
                 }
@@ -1547,8 +1473,9 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
-    // Para móvil - Modo no biblioteca (selección de coordenadas)
+    // Si es movil y no es biblioteca, solo mostramos el mapa para selección de coordenadas sin filtros ni gestión de recuerdos
     return GoogleMap(
+      style: mapStyle,
       initialCameraPosition: CameraPosition(
         target: widget.initialMarkers?.isNotEmpty == true
             ? widget.initialMarkers!.first.position
@@ -1557,7 +1484,7 @@ class _MapScreenState extends State<MapScreen> {
       ),
       onMapCreated: (controller) {
         mapController = controller;
-        mapController.setMapStyle(mapStyle);
+
         if (widget.onMapCreatedCallback != null) {
           widget.onMapCreatedCallback!(controller);
         }

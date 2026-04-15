@@ -14,6 +14,7 @@ import '../screens/coordinate_input_screen.dart';
 import '../providers/category_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'package:video_player/video_player.dart';
+import '../constants/category_icons.dart';
 
 /// Formulario principal para crear y editar los recuerdos
 /// Maneja la subida de foto/video, PIN para carpetas y obtiene coordenadas GPS de los recuerdos
@@ -1329,8 +1330,7 @@ class _MemoryFormState extends State<MemoryForm> {
                               value: category,
                               child: Row(
                                 children: [
-                                  Icon(_getCategoryIcon(category),
-                                      color: pinkPrimary, size: 24),
+                                  Icon(CategoryIcons.getIcon(category), color: pinkPrimary, size: 24),
                                   const SizedBox(width: 15),
                                   Text(
                                     category,
@@ -1585,24 +1585,6 @@ class _MemoryFormState extends State<MemoryForm> {
         ),
       ),
     );
-  }
-
-  /// Función para obtener el ícono correspondiente a cada categoría
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'Viajes':
-        return Icons.flight;
-      case 'Amigos':
-        return Icons.people;
-      case 'Familia':
-        return Icons.home;
-      case 'Comida':
-        return Icons.restaurant;
-      case 'Estudio':
-        return Icons.school;
-      default:
-        return Icons.bookmark;
-    }
   }
 
   @override

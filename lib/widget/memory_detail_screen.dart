@@ -13,6 +13,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../constants/category_icons.dart';
 
 /// Pantalla de detalle que muestra la información completa de un recuerdo
 /// Permite la reproducción de vídeos, ver imágenes
@@ -322,8 +323,8 @@ https://nayeka-memories.com
     );
   }
 
-  /// Método que construye el contenido principal de la pantalla, mostrando la imagen o video, 
-  /// título, descripción, fecha, ubicación y botones de acción según los permisos 
+  /// Método que construye el contenido principal de la pantalla, mostrando la imagen o video,
+  /// título, descripción, fecha, ubicación y botones de acción según los permisos
   Widget _buildContent(BuildContext context, bool isDarkMode) {
     // Verificamos si hay algún botón de acción que mostrar
     final bool showActions = _canEdit() || _canDelete();
@@ -463,7 +464,7 @@ https://nayeka-memories.com
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(_getCategoryIcon(widget.memory.category),
+              Icon(CategoryIcons.getIcon(widget.memory.category),
                   size: 16, color: pinkPrimary),
               const SizedBox(width: 6),
               Text(
@@ -478,7 +479,6 @@ https://nayeka-memories.com
           ),
         ),
         const SizedBox(height: 10),
-
         Text(
           widget.memory.title,
           style: TextStyle(
@@ -492,25 +492,7 @@ https://nayeka-memories.com
     );
   }
 
-  // Helper de iconos (puedes ponerlo global en constants si prefieres no repetir)
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'Viajes':
-        return Icons.flight;
-      case 'Amigos':
-        return Icons.people;
-      case 'Familia':
-        return Icons.home;
-      case 'Comida':
-        return Icons.restaurant;
-      case 'Estudio':
-        return Icons.school;
-      default:
-        return Icons.bookmark;
-    }
-  }
-
-  // mostramos la fecha del recuerdo con icono de calendario
+  /// Método que muestra la fecha del recuerdo con su icono correspondiente
   Widget _buildDate(bool isDarkMode) {
     return Row(
       children: [
@@ -519,7 +501,8 @@ https://nayeka-memories.com
         Text(
           widget.memory.date,
           style: TextStyle(
-            color: isDarkMode ? Colors.grey[400] : pinkDark.withOpacity(0.8),
+            color:
+                isDarkMode ? Colors.grey[400] : pinkDark.withValues(alpha: 0.8),
             fontSize: 16,
           ),
         ),
@@ -527,7 +510,7 @@ https://nayeka-memories.com
     );
   }
 
-  // mostramos la descripción detallada del recuerdo
+  /// Método que muestra la descripción del recuerdo
   Widget _buildDescription(bool isDarkMode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -553,7 +536,7 @@ https://nayeka-memories.com
     );
   }
 
-  // mostramos la información de ubicación, es decir las coordenadas
+  /// Método que muestra la ubicación (coordenadas)
   Widget _buildLocationInfo(bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -561,7 +544,9 @@ https://nayeka-memories.com
         color: isDarkMode ? cardDark : pinkLighter,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-            color: isDarkMode ? Colors.grey[700]! : pinkLight.withOpacity(0.3)),
+            color: isDarkMode
+                ? Colors.grey[700]!
+                : pinkLight.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -571,7 +556,7 @@ https://nayeka-memories.com
               const Icon(Icons.location_on, color: pinkPrimary, size: 24),
               const SizedBox(width: 10),
               Text(
-                'Ubicación Exacta',
+                'Ubicación exacta',
                 style: TextStyle(
                   color: isDarkMode ? textDarkMode : pinkDark,
                   fontSize: 20,
@@ -617,10 +602,11 @@ https://nayeka-memories.com
     );
   }
 
-  // construimos los botones de acción, es decir editar y eliminar y oculta botones según permisos
+  /// Método que muestra los botones de compartir, editar y eliminar (oculta botones según permisos)
   Widget _buildActionButtons(BuildContext context, bool isDarkMode) {
     return Column(
       children: [
+        // Solo muestra el boton de editar y compartir si el usuario tiene permisos (propietario, admin o editor)
         if (_canEdit()) ...[
           SizedBox(
             width: double.infinity,
@@ -662,7 +648,7 @@ https://nayeka-memories.com
               ),
               icon: const Icon(Icons.edit, color: Colors.white),
               label: const Text(
-                'Editar Recuerdo',
+                'Editar recuerdo',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -673,6 +659,7 @@ https://nayeka-memories.com
           ),
           const SizedBox(height: 15),
         ],
+        // Solo muestra el boton de eliminar si el usuario tiene permisos (propietario o admin)
         if (_canDelete())
           SizedBox(
             width: double.infinity,
@@ -701,7 +688,8 @@ https://nayeka-memories.com
     );
   }
 
-  // Mostrar un menú con opciones de edición
+  /// Muestra un menú inferior con opciones de edición
+  /// (editar solo ubicación o editar todos los datos) y eliminar recuerdo (si tiene permisos)
   void _showEditOptions(BuildContext context, bool isDarkMode) {
     showModalBottomSheet(
       context: context,
@@ -769,7 +757,7 @@ https://nayeka-memories.com
                 },
               ),
 
-              // Ocultamos la opción de borrar en el menú si no es admin
+              // ocultar la opción de borrar en el menú si no es admin o propietario
               if (_canDelete()) ...[
                 Divider(
                     color: isDarkMode ? Colors.grey[700] : Colors.grey[300]),
@@ -802,8 +790,9 @@ https://nayeka-memories.com
     );
   }
 
+  /// Muestra el formulario de edición completa (modal)
+  /// para editar todos los datos del recuerdo
   void _navigateToFullEditForm(BuildContext context) {
-    // Muestra el formulario de edición completa
     showDialog(
       context: context,
       builder: (context) {

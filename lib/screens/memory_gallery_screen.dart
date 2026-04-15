@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import '../services/MemoryService.dart';
 import '../models/Memory.dart';
-import '../widget/MemoryDetailScreen.dart';
+import '../widget/memory_detail_screen.dart';
 import 'coordinate_input_screen.dart';
 import '../constants/colors.dart';
 import '../providers/theme_provider.dart';
@@ -386,12 +386,15 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
 
     final TextEditingController emailController = TextEditingController();
     String selectedRole = 'lector';
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDarkMode = themeProvider.isDarkMode;
 
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return StatefulBuilder(builder: (context, setDialogState) {
           return AlertDialog(
+            backgroundColor: isDarkMode ? cardDark : Colors.white,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             contentPadding: const EdgeInsets.all(24),
@@ -399,13 +402,17 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Compartir "$categoryToShare"',
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? textLight : Colors.black87)),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: isDarkMode
+                          ? Colors.grey.shade900
+                          : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12)),
                   child: Row(
                     children: [
@@ -413,10 +420,12 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text('Propietario:\n${currentUser?.email}',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87)),
+                                color: isDarkMode
+                                    ? Colors.grey[300]
+                                    : Colors.black87)),
                       ),
                     ],
                   ),
@@ -430,25 +439,46 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                 children: [
                   const SizedBox(height: 16),
 
-                  const Text(
+                  Text(
                     'Escribe un correo electrónico:',
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87),
+                        color: isDarkMode ? textLight : Colors.black87),
                   ),
                   const SizedBox(height: 8),
 
                   TextField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(fontSize: 16),
+                    style: TextStyle(
+                        fontSize: 16,
+                        color: isDarkMode ? textLight : Colors.black87),
                     decoration: InputDecoration(
                       hintText: 'amigo@correo.com',
+                      hintStyle: TextStyle(
+                          color:
+                              isDarkMode ? Colors.grey[500] : Colors.grey[600]),
+                      fillColor: isDarkMode ? cardDark : Colors.white,
+                      filled: true,
                       contentPadding: const EdgeInsets.symmetric(
                           vertical: 16, horizontal: 16),
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: isDarkMode
+                                  ? Colors.grey[700]!
+                                  : Colors.grey)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: isDarkMode
+                                  ? Colors.grey[700]!
+                                  : Colors.grey)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: pinkPrimary, width: 2)),
                       prefixIcon: const Icon(Icons.email, color: pinkPrimary),
                     ),
                   ),
@@ -458,23 +488,53 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                     initialValue: selectedRole,
                     isExpanded: true,
                     isDense: false,
-                    style: const TextStyle(fontSize: 16, color: Colors.black87),
+                    dropdownColor: isDarkMode ? cardDark : Colors.white,
+                    style: TextStyle(
+                        fontSize: 16,
+                        color: isDarkMode ? textLight : Colors.black87),
                     decoration: InputDecoration(
                       labelText: 'Permiso otorgado',
-                      labelStyle: const TextStyle(fontSize: 14),
+                      labelStyle: TextStyle(
+                          fontSize: 14,
+                          color:
+                              isDarkMode ? Colors.grey[400] : Colors.grey[700]),
                       contentPadding: const EdgeInsets.symmetric(
                           vertical: 16, horizontal: 16),
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: isDarkMode
+                                  ? Colors.grey[700]!
+                                  : Colors.grey)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                              color: isDarkMode
+                                  ? Colors.grey[700]!
+                                  : Colors.grey)),
                     ),
-                    items: const [
+                    items: [
                       DropdownMenuItem(
-                          value: 'lector', child: Text('Lector (Solo ver)')),
+                          value: 'lector',
+                          child: Text('Lector (Solo ver)',
+                              style: TextStyle(
+                                  color: isDarkMode
+                                      ? textLight
+                                      : Colors.black87))),
                       DropdownMenuItem(
                           value: 'editor',
-                          child: Text('Editor (Ver y editar)')),
+                          child: Text('Editor (Ver y editar)',
+                              style: TextStyle(
+                                  color: isDarkMode
+                                      ? textLight
+                                      : Colors.black87))),
                       DropdownMenuItem(
-                          value: 'admin', child: Text('Todo (Admin)')),
+                          value: 'admin',
+                          child: Text('Todo (Admin)',
+                              style: TextStyle(
+                                  color: isDarkMode
+                                      ? textLight
+                                      : Colors.black87))),
                     ],
                     onChanged: (String? newValue) {
                       if (newValue != null) {
@@ -487,16 +547,22 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                   if (categoryMemories.first.sharedRoles != null &&
                       categoryMemories.first.sharedRoles!.isNotEmpty) ...[
                     const SizedBox(height: 24),
-                    const Text('Usuarios con acceso:',
+                    Text('Usuarios con acceso:',
                         style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.bold)),
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode ? textLight : Colors.black87)),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
+                        color:
+                            isDarkMode ? Colors.grey[900] : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
+                        border: Border.all(
+                            color: isDarkMode
+                                ? Colors.grey[800]!
+                                : Colors.grey.shade200),
                       ),
                       child: Column(
                         children: categoryMemories.first.sharedRoles!.entries
@@ -510,7 +576,11 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                                 const SizedBox(width: 6),
                                 Expanded(
                                     child: Text(entry.key,
-                                        style: const TextStyle(fontSize: 14))),
+                                        style: TextStyle(
+                                            fontSize: 14,
+                                            color: isDarkMode
+                                                ? Colors.grey[300]
+                                                : Colors.black87))),
                                 const SizedBox(width: 8),
 
                                 // Menú de permisos por usuario con la opción de cambiar rol o quitar (eliminarlo)
@@ -519,8 +589,14 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                                       horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
                                       color: entry.value == 'quitar'
-                                          ? Colors.red.shade50
-                                          : pinkLighter,
+                                          ? (isDarkMode
+                                              ? Colors.red
+                                                  .withValues(alpha: 0.2)
+                                              : Colors.red.shade50)
+                                          : (isDarkMode
+                                              ? pinkLighter.withValues(
+                                                  alpha: 0.2)
+                                              : pinkLighter),
                                       borderRadius: BorderRadius.circular(6)),
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String>(
@@ -528,22 +604,38 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                                       icon: const Icon(Icons.arrow_drop_down,
                                           size: 20, color: pinkDark),
                                       isDense: false,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
-                                          color: pinkDark),
-                                      dropdownColor: Colors.white,
-                                      items: const [
+                                          color: isDarkMode
+                                              ? pinkLight
+                                              : pinkDark),
+                                      dropdownColor: isDarkMode
+                                          ? Colors.grey[800]
+                                          : Colors.white,
+                                      items: [
                                         DropdownMenuItem(
                                             value: 'lector',
-                                            child: Text('Lector')),
+                                            child: Text('Lector',
+                                                style: TextStyle(
+                                                    color: isDarkMode
+                                                        ? textLight
+                                                        : Colors.black87))),
                                         DropdownMenuItem(
                                             value: 'editor',
-                                            child: Text('Editor')),
+                                            child: Text('Editor',
+                                                style: TextStyle(
+                                                    color: isDarkMode
+                                                        ? textLight
+                                                        : Colors.black87))),
                                         DropdownMenuItem(
                                             value: 'admin',
-                                            child: Text('Admin')),
-                                        DropdownMenuItem(
+                                            child: Text('Admin',
+                                                style: TextStyle(
+                                                    color: isDarkMode
+                                                        ? textLight
+                                                        : Colors.black87))),
+                                        const DropdownMenuItem(
                                             value: 'quitar',
                                             child: Text('QUITAR',
                                                 style: TextStyle(
@@ -616,8 +708,10 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                       style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16)),
                       onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Cancelar',
-                          style: TextStyle(fontSize: 16)),
+                      child: Text('Cancelar',
+                          style: TextStyle(
+                              fontSize: 16,
+                              color: isDarkMode ? Colors.grey[300] : null)),
                     ),
                   ),
                   const SizedBox(width: 12),

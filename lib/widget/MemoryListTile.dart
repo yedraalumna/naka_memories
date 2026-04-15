@@ -5,7 +5,7 @@ import '../providers/favorite_provider.dart';
 import '../providers/theme_provider.dart';
 import '../constants/colors.dart';
 import 'MemoryThumbnail.dart';
-import 'MemoryDetailScreen.dart';
+import 'memory_detail_screen.dart';
 
 // Widget que muestra un recuerdo como una tarjeta en una lista
 class MemoryListTile extends StatelessWidget {
