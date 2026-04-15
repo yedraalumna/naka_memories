@@ -28,14 +28,17 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Obtenemos los proveedores para acceder a los datos y el tema
     final themeProvider = Provider.of<ThemeProvider>(context);
     final memoryProvider = Provider.of<MemoryProvider>(context);
 
-    // Obtenemos los datos agrupados
+    // Obtenemos los datos agrupados por continente desde el MemoryProvider
     final paisesPorContinente = memoryProvider.paisesPorContinente;
     final ciudadesPorContinente = memoryProvider.ciudadesPorContinente;
 
-    // Obtenemos la lista de continentes con datos
+    // Obtenemos la lista de continentes que tienen al menos un dato
+    // Si mostramos países, usamos los continentes que tienen países
+    // Si mostramos ciudades, usamos los continentes que tienen ciudades
     List<String> continentesConDatos;
     if (_mostrarPaises) {
       continentesConDatos = paisesPorContinente.keys.toList();
@@ -44,6 +47,7 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
     }
     continentesConDatos.sort(); // Ordenamos alfabéticamente
 
+    // Determinamos el color de fondo según el tema, si es oscuro o claro
     Color colorFondoPantalla;
     if (themeProvider.isDarkMode == true) {
       colorFondoPantalla = backgroundDark;
@@ -51,8 +55,7 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
       colorFondoPantalla = textLight;
     }
 
-
-    //MODIFICAMOS ESTO PARA DEJARLO BIEN
+    //Lo que visualizaomos en pantalla
     return Scaffold(
       backgroundColor: colorFondoPantalla,
       appBar: AppBar(
@@ -60,11 +63,12 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
         backgroundColor: pinkPrimary,
         foregroundColor: Colors.white,
         leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              Navigator.pop(context);
-            }),
-        // Botones para cambiar entre vista de países y ciudades
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        // es para la barra inferior con los botones para cambiar entre países y ciudades
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Container(
@@ -78,20 +82,21 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
                     isSelected: _mostrarPaises,
                     onTap: () {
                       setState(() {
-                        _mostrarPaises = true;
+                        _mostrarPaises = true; // Cambiamos a vista de países
                       });
                     },
                   ),
                 ),
                 const SizedBox(width: 10),
+                // Botón "Ciudades"
                 Expanded(
                   child: _buildViewToggleButton(
                     titulo: 'Ciudades',
                     icon: Icons.location_city,
-                    isSelected: !_mostrarPaises,
+                    isSelected: _mostrarPaises == false,
                     onTap: () {
                       setState(() {
-                        _mostrarPaises = false;
+                        _mostrarPaises = false; // Cambiamos a vista de ciudades
                       });
                     },
                   ),
@@ -101,32 +106,68 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
           ),
         ),
       ),
-      body: memoryProvider.isLoading ? const Center(child: CircularProgressIndicator(color: pinkPrimary))
-          : continentesConDatos.isEmpty
-              ? _buildEmptyState(themeProvider)
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: continentesConDatos.length,
-                  itemBuilder: (context, index) {
-                    final continente = continentesConDatos[index];
+      body: () {
+        // Para los datos que se estan cargando
+        if (memoryProvider.isLoading == true) {
+          return const Center(
+            child: CircularProgressIndicator(color: pinkPrimary),
+          );
+        }
 
-                    //MODIFCAMOS AQUI
-                    final color = _coloresContinentes[continente] ?? Colors.grey;
-                    // Obtenemos los datos según la vista seleccionada
-                    final datos = _mostrarPaises ? paisesPorContinente[continente]?.toList() ?? [] : ciudadesPorContinente[continente]?.toList() ?? [];
+        // si no hay datos
+        if (continentesConDatos.isEmpty == true) {
+          return _buildEmptyState(themeProvider);
+        }
 
-                    // Ordenamos alfabéticamente
-                    datos.sort();
+        // si hay datos para mostrar
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: continentesConDatos.length,
+          itemBuilder: (context, index) {
+            final continente = continentesConDatos[index];
 
-                    return _buildContinenteCard(
-                      continente: continente,
-                      color: color,
-                      datos: datos,
-                      themeProvider: themeProvider,
-                      mostrarPaises: _mostrarPaises,
-                    );
-                  },
-                ),
+            Color color;
+            final colorBuscado = _coloresContinentes[continente];
+            if (colorBuscado != null) {
+              color = colorBuscado;
+            } else {
+              color = Colors.grey;
+            }
+
+            List<String> datos;
+
+            if (_mostrarPaises == true) {
+              // Mostramos los países del continente
+              final listaPaises = paisesPorContinente[continente];
+              if (listaPaises != null) {
+                datos = listaPaises.toList(); // Convertimos a lista
+              } else {
+                datos = []; // Lista vacía si no hay datos
+              }
+            } else {
+              // Mostramos las ciudades del continente
+              final listaCiudades = ciudadesPorContinente[continente];
+              if (listaCiudades != null) {
+                datos = listaCiudades.toList(); // Convertimos a lista
+              } else {
+                datos = []; // Lista vacía si no hay datos
+              }
+            }
+
+            // Ordenamos alfabéticamente
+            datos.sort();
+
+            // Construimos la tarjeta del continente
+            return _buildContinenteCard(
+              continente: continente,
+              color: color,
+              datos: datos,
+              themeProvider: themeProvider,
+              mostrarPaises: _mostrarPaises,
+            );
+          },
+        );
+      }(),
     );
   }
 
@@ -137,19 +178,35 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    // Determinamos los colores y estilos según si está seleccionado o no
+    Color colorFondo;
+    Color colorBorde;
+    Color colorIconoTexto;
+    FontWeight fontWeight;
+
+    if (isSelected == true) {
+      // Estilo para botón seleccionado
+      colorFondo = Colors.white;
+      colorBorde = Colors.white;
+      colorIconoTexto = pinkPrimary;
+      fontWeight = FontWeight.bold;
+    } else {
+      // Estilo para botón no seleccionado
+      colorFondo = Colors.white.withOpacity(0.3);
+      colorBorde = Colors.transparent;
+      colorIconoTexto = Colors.white;
+      fontWeight = FontWeight.normal;
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-
-            //MODIFICAMOS AQUI
-          color: isSelected ? Colors.white : Colors.white.withOpacity(0.3),
+          color: colorFondo,
           borderRadius: BorderRadius.circular(25),
           border: Border.all(
-
-            //MODIFCAMOS AQUI
-            color: isSelected ? Colors.white : Colors.transparent,
+            color: colorBorde,
             width: 1,
           ),
         ),
@@ -158,20 +215,15 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
           children: [
             Icon(
               icon,
-
-                //MODIFICAMOS AQUI
-              color: isSelected ? pinkPrimary : Colors.white,
+              color: colorIconoTexto,
               size: 18,
             ),
             const SizedBox(width: 8),
             Text(
               titulo,
               style: TextStyle(
-
-
-                //MODIFCAMOS AQUI
-                color: isSelected ? pinkPrimary : Colors.white,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: colorIconoTexto,
+                fontWeight: fontWeight,
                 fontSize: 14,
               ),
             ),
@@ -189,15 +241,40 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
     required ThemeProvider themeProvider,
     required bool mostrarPaises,
   }) {
+    // Determinamos todos los valores según el tema
+    Color colorTarjeta;
+    Color colorTitulo;
+    Color colorSubtitulo;
+    String textoSubtitulo;
+
+    if (themeProvider.isDarkMode == true) {
+      // Colores para modo oscuro
+      colorTarjeta = cardDark;
+      colorTitulo = textLight;
+      colorSubtitulo = Colors.grey[400]!;
+    } else {
+      // Colores para modo claro
+      colorTarjeta = Colors.white;
+      colorTitulo = Colors.black87;
+      colorSubtitulo = Colors.grey[600]!;
+    }
+
+    // Determinamos el texto del subtítulo
+    if (mostrarPaises == true) {
+      textoSubtitulo = '${datos.length} países visitados';
+    } else {
+      textoSubtitulo = '${datos.length} ciudades visitados';
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),),
-
-
-      //MODIFCAMOS AQUI
-      color: themeProvider.isDarkMode ? cardDark : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      color: colorTarjeta,
       child: ExpansionTile(
+        // ExpansionTile permite desplegar o contraer la lista
         leading: Container(
           width: 40,
           height: 40,
@@ -221,22 +298,14 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-
-            //MODIFCAMOS AQUI
-            color: themeProvider.isDarkMode ? textLight : Colors.black87,
+            color: colorTitulo,
           ),
         ),
         subtitle: Text(
-
-          
-          //MODIFCAMOS AQUI
-          '${datos.length} ${mostrarPaises ? 'países' : 'ciudades'} visitados',
+          textoSubtitulo,
           style: TextStyle(
             fontSize: 13,
-
-
-            //MODIFCAMOS AQUI
-            color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+            color: colorSubtitulo,
           ),
         ),
         children: [
@@ -245,9 +314,6 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
             child: Column(
               children: datos.map((lugar) {
                 return _buildLugarItem(
-
-
-                  //MODIFCAMOS AQUI
                   lugar: lugar,
                   color: color,
                   themeProvider: themeProvider,
@@ -261,34 +327,51 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
     );
   }
 
-  // //MODIFCAMOS AQUI
   Widget _buildLugarItem({
     required String lugar,
     required Color color,
     required ThemeProvider themeProvider,
     required bool mostrarPaises,
   }) {
+    // Determinamos los colores según el tema
+    Color colorFondo;
+    Color colorBorde;
+    Color colorTexto;
+
+    if (themeProvider.isDarkMode == true) {
+      // Colores para modo oscuro
+      colorFondo = Colors.grey[800]!;
+      colorBorde = Colors.grey[700]!;
+      colorTexto = textLight;
+    } else {
+      // Colores para modo claro
+      colorFondo = Colors.grey[50]!;
+      colorBorde = Colors.grey[200]!;
+      colorTexto = Colors.black87;
+    }
+
+    // Determinamos el icono según la vista seleccionada
+    IconData icono;
+    if (mostrarPaises == true) {
+      icono = Icons.flag; // Icono de bandera para países
+    } else {
+      icono = Icons.location_on; // Icono de ubicación para ciudades
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-
-        //MODIFCAMOS AQUI
-        color: themeProvider.isDarkMode ? Colors.grey[800] : Colors.grey[50],
+        color: colorFondo,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-
-
-          //MODIFCAMOS AQUI
-          color: themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[200]!,
+          color: colorBorde,
         ),
       ),
       child: Row(
         children: [
           Icon(
-
-            //MODIFCAMOS AQUI
-            mostrarPaises ? Icons.flag : Icons.location_on,
+            icono,
             size: 16,
             color: color,
           ),
@@ -298,9 +381,7 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
               lugar,
               style: TextStyle(
                 fontSize: 15,
-
-                //MODIFCAMOS AQUI
-                color: themeProvider.isDarkMode ? textLight : Colors.black87,
+                color: colorTexto,
               ),
             ),
           ),
@@ -309,40 +390,64 @@ class _VisitedPlacesScreenState extends State<VisitedPlacesScreen> {
     );
   }
 
-  // Estado vacío para cuando no hay lugares visitados
+  // Pantalla vacía para cuando no hay lugares visitados
   Widget _buildEmptyState(ThemeProvider themeProvider) {
+    // Determinar colores según el tema
+    Color colorIcono;
+    Color colorTextoPrincipal;
+    Color colorTextoSecundario;
+    String textoMensaje;
+
+    if (themeProvider.isDarkMode == true) {
+      // Colores para modo oscuro
+      colorIcono = Colors.grey[700]!;
+      colorTextoPrincipal = Colors.grey[400]!;
+      colorTextoSecundario = Colors.grey[600]!;
+    } else {
+      // Colores para modo claro
+      colorIcono = Colors.grey[300]!;
+      colorTextoPrincipal = Colors.grey[600]!;
+      colorTextoSecundario = Colors.grey[400]!;
+    }
+
+    // Determinamos el icono según la vista seleccionada
+    IconData icono;
+    if (_mostrarPaises == true) {
+      icono = Icons.flag;
+    } else {
+      icono = Icons.location_city;
+    }
+
+    // Determinamos el texto según la vista seleccionada
+    if (_mostrarPaises == true) {
+      textoMensaje = 'No has visitado ningún país aún';
+    } else {
+      textoMensaje = 'No has visitado ninguna ciudad aún';
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            _mostrarPaises ? Icons.flag : Icons.location_city,
+            icono,
             size: 80,
-            color:
-                themeProvider.isDarkMode ? Colors.grey[700] : Colors.grey[300],
+            color: colorIcono,
           ),
           const SizedBox(height: 16),
           Text(
-
-            //MODIFCAMOS AQUI
-            _mostrarPaises ? 'No has visitado ningún país aún' : 'No has visitado ninguna ciudad aún',
+            textoMensaje,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w500,
-
-
-              //MODIFCAMOS AQUI
-              color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+              color: colorTextoPrincipal,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Comienza a añadir recuerdos para ver tu progreso',
+          Text('Comienza a añadir recuerdos para ver tu progreso',
             style: TextStyle(
               fontSize: 14,
-              
-               //MODIFCAMOS AQUI
-              color: themeProvider.isDarkMode ? Colors.grey[600] : Colors.grey[400],
+              color: colorTextoSecundario,
             ),
             textAlign: TextAlign.center,
           ),

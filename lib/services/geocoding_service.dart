@@ -3,8 +3,9 @@ import 'package:http/http.dart' as http;
 
 class GeocodingService {
   // Usamos nominatim de openStreetMap ya que es gratis y sin necesidad de una API key)
+  // nominatim es un servicio gratuito que funciona como un traductor de coordenadas a direcciones y viceversa 
   final String _baseUrl = 'https://nominatim.openstreetmap.org/reverse';
-  
+
   // Mapa de continentes por pais
   final Map<String, String> _continentesPorPais = {
     // Europa
@@ -32,7 +33,7 @@ class GeocodingService {
     'Croacia': 'Europa',
     'Ucrania': 'Europa',
     'Rusia': 'Europa',
-    
+
     // Asia
     'China': 'Asia',
     'Japón': 'Asia',
@@ -58,7 +59,7 @@ class GeocodingService {
     'Emiratos Árabes Unidos': 'Asia',
     'Israel': 'Asia',
     'Turquía': 'Asia',
-    
+
     // América
     'Estados Unidos': 'América',
     'México': 'América',
@@ -89,7 +90,7 @@ class GeocodingService {
     'Haití': 'América',
     'Jamaica': 'América',
     'Bahamas': 'América',
-    
+
     // África
     'Egipto': 'África',
     'Marruecos': 'África',
@@ -114,7 +115,7 @@ class GeocodingService {
     'Zambia': 'África',
     'Congo': 'África',
     'Camerún': 'África',
-    
+
     // Oceanía
     'Australia': 'Oceanía',
     'Nueva Zelanda': 'Oceanía',
@@ -126,79 +127,107 @@ class GeocodingService {
     'Tonga': 'Oceanía',
     'Polinesia Francesa': 'Oceanía',
     'Guam': 'Oceanía',
-    
+
     // Antártida
     'Antártida': 'Antártida',
   };
 
   Future<Map<String, String>?> getPlaceFromCoordinates(
-    double lat, 
-    double lng
-
-  ) async {
+      double lat, double lng) async {
     try {
+      // Construimos la URL para la API de Nominatim
+      final url ='$_baseUrl?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1';
 
-      //MODIFICAMOS AQUI
-      final url = '$_baseUrl?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1';
-      
-      //MODIFICAMOS AQUI
-      final response = await http.get(Uri.parse(url),
+      // Hacemos la petición HTTP
+      final response = await http.get(
+        Uri.parse(url), //Convertimos el texto de la URL en una dirección válida
         headers: {
-          'User-Agent': 'MemoryPlaces/1.0', // Obligatorio para Nominatim
+          'User-Agent': 'MemoryPlaces/1.0', // Obligatorio para Nominatim y con esto le decimos al servidor "Hola, soy la app Memory Places"
         },
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
 
-          //MODIFICAMOS AQUI
-        final address = data['address'] ?? {};
-        
-        // Obtenemos el país
+        // obtenemos la dirección del resultado
+        Map<String, dynamic> address;
+        if (data['address'] != null) {
+          address = data['address'];
+        } else {
+          address = {};
+        }
 
-        //MODIFICAMOS AQUI
-        String? pais = 'Desconocido';
+        // obtenemos el pais, buscando en varios campos posibles
+        String pais = 'Desconocido';
         if (address['country'] != null) {
-        pais = address['country'];
-        } else if (address['country_code'] != null) {
-        pais = address['country_code'].toString().toUpperCase();
+          pais = address['country'];
+        } else {
+          if (address['country_code'] != null) {
+            pais = address['country_code'].toString().toUpperCase();
+          }
         }
 
-        // Obtenemos la ciudad
-          //MODIFICAMOS AQUI
-        String? ciudad = 'Desconocido';
+        // obtenemos la ciudad, buscando en varios campos posibles
+        String ciudad = 'Desconocido';
         if (address['city'] != null) {
-        ciudad = address['city'];
-        } else if (address['town'] != null) {
-        ciudad = address['town'];
-        } else if (address['village'] != null) {
-        ciudad = address['village'];
-        } else if (address['hamlet'] != null) {
-        ciudad = address['hamlet'];
-        } else if (address['suburb'] != null) {
-        ciudad = address['suburb'];
-        } else if (address['county'] != null) {
-        ciudad = address['county'];
+          ciudad = address['city'];
+        } else {
+          if (address['town'] != null) {
+            ciudad = address['town'];
+          } else {
+            if (address['village'] != null) {
+              ciudad = address['village'];
+            } else {
+              if (address['hamlet'] != null) {
+                ciudad = address['hamlet'];
+              } else {
+                if (address['suburb'] != null) {
+                  ciudad = address['suburb'];
+                } else {
+                  if (address['county'] != null) {
+                    ciudad = address['county'];
+                  }
+                }
+              }
+            }
+          }
         }
-        
-        // Limpiar nombres de países, es decir convertimos códigos a nombres)
-          //MODIFICAMOS AQUI
-        if (pais != 'Desconocido' && pais?.length == 2) {
-          // Si es un código de país, intentamos convertirlo
-          pais = _codigoANombrePais(pais!);
+
+        // Convertimos códigos de país a nombres completos
+        if (pais != 'Desconocido') {
+          if (pais.length == 2) {
+            // Si es un código de país, como por ejemplo "ES", lo convertimos a nombre
+            String nombrePais = _codigoANombrePais(pais);
+            if (nombrePais.isNotEmpty) {
+              pais = nombrePais;
+            }
+          }
         }
-        
-        // determinamos el continente
-          //MODIFICAMOS AQUI
-        String continente = _determinarContinente(pais ?? '');
-        
-        return {
-          
-          //MODIFICAMOS AQUI
-          'pais': pais ?? 'Desconocido',
-          'ciudad': ciudad ?? 'Desconocido',
-          'continente': continente,
-        };
+
+        // determinamos el continente del país
+        String continente = _determinarContinente(pais);
+
+        // Para el resultado
+        Map<String, String> resultado = {};
+
+        // Añadimos el país
+        if (pais.isNotEmpty) {
+          resultado['pais'] = pais;
+        } else {
+          resultado['pais'] = 'Desconocido';
+        }
+
+        // Añadimos la ciudad
+        if (ciudad.isNotEmpty) {
+          resultado['ciudad'] = ciudad;
+        } else {
+          resultado['ciudad'] = 'Desconocido';
+        }
+
+        // Añadimos el continente
+        resultado['continente'] = continente;
+
+        return resultado;
       }
     } catch (e) {
       print('Error en geocoding: $e');
@@ -207,7 +236,16 @@ class GeocodingService {
   }
 
   String _determinarContinente(String pais) {
-    return _continentesPorPais[pais] ?? 'Otro';
+    // Buscamos el continente del país
+    String? continente = _continentesPorPais[
+        pais]; //String? significa que la variable puede ser un texto o puede ser null, es decir que esta vacío o sin valor
+
+    // Si no se encuentra, usar 'Otro'
+    if (continente != null) {
+      return continente;
+    } else {
+      return 'Otro';
+    }
   }
 
   String _codigoANombrePais(String codigo) {
@@ -259,8 +297,15 @@ class GeocodingService {
       'NZ': 'Nueva Zelanda',
       'AQ': 'Antártida',
     };
-    
-    //MODIFICAMOS AQUI
-    return codigosPais[codigo.toUpperCase()] ?? codigo;
+
+    // Buscamos el nombre del país
+    String? nombrePais = codigosPais[codigo.toUpperCase()];
+
+    // Verificamos si se encontró el código
+    if (nombrePais != null) {
+      return nombrePais; // Si existe, devolvemos el nombre
+    } else {
+      return codigo; // Si no existe, devolvemos el código original
+    }
   }
 }

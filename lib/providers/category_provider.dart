@@ -103,14 +103,19 @@ class CategoryProvider with ChangeNotifier {
 
   /// Obtiene las categorías desde la base de datos y las ordena,
   /// manteniendo siempre "General" en la primera posición.
+  /// Obtiene las categorías desde la base de datos y las ordena,
+  /// manteniendo siempre "General" en la primera posición.
   Future<void> loadCategories() async {
     _isLoading = true;
 
-    // Retraso de microsegundos para asegurar que el estado de carga se actualice antes de la consulta a la base de datos
+    // Retraso de microsegundos para asegurar que el estado de carga se actualice
     Future.microtask(() => notifyListeners());
 
     try {
+      // solo traemos las categorías de la base de datos
       final dbCategories = await _memoryService.getAllCategories();
+
+      // Aseguramos que 'General' siempre esté presente
       final Set<String> allCategories = {'General'};
       allCategories.addAll(dbCategories);
 
@@ -120,13 +125,15 @@ class CategoryProvider with ChangeNotifier {
       result.insert(0, 'General');
 
       _categories = result;
+      print('Categorías cargadas desde BD: $_categories');
     } catch (e) {
       if (kDebugMode) print('Error cargando categorías: $e');
-      _categories = ['General']; // Estado seguro en caso de error
+      _categories = ['General'];
     } finally {
       _isLoading = false;
-      // Usamos el mismo retraso de microsegundos por seguridad
-      Future.microtask(() => notifyListeners());
+      Future.microtask(() {
+        notifyListeners();
+      });
     }
   }
 
@@ -151,6 +158,41 @@ class CategoryProvider with ChangeNotifier {
     }
   }
 
+  /// Método que restaura las carpetas predeterminadas
+  Future<void> restoreDefaultCategories() async {
+    print('Restaurando carpetas predeterminadas');
+
+    final List<String> defaultCategories = [
+      'Viajes',
+      'Amigos',
+      'Familia',
+      'Comida',
+      'Estudio'
+    ];
+
+    try {
+      // Obtenemos las categorías actuales de la BD
+      final dbCategories = await _memoryService.getAllCategories();
+
+      for (var category in defaultCategories) {
+        // Verificamos si la categoría ya existe en la base de datos, no en la lista local
+        if (dbCategories.contains(category) == false) {
+          await _memoryService.createCategory(category);
+          print('Categoría creada: $category');
+        } else {
+          print('La categoría $category ya existe en BD');
+        }
+      }
+
+      // Recargamos las categorías
+      await loadCategories();
+      print('Carpetas predeterminadas restauradas correctamente');
+    } catch (e) {
+      print('Error al restaurar: $e');
+      rethrow;
+    }
+  }
+
   /// Método que cambia el nombre de una categoría existente
   Future<void> renameCategory(String oldName, String newName) async {
     if (oldName == 'General' || oldName == newName) return;
@@ -158,7 +200,7 @@ class CategoryProvider with ChangeNotifier {
     try {
       await _memoryService.renameCategory(oldName, newName);
 
-      // Actualizar la clave del hash si la categoría estaba protegida
+      // Actualizamos la clave del hash si la categoría estaba protegida
       if (_categoryPasswords.containsKey(oldName)) {
         final hash = _categoryPasswords[oldName];
         _categoryPasswords.remove(oldName);
@@ -206,11 +248,6 @@ class CategoryProvider with ChangeNotifier {
       if (kDebugMode) print("Error al borrar categoría: $e");
       rethrow;
     }
-  }
-
-  /// Método que mantiene la estructura base de categorías desactivando listas fijas
-  Future<void> restoreDefaultCategories() async {
-    await loadCategories();
   }
 
   /// Añade una categoría al estado local sin enviar petición al servidor/bd de inmediato
