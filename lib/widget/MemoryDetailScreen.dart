@@ -14,8 +14,10 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Pantalla de detalle que muestra la información completa de un recuerdo
+/// Permite la reproducción de vídeos, ver imágenes
+/// y botones de acción (compartir, editar, eliminar) según los permisos
 class MemoryDetailScreen extends StatefulWidget {
-  // Antes era StatelessWidget, se cambia pq es necesario para video
   final Memory memory;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -48,7 +50,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
   @override
   void didUpdateWidget(MemoryDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Si la URL cambia (gracias al paso 1), esto se activará y refrescará la imagen
+    // si la url cambia, se reinicia el controlador para cargar el nuevo video o imagen
     if (widget.memory.imageAsset != oldWidget.memory.imageAsset) {
       _disposeControllers();
       _checkMediaType();
@@ -61,6 +63,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     super.dispose();
   }
 
+  /// Método para limpiar los controladores de video y chewie
   void _disposeControllers() {
     _videoPlayerController?.dispose();
     _chewieController?.dispose();
@@ -68,32 +71,44 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     _chewieController = null;
   }
 
-  // LÓGICA DE PERMISOS
+  // Logica de permisos
+
+  /// Si el usuario tiene permisos de edición (propietario, admin o editor)
   bool _canEdit() {
     final currentUser = Supabase.instance.client.auth.currentUser;
     // Si no hay creador definido, asumimos que es el dueño por defecto
     if (widget.memory.creatorId == null ||
-        widget.memory.creatorId == currentUser?.id) return true;
+        widget.memory.creatorId == currentUser?.id) {
+      return true;
+    }
 
     final role = widget.memory.sharedRoles?[currentUser?.email];
     return role == 'admin' || role == 'editor';
   }
 
+  /// Si el usuario tiene permisos para eliminar (propietario o admin)
   bool _canDelete() {
     final currentUser = Supabase.instance.client.auth.currentUser;
     if (widget.memory.creatorId == null ||
-        widget.memory.creatorId == currentUser?.id) return true;
+        widget.memory.creatorId == currentUser?.id) {
+      return true;
+    }
 
     final role = widget.memory.sharedRoles?[currentUser?.email];
     return role == 'admin';
   }
 
-  // LÓGICA DE DETECCIÓN
+  // Logica de detección (video o imagen)
+
+  /// Verifica si es un video analizando la ruta y extension, si lo es inicia el reproductor
+  /// Si es imagen o asset también se muestra, soportando rutas locales, remotas y assets internos
   void _checkMediaType() {
     final path = widget.memory.imageAsset?.trim();
-    if (path == null || path.isEmpty) return;
+    if (path == null || path.isEmpty) {
+      return;
+    }
 
-    // Detectar .mp4 permitiendo parámetros URL
+    // Detectar la extension .mp4 y no un asset
     if (!path.startsWith('assets/') && path.toLowerCase().contains('.mp4')) {
       setState(() => _isVideo = true);
       _initializePlayer(path);
@@ -102,6 +117,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     }
   }
 
+  /// Configura y inicia el reproductor de video depende de si es una URL o un archivo local
   Future<void> _initializePlayer(String path) async {
     try {
       if (kIsWeb || path.startsWith('http')) {
@@ -119,21 +135,27 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
         errorBuilder: (context, errorMessage) => const Center(
             child: Text('Error video', style: TextStyle(color: Colors.white))),
       );
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
-      print("Error video: $e");
-      if (mounted) setState(() => _isInitVideoError = true);
+      debugPrint("Error video: $e");
+      if (mounted) {
+        setState(() => _isInitVideoError = true);
+      }
     }
   }
 
+  /// Método para compartir un recuerdo externamente (otra app, red social, etc)
+  /// Descarga el archivo si se comparte por movil, en web solo la url o asset
   Future<void> _shareMemory() async {
-    // 1. Enlace limpio y oficial de Google Maps
+    // Enlace de Google Maps
     final String googleMapsLink =
         'https://www.google.com/maps/search/?api=1&query=${widget.memory.latitude},${widget.memory.longitude}';
 
-    // 2. Texto del mensaje
+    // Texto del mensaje
     final String shareText = '''
-Nayeka Memories - Recuerdo compartido
+NaYeKa Memories - Recuerdo compartido
 
 Título: ${widget.memory.title}
 Descripción: ${widget.memory.description}
@@ -141,7 +163,7 @@ Fecha: ${widget.memory.date.split('T')[0]}
 
 Ver ubicación en Maps: $googleMapsLink
 
-Creado con Nayeka Memories: 
+Creado con NaYeKa Memories: 
 https://nayeka-memories.com
 ''';
 
@@ -154,7 +176,7 @@ https://nayeka-memories.com
         return;
       }
 
-      // LÓGICA PARA CHROME / WEB
+      // Lógica para compartir en web (no soporta archivos locales ni descargas, solo enlaces o assets)
       if (kIsWeb) {
         final mediaIcon = widget.memory.isVideo ? 'Video' : 'Imagen';
         // En web compartimos el enlace directamente
@@ -164,7 +186,7 @@ https://nayeka-memories.com
         return;
       }
 
-      // LÓGICA PARA MÓVILES (Android/iOS)
+      // Lógica para compartir en móvil o app (soporta archivos locales, remotos y assets)
       if (mediaPath.startsWith('http')) {
         // Aviso visual amplio y legible
         ScaffoldMessenger.of(context).showSnackBar(
@@ -186,7 +208,7 @@ https://nayeka-memories.com
 
         await tempFile.writeAsBytes(response.bodyBytes);
 
-        // Enviamos el archivo físico nativo (Sintaxis moderna)
+        // Se envia el archivo físico descagrado junto con el texto
         await SharePlus.instance.share(
           ShareParams(
             text: shareText,
@@ -194,7 +216,7 @@ https://nayeka-memories.com
           ),
         );
       } else if (!mediaPath.startsWith('assets/')) {
-        // Archivo físico local preexistente (Sintaxis moderna)
+        // Archivo físico local descargado o creado por el usuario (no es asset interno)
         await SharePlus.instance.share(
           ShareParams(
             text: shareText,
@@ -202,11 +224,11 @@ https://nayeka-memories.com
           ),
         );
       } else {
-        // Asset interno (Sintaxis moderna)
+        // Asset interno
         await SharePlus.instance.share(ShareParams(text: shareText));
       }
     } catch (e) {
-      print('Error al compartir: $e');
+      debugPrint('Error al compartir: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -239,7 +261,7 @@ https://nayeka-memories.com
             borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
             boxShadow: [
               BoxShadow(
-                color: pinkPrimary.withOpacity(isDarkMode ? 0.1 : 0.2),
+                color: pinkPrimary.withValues(alpha: isDarkMode ? 0.1 : 0.2),
                 blurRadius: 30,
                 spreadRadius: 5,
               ),
@@ -259,7 +281,7 @@ https://nayeka-memories.com
     );
   }
 
-  //Construimos el encabezado superior
+  /// Método que construye el encabezado de la pantalla con título, subtítulo y botón de cerrar del modal
   Widget _buildHeader(BuildContext context, bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(25),
@@ -285,7 +307,7 @@ https://nayeka-memories.com
               Text(
                 'Un lugar especial para ti',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   fontSize: 14,
                 ),
               ),
@@ -300,7 +322,8 @@ https://nayeka-memories.com
     );
   }
 
-  // Contenedor principal con todos los elementos de la memoria
+  /// Método que construye el contenido principal de la pantalla, mostrando la imagen o video, 
+  /// título, descripción, fecha, ubicación y botones de acción según los permisos 
   Widget _buildContent(BuildContext context, bool isDarkMode) {
     // Verificamos si hay algún botón de acción que mostrar
     final bool showActions = _canEdit() || _canDelete();
@@ -331,12 +354,13 @@ https://nayeka-memories.com
     );
   }
 
-  // Construimos la sección de imagen y video soportando archivos locales
+  /// Método que construye el widget, gestionando la renderización
+  /// correcta ya sea para un vídeo (Chewie) o una imagen (local o remota)
   Widget _buildImage(bool isDarkMode) {
     final path = widget.memory.imageAsset?.trim();
 
     if (path != null && path.isNotEmpty) {
-      // 1. SECCIÓN DE VIDEO
+      // Seccion de video (si se detecta que es un video, se muestra el reproductor)
       if (_isVideo) {
         if (_isInitVideoError) return _buildErrorContainer(isDarkMode);
         if (_chewieController != null &&
@@ -359,7 +383,7 @@ https://nayeka-memories.com
         }
       }
 
-      // 2. SECCIÓN DE FOTO (A TAMAÑO REAL)
+      // Seccion de imagen (si es imagen, se muestra con soporte para assets, url y archivos locales)
       Widget imageWidget;
 
       // Configuramos la carga de la imagen
@@ -369,7 +393,7 @@ https://nayeka-memories.com
         imageWidget = Image.network(
           path,
           key: ValueKey(path),
-          fit: BoxFit.contain, // CLAVE: Muestra la foto entera sin recortar
+          fit: BoxFit.contain, // Muestra la foto entera sin recortar
           cacheWidth:
               1200, // Subimos la calidad para que se vea nítida en el detalle
           loadingBuilder: (context, child, loadingProgress) {
@@ -385,7 +409,7 @@ https://nayeka-memories.com
       } else {
         imageWidget = Image.file(
           File(path),
-          fit: BoxFit.contain, // Muestra la foto entera sin recortar
+          fit: BoxFit.contain,
           cacheWidth: 1200,
           errorBuilder: (context, error, stackTrace) =>
               _buildErrorContainer(isDarkMode),
@@ -395,13 +419,13 @@ https://nayeka-memories.com
       return Container(
         constraints: const BoxConstraints(
             maxHeight:
-                500), // Limitamos la altura máxima para que no ocupe toda la pantalla
+                500), // limita la altura máxima para que no ocupe toda la pantalla
         width: double.infinity,
         decoration: BoxDecoration(
           color: isDarkMode
               ? Colors.black26
               : Colors
-                  .grey[100], // Fondo sutil para las zonas que queden vacías
+                  .grey[100], // fondo sutil para las zonas que queden vacías
           borderRadius: BorderRadius.circular(20),
         ),
         child: ClipRRect(
@@ -414,7 +438,7 @@ https://nayeka-memories.com
     return _buildErrorContainer(isDarkMode); // Si no hay nada, error
   }
 
-  // Widget auxiliar para control de errores de carga de imagen
+  /// Widget para control de errores de carga de imagen
   Widget _buildErrorContainer(bool isDarkMode) {
     return Container(
       height: 250,
@@ -424,18 +448,17 @@ https://nayeka-memories.com
     );
   }
 
-  // Muestra el título principal de la memoria
+  /// Método que muestra la categoría y el título principal de la memoria
   Widget _buildTitle(bool isDarkMode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // categoría
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: pinkPrimary.withOpacity(0.1),
+            color: pinkPrimary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: pinkPrimary.withOpacity(0.5)),
+            border: Border.all(color: pinkPrimary.withValues(alpha: 0.5)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -456,7 +479,6 @@ https://nayeka-memories.com
         ),
         const SizedBox(height: 10),
 
-        // Titulo
         Text(
           widget.memory.title,
           style: TextStyle(

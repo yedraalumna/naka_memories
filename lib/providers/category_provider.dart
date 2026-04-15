@@ -102,9 +102,7 @@ class CategoryProvider with ChangeNotifier {
   }
 
   /// Obtiene las categorías desde la base de datos y las ordena,
-  /// manteniendo siempre "General" en la primera posición.
-  /// Obtiene las categorías desde la base de datos y las ordena,
-  /// manteniendo siempre "General" en la primera posición.
+  /// manteniendo siempre "General" en la primera posición
   Future<void> loadCategories() async {
     _isLoading = true;
 
@@ -125,7 +123,7 @@ class CategoryProvider with ChangeNotifier {
       result.insert(0, 'General');
 
       _categories = result;
-      print('Categorías cargadas desde BD: $_categories');
+      if (kDebugMode) print('Categorías cargadas desde BD: $_categories');
     } catch (e) {
       if (kDebugMode) print('Error cargando categorías: $e');
       _categories = ['General'];
@@ -160,7 +158,7 @@ class CategoryProvider with ChangeNotifier {
 
   /// Método que restaura las carpetas predeterminadas
   Future<void> restoreDefaultCategories() async {
-    print('Restaurando carpetas predeterminadas');
+    if (kDebugMode) print('Restaurando carpetas predeterminadas');
 
     final List<String> defaultCategories = [
       'Viajes',
@@ -178,17 +176,17 @@ class CategoryProvider with ChangeNotifier {
         // Verificamos si la categoría ya existe en la base de datos, no en la lista local
         if (dbCategories.contains(category) == false) {
           await _memoryService.createCategory(category);
-          print('Categoría creada: $category');
+        if (kDebugMode) print('Categoría creada: $category');
         } else {
-          print('La categoría $category ya existe en BD');
+        if (kDebugMode) print('La categoría $category ya existe en BD');
         }
       }
 
       // Recargamos las categorías
       await loadCategories();
-      print('Carpetas predeterminadas restauradas correctamente');
+      if (kDebugMode) print('Carpetas predeterminadas restauradas correctamente');
     } catch (e) {
-      print('Error al restaurar: $e');
+      if (kDebugMode) print('Error al restaurar: $e');
       rethrow;
     }
   }

@@ -6,16 +6,17 @@ import '../constants/colors.dart';
 import 'MemoryThumbnail.dart';
 import '../providers/theme_provider.dart';
 
+/// Menú flotante que aparece al pulsar el botón de menú en el mapa el cual permite crear recuerdos, centrar el mapa, listar recuerdos, generar PDF, etc
 class MenuDialog extends StatefulWidget {
-  final List<Memory> memories;
-  final LatLng currentPosition;
-  final VoidCallback onShowAllMemories;
-  final VoidCallback onSaveCurrentCoordinates;
-  final VoidCallback onCreateNewMemory;
-  final VoidCallback onClearAllMemories;
-  final Function(Memory) onShowMemoryDetails;
-  final Function(List<Memory>) onCenterList;
-  final VoidCallback onGenerarPdf;
+  final List<Memory> memories;           // Lista de todos los recuerdos
+  final LatLng currentPosition;          // Posición actual del mapa
+  final VoidCallback onShowAllMemories;   // Función para centrar el mapa en todos los recuerdos
+  final VoidCallback onSaveCurrentCoordinates; // Función para guardar coordenadas actuales
+  final VoidCallback onCreateNewMemory;   // Función para crear un nuevo recuerdo
+  final VoidCallback onClearAllMemories;  // Función para eliminar todos los recuerdos
+  final Function(Memory) onShowMemoryDetails; // Función para mostrar detalles de un recuerdo
+  final Function(List<Memory>) onCenterList;  // Función para centrar el mapa en una lista
+  final VoidCallback onGenerarPdf;        // Función para generar PDF
 
   const MenuDialog({
     super.key,
@@ -31,37 +32,49 @@ class MenuDialog extends StatefulWidget {
   });
 
   @override
-  State<MenuDialog> createState() => _MenuDialogState();
+  State<MenuDialog> createState() {
+    return _MenuDialogState();
+  }
 }
 
 class _MenuDialogState extends State<MenuDialog> {
 
+  /// Muestra un modal con una lista de recuerdos como todos, favoritos y por fecha
   void _showMemoryListModal(List<Memory> list, String title, ThemeData theme, bool isDarkMode) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      
-      //MODIFCAMOS AQUI ( QUE ES CTX)
-      builder: (ctx) {
+      isScrollControlled: true,      
+      backgroundColor: Colors.transparent,  
+      builder: (contextModal) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.8,
-          maxChildSize: 0.95,
-          minChildSize: 0.5,
-          builder: (ctx2, scrollController) {
+          initialChildSize: 0.8,     
+          maxChildSize: 0.95,        
+          minChildSize: 0.5,        
+          builder: (contextSheet, scrollController) {
             
-            //MODIFCAMOS AQUI
-            Color backgroundColor = isDarkMode ? backgroundDark : Colors.white;
-            Color textColor = isDarkMode ? Colors.white : Colors.black;
-            Color primaryColor = theme.brightness == Brightness.dark ? pinkLight : pinkPrimary;
+            // Colores según el tema
+            Color colorFondo;
+            Color colorTexto;
+            Color colorPrincipal;
+            
+            if (isDarkMode == true) {
+              colorFondo = backgroundDark;
+              colorTexto = Colors.white;
+              colorPrincipal = pinkLight;
+            } else {
+              colorFondo = Colors.white;
+              colorTexto = Colors.black;
+              colorPrincipal = pinkPrimary;
+            }
 
             return Container(
               decoration: BoxDecoration(
-                color: backgroundColor,
+                color: colorFondo,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
                 children: [
+                  // Título del modal
                   Container(
                     padding: const EdgeInsets.all(15),
                     alignment: Alignment.center,
@@ -70,49 +83,83 @@ class _MenuDialogState extends State<MenuDialog> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: primaryColor,
+                        color: colorPrincipal,
                       ),
                     ),
                   ),
                   Expanded(
-
-                     //MODIFCAMOS AQUI
-                    child: list.isEmpty ? Center(
-                            child: Text( 'No se encontraron recuerdos.', style: TextStyle(color: textColor),),
-                          )
-                        : ListView.builder(
-                            controller: scrollController,
-                            itemCount: list.length,
-                            itemBuilder: (ctx3, index) {
-                              final memory = list[index];
-                              return ListTile(
-                                leading: MemoryThumbnail(
-                                  imagePath: memory.imageAsset,
-                                  width: 50,
-                                  height: 50,
-                                ),
-                                title: Text(
-                                  memory.title,
-                                  style: TextStyle(color: textColor),
-                                ),
-                                subtitle: Text(
-
-
-                                   //MODIFCAMOS AQUI
-                                  '${memory.date} | ${memory.location['latitude']?.toStringAsFixed(4)}, ${memory.location['longitude']?.toStringAsFixed(4)}',
-                                  style: TextStyle(
-                                      color: theme.brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[700]),
-                                ),
-                                onTap: () {
-                                  Navigator.pop(ctx3);
-                                  widget.onShowMemoryDetails(memory);
-                                },
-
-                                 //MODIFCAMOS AQUI
-                                tileColor: theme.brightness == Brightness.dark ? cardDark.withOpacity(0.5) : null,
-                              );
-                            },
+                    // Si la lista está vacía, mostramos un el mensaje
+                    child: () {
+                      if (list.isEmpty == true) {
+                        return Center(
+                          child: Text('No se encontraron recuerdos.',
+                            style: TextStyle(color: colorTexto),
                           ),
+                        );
+                      } else {
+                        // Si hay recuerdos, lo mostramos en una lista
+                        return ListView.builder(
+                          controller: scrollController,
+                          itemCount: list.length,
+                          itemBuilder: (contextItem, index) {
+                            final memory = list[index];
+                            
+                            // Color del fondo de cada elemento de la lista
+                            Color? colorTile;
+                            if (theme.brightness == Brightness.dark) {
+                              colorTile = cardDark.withOpacity(0.5);
+                            } else {
+                              colorTile = null;
+                            }
+                            
+                            return ListTile(
+                              leading: MemoryThumbnail(
+                                imagePath: memory.imageAsset,
+                                width: 50,
+                                height: 50,
+                              ),
+                              title: Text(
+                                memory.title,
+                                style: TextStyle(color: colorTexto),
+                              ),
+                              subtitle: () {
+                                // Obtenemos la latitud y longitud de forma segura
+                                String latitud;
+                                String longitud;
+                                
+                                if (memory.location['latitude'] != null) {
+                                  latitud = memory.location['latitude']!.toStringAsFixed(4);
+                                } else {
+                                  latitud = '0.0000';
+                                }
+                                
+                                if (memory.location['longitude'] != null) {
+                                  longitud = memory.location['longitude']!.toStringAsFixed(4);
+                                } else {
+                                  longitud = '0.0000';
+                                }
+                                
+                                Color colorSubtitulo;
+                                if (theme.brightness == Brightness.dark) {
+                                  colorSubtitulo = Colors.grey[400]!;
+                                } else {
+                                  colorSubtitulo = Colors.grey[700]!;
+                                }
+                                
+                                return Text('${memory.date} | $latitud, $longitud',
+                                  style: TextStyle(color: colorSubtitulo),
+                                );
+                              }(),
+                              onTap: () {
+                                Navigator.pop(contextItem);
+                                widget.onShowMemoryDetails(memory);
+                              },
+                              tileColor: colorTile,
+                            );
+                          },
+                        );
+                      }
+                    }(),
                   ),
                 ],
               ),
@@ -123,14 +170,19 @@ class _MenuDialogState extends State<MenuDialog> {
     );
   }
 
-
-   //MODIFCAMOS AQUI
+  /// mostramos los recuerdos ordenados por fecha, del más reciente al más antiguo
   void _showSortedByDate(ThemeData theme, bool isDarkMode) {
+    // Cerramos el menú actual
     Navigator.pop(context);
-    final sortedMemories = List<Memory>.from(widget.memories)
-      ..sort((a, b) => b.date.compareTo(a.date));
-    _showMemoryListModal(
-        sortedMemories, 'Recuerdos por Fecha (Recientes)', theme, isDarkMode);
+    
+    // Creamos una copia de la lista y la ordenamos por fecha descendente
+    final List<Memory> sortedMemories = List<Memory>.from(widget.memories);
+    sortedMemories.sort((a, b) {
+      return b.date.compareTo(a.date);
+    });
+    
+    //Mostramos el modal con la lista ordenada
+    _showMemoryListModal(sortedMemories, 'Recuerdos por Fecha (Recientes)', theme, isDarkMode);
   }
 
   @override
@@ -138,21 +190,40 @@ class _MenuDialogState extends State<MenuDialog> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final theme = Theme.of(context);
 
+    // Determinamos si estamos en modo oscuro
     bool isDarkMode;
     if (themeProvider.themeMode == ThemeMode.system) {
-      isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
+      // Si es automático, miramos la configuración del sistema
+      if (MediaQuery.of(context).platformBrightness == Brightness.dark) {
+        isDarkMode = true;
+      } else {
+        isDarkMode = false;
+      }
     } else {
-      isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+      // Si no es automático, miramos la configuración guardada
+      if (themeProvider.themeMode == ThemeMode.dark) {
+        isDarkMode = true;
+      } else {
+        isDarkMode = false;
+      }
     }
 
-     //MODIFCAMOS AQUI
-    Color backgroundColor = isDarkMode ? backgroundDark : Colors.white;
-    Color dividerColor = isDarkMode ? Colors.grey[700]! : pinkLighter;
+    // Colores según el modo oscuro
+    Color colorFondo;
+    Color colorDivisor;
+    
+    if (isDarkMode == true) {
+      colorFondo = backgroundDark;
+      colorDivisor = Colors.grey[700]!;
+    } else {
+      colorFondo = Colors.white;
+      colorDivisor = pinkLighter;
+    }
 
     return Container(
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: colorFondo,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: Column(
@@ -168,6 +239,7 @@ class _MenuDialogState extends State<MenuDialog> {
           ),
           const SizedBox(height: 25),
 
+          // guardamos el nuevo recuerdo
           _buildMenuItem(
             icon: Icons.add_location_alt,
             title: 'Guardar nuevo recuerdo',
@@ -179,8 +251,9 @@ class _MenuDialogState extends State<MenuDialog> {
             isDarkMode: isDarkMode,
           ),
 
-          Divider(color: dividerColor),
+          Divider(color: colorDivisor),
 
+          // centramos todos los recuerdos
           _buildMenuItem(
             icon: Icons.zoom_out_map,
             title: 'Centrar en todos los recuerdos',
@@ -189,18 +262,27 @@ class _MenuDialogState extends State<MenuDialog> {
             isDarkMode: isDarkMode,
           ),
 
+          // centramos los recuerdos en favoritos
           _buildMenuItem(
             icon: Icons.filter_center_focus,
             title: 'Centrar favoritos',
             color: pinkPrimary,
             onTap: () {
               Navigator.pop(context);
-              final favs = widget.memories.where((m) => m.isFavorite).toList();
-              if (favs.isNotEmpty) widget.onCenterList(favs);
+              final List<Memory> favoritos = [];
+              for (var m in widget.memories) {
+                if (m.isFavorite == true) {
+                  favoritos.add(m);
+                }
+              }
+              if (favoritos.isNotEmpty) {
+                widget.onCenterList(favoritos);
+              }
             },
             isDarkMode: isDarkMode,
           ),
 
+          // listamos todos los recuerdos
           _buildMenuItem(
             icon: Icons.list,
             title: 'Listar todos los recuerdos',
@@ -212,43 +294,52 @@ class _MenuDialogState extends State<MenuDialog> {
             isDarkMode: isDarkMode,
           ),
 
+          // listamos los favoritos
           _buildMenuItem(
             icon: Icons.favorite,
             title: 'Listar favoritos',
             color: pinkPrimary,
             onTap: () {
               Navigator.pop(context);
-              final favs = widget.memories.where((m) => m.isFavorite).toList();
-              _showMemoryListModal(favs, 'Mis Favoritos', theme, isDarkMode);
+              final List<Memory> favoritos = [];
+              for (var m in widget.memories) {
+                if (m.isFavorite == true) {
+                  favoritos.add(m);
+                }
+              }
+              _showMemoryListModal(favoritos, 'Mis Favoritos', theme, isDarkMode);
             },
             isDarkMode: isDarkMode,
           ),
 
+          // Opción: Listar por fecha
           _buildMenuItem(
             icon: Icons.date_range,
             title: 'Listar por fecha (Recientes)',
             color: pinkPrimary,
-
-             //MODIFCAMOS AQUI
-            onTap: () => _showSortedByDate(theme, isDarkMode),
+            onTap: () {
+              _showSortedByDate(theme, isDarkMode);
+            },
             isDarkMode: isDarkMode,
           ),
 
-          Divider(color: dividerColor),
+          Divider(color: colorDivisor),
 
+          // pata generar el PDF
           _buildMenuItem(
             icon: Icons.picture_as_pdf,
             title: 'Generar PDF de recuerdos',
             color: Colors.pink,
             onTap: () {
-              Navigator.pop(context); // Cerramos el menú
-              widget.onGenerarPdf(); 
+              Navigator.pop(context);
+              widget.onGenerarPdf();
             },
             isDarkMode: isDarkMode,
           ),
 
-          Divider(color: dividerColor),
+          Divider(color: colorDivisor),
 
+          // eliminamos todos los recuerdos
           _buildMenuItem(
             icon: Icons.delete_sweep,
             title: 'Eliminar todos los recuerdos',
@@ -261,6 +352,7 @@ class _MenuDialogState extends State<MenuDialog> {
     );
   }
 
+  /// Construimos un elemento del menú, icono + texto + flecha
   Widget _buildMenuItem({
     required IconData icon,
     required String title,
@@ -268,13 +360,35 @@ class _MenuDialogState extends State<MenuDialog> {
     required Color color,
     required bool isDarkMode,
   }) {
+    // Color de fondo del icono, según modo oscuro 
+    Color colorFondoIcono;
+    if (isDarkMode == true) {
+      colorFondoIcono = color.withOpacity(0.2);
+    } else {
+      colorFondoIcono = color.withOpacity(0.1);
+    }
+    
+    // Color del texto según modo oscuro)
+    Color colorTexto;
+    if (isDarkMode == true) {
+      colorTexto = Colors.white;
+    } else {
+      colorTexto = Colors.black87;
+    }
+    
+    // Color de fondo del ListTile (según modo oscuro)
+    Color? colorTile;
+    if (isDarkMode == true) {
+      colorTile = cardDark.withOpacity(0.3);
+    } else {
+      colorTile = null;
+    }
+
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-
-           //MODIFCAMOS AQUI
-          color: color.withOpacity(isDarkMode ? 0.2 : 0.1),
+          color: colorFondoIcono,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: color),
@@ -282,9 +396,7 @@ class _MenuDialogState extends State<MenuDialog> {
       title: Text(
         title,
         style: TextStyle(
-
-           //MODIFCAMOS AQUI
-          color: isDarkMode ? Colors.white : Colors.black87,
+          color: colorTexto,
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
@@ -292,9 +404,7 @@ class _MenuDialogState extends State<MenuDialog> {
       trailing: Icon(Icons.chevron_right, color: color),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-
-       //MODIFCAMOS AQUI
-      tileColor: isDarkMode ? cardDark.withOpacity(0.3) : null,
+      tileColor: colorTile,
     );
   }
 }

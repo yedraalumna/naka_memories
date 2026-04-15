@@ -7,11 +7,12 @@ import '../constants/colors.dart';
 import 'MemoryThumbnail.dart';
 import 'MemoryDetailScreen.dart';
 
+// Widget que muestra un recuerdo como una tarjeta en una lista
 class MemoryListTile extends StatelessWidget {
   final Memory memory;
-  final VoidCallback onEdit; // Callback para la lógica de edición
-  final VoidCallback onDelete; // Callback para la lógica de borrado
-  final Function(Memory) onUpdate; // Callback para actualizar el recuerdo
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final Function(Memory) onUpdate;
 
   const MemoryListTile({
     super.key,
@@ -24,13 +25,34 @@ class MemoryListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final isFav = context.watch<FavoriteProvider>().isFavorite(memory.id);
+    final bool isFav = context.watch<FavoriteProvider>().isFavorite(memory.id);
+
+    // Colores según el tema
+    Color colorTarjeta;
+    Color colorTitulo;
+    Color colorSubtitulo;
+    
+    if (themeProvider.isDarkMode == true) {
+      colorTarjeta = cardDark;
+      colorTitulo = textDarkMode;
+      colorSubtitulo = Colors.grey[400]!;
+    } else {
+      colorTarjeta = Colors.white;
+      colorTitulo = Colors.black87;
+      colorSubtitulo = Colors.grey[600]!;
+    }
+
+    // Icono del botón favorito
+    Icon iconoFavorito;
+    if (isFav == true) {
+      iconoFavorito = const Icon(Icons.favorite, color: pinkPrimary);
+    } else {
+      iconoFavorito = const Icon(Icons.favorite_border, color: Colors.grey);
+    }
 
     return Card(
       elevation: 2,
-
-       //MODIFCAMOS AQUI
-      color: themeProvider.isDarkMode ? cardDark : Colors.white,
+      color: colorTarjeta,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -49,40 +71,35 @@ class MemoryListTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontWeight: FontWeight.bold,
-
-             //MODIFCAMOS AQUI
-            color: themeProvider.isDarkMode ? textDarkMode : Colors.black87,
+            color: colorTitulo,
           ),
         ),
         subtitle: Text(
           memory.date,
           style: TextStyle(
-
-             //MODIFCAMOS AQUI
-            color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+            color: colorSubtitulo,
             fontSize: 12,
           ),
         ),
         trailing: IconButton(
-
-           //MODIFCAMOS AQUI
-          icon: Icon( isFav ? Icons.favorite : Icons.favorite_border, color: isFav ? pinkPrimary : Colors.grey,),
+          icon: iconoFavorito,
           onPressed: () {
             context.read<FavoriteProvider>().toggleFavorite(memory.id);
           },
         ),
         onTap: () {
-          // Abrimos el modal con la lógica de gestión de edición y borrado inyectada
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
-            builder: (context) => MemoryDetailScreen(
-              memory: memory,
-              onEdit: onEdit,
-              onDelete: onDelete,
-              onUpdate: onUpdate,
-            ),
+            builder: (context) {
+              return MemoryDetailScreen(
+                memory: memory,
+                onEdit: onEdit,
+                onDelete: onDelete,
+                onUpdate: onUpdate,
+              );
+            },
           );
         },
       ),
