@@ -231,12 +231,29 @@ class _CoordinateInputScreenState extends State<CoordinateInputScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Determinar el título según si estamos editando o creando
+    String titulo;
+    if (widget.existingMemory != null) {
+      titulo = 'Editar ubicación del recuerdo';
+    } else {
+      titulo = 'Seleccionar coordenadas';
+    }
+
+    // Determinar el texto del botón
+    String textoBoton;
+    IconData iconoBoton;
+    if (widget.existingMemory != null) {
+      textoBoton = 'Actualizar Ubicación';
+      iconoBoton = Icons.save;
+    } else {
+      textoBoton = 'Confirmar ubicación';
+      iconoBoton = Icons.check;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.existingMemory != null
-              ? 'Editar ubicación del recuerdo'
-              : 'Seleccionar coordenadas',
+          titulo,
           style: const TextStyle(color: Colors.white),
         ),
         backgroundColor: pinkPrimary,
@@ -320,10 +337,10 @@ class _CoordinateInputScreenState extends State<CoordinateInputScreen> {
             ),
           ),
 
-          // Instrucciones para móvil
+          // Instrucciones para móvil (con texto justificado)
           if (!_isWeb)
             Positioned(
-              bottom: 100,
+              bottom: 140,
               left: 20,
               right: 20,
               child: Card(
@@ -336,6 +353,7 @@ class _CoordinateInputScreenState extends State<CoordinateInputScreen> {
                   padding: EdgeInsets.all(12.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Cómo seleccionar:',
@@ -348,14 +366,19 @@ class _CoordinateInputScreenState extends State<CoordinateInputScreen> {
                       Text(
                         '1. Mueve el mapa para ajustar la ubicación',
                         style: TextStyle(color: Colors.white, fontSize: 12),
+                        textAlign: TextAlign.justify,
                       ),
+                      SizedBox(height: 2),
                       Text(
                         '2. Las coordenadas se actualizan automáticamente',
                         style: TextStyle(color: Colors.white, fontSize: 12),
+                        textAlign: TextAlign.justify,
                       ),
+                      SizedBox(height: 2),
                       Text(
                         '3. Toca y mantén presionado para mover directamente',
                         style: TextStyle(color: Colors.white, fontSize: 12),
+                        textAlign: TextAlign.justify,
                       ),
                     ],
                   ),
@@ -372,13 +395,11 @@ class _CoordinateInputScreenState extends State<CoordinateInputScreen> {
         child: FloatingActionButton.extended(
           onPressed: _saveSelectedCoordinate,
           label: Text(
-            widget.existingMemory != null
-                ? 'Actualizar Ubicación'
-                : 'Confirmar ubicación',
+            textoBoton,
             style: const TextStyle(color: Colors.white),
           ),
           icon: Icon(
-            widget.existingMemory != null ? Icons.save : Icons.check,
+            iconoBoton,
             color: Colors.white,
           ),
           backgroundColor: pinkPrimary,
