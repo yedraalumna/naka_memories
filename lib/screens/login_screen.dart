@@ -7,6 +7,7 @@ import 'register_screen.dart';
 import '../constants/colors.dart';
 import 'change_password_screen.dart';
 
+//Pantalla de login
 class LoginScreen extends StatefulWidget {
   //Se usa lo de stateful porque el formulario tiene campos que cambian y un botón de carga
   const LoginScreen({super.key});
@@ -17,8 +18,9 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   late String email, password;
-  final _formKey = GlobalKey<FormState>();
-  bool _isLoading = false;
+  final _formKey = GlobalKey<
+      FormState>(); //identificador del formulario para validarlo y guardarlo
+  bool _isLoading = false; // para mostrar el circulo de carga
   bool _ocultarPassword = true; // variable para el ojito
 
   @override
@@ -34,6 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
       error = authProvider.errorMessage;
     }
 
+    //color de fondo dependiendo del tema (oscuro o claro)
     Color backgroundColor;
     if (themeProvider.isDarkMode) {
       backgroundColor = backgroundDark;
@@ -47,11 +50,13 @@ class _LoginScreenState extends State<LoginScreen> {
         padding: const EdgeInsets.all(20),
         child: Center(
           child: SingleChildScrollView(
+            //permite hacer scroll si no se muestra todo en la pantalla
             child: Column(
               mainAxisSize: MainAxisSize.max,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Padding(
+                  //logo de la app
                   padding: const EdgeInsets.all(16.0),
                   child: Image.asset(
                     'assets/images/logo.png',
@@ -87,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: Row(
                         children: [
+                          //Icono de error, mensaje y botón para cerrar el error
                           Icon(
                             Icons.error,
                             color: () {
@@ -133,6 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
+                //Formulario de email y contraseña
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: formulario(themeProvider),
@@ -141,6 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 15), botonLogin(),
                 const SizedBox(height: 20),
 
+                // Enlaces para cambiar contraseña
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -168,6 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
 
+                //Enlace para ir a registrarse
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -226,6 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  //campo de email
   Widget buildEmail(ThemeProvider themeProvider) {
     Color textColor;
     Color borderColor;
@@ -275,6 +285,8 @@ class _LoginScreenState extends State<LoginScreen> {
       onSaved: (String? value) {
         email = value!;
       },
+
+      //validación del email
       validator: (value) {
         if (value!.isEmpty) {
           return "Este campo es obligatorio";
@@ -287,6 +299,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  //campo de contraseña
   Widget buildPassword(ThemeProvider themeProvider) {
     Color textColor;
     Color borderColor;
@@ -365,6 +378,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  //botón de iniciar sesión
   Widget botonLogin() {
     return FractionallySizedBox(
       widthFactor: 0.6,
@@ -385,6 +399,7 @@ class _LoginScreenState extends State<LoginScreen> {
               if (_formKey.currentState!.validate()) {
                 _formKey.currentState!.save();
 
+                //muestra circulo de carga
                 setState(() {
                   _isLoading = true;
                 });
@@ -401,6 +416,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   _isLoading = false;
                 });
 
+                //si el login es exitoso, se redirige a la pantalla principal
                 if (success) {
                   Navigator.pushAndRemoveUntil(
                     context,
