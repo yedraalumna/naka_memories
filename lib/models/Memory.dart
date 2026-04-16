@@ -17,6 +17,7 @@ class Memory {
   final Map<String, dynamic>? sharedRoles;
   final Map<String, dynamic>? pendingRoles;
   final String? creatorEmail;
+  final bool isShared;  // NUEVO: indica si el recuerdo es compartido
 
   // Lista de las categorias predeterminadas
   static const List<String> categoriesList = [
@@ -44,6 +45,7 @@ class Memory {
     this.sharedRoles,
     this.pendingRoles,
     this.creatorEmail,
+    this.isShared = false,  // NUEVO: por defecto false
   });
 
   static const List<String> defaultCategories = [
@@ -127,6 +129,7 @@ class Memory {
       'shared_roles': sharedRoles,
       'pending_roles': pendingRoles,
       'creator_email': creatorEmail,
+      'is_shared': isShared,  // NUEVO: guardar en la base de datos
     };
   }
 
@@ -221,6 +224,9 @@ class Memory {
         parsedPendingRoles = Map<String, dynamic>.from(pendingRaw);
       }
 
+      // NUEVO: leer si es compartido
+      final isShared = (map['is_shared'] == true) || (map['isShared'] == true);
+
       return Memory(
         id: id,
         title: title,
@@ -240,6 +246,7 @@ class Memory {
         sharedRoles: parsedSharedRoles,
         pendingRoles: parsedPendingRoles,
         creatorEmail: creatorEmail,
+        isShared: isShared,  // NUEVO: asignar valor
       );
     } catch (e) {
       print('Error en Memory.fromMap: $e');
@@ -259,6 +266,7 @@ class Memory {
         sharedRoles: null,
         pendingRoles: null,
         creatorEmail: null,
+        isShared: false,  // NUEVO: por defecto false
       );
     }
   }
@@ -334,6 +342,7 @@ class Memory {
     Map<String, dynamic>? sharedRoles,
     Map<String, dynamic>? pendingRoles,
     String? creatorEmail,
+    bool? isShared,  // NUEVO: parámetro opcional
   }) {
     return Memory(
       id: _valor(id, this.id),
@@ -351,6 +360,7 @@ class Memory {
       sharedRoles: _valor(sharedRoles, this.sharedRoles),
       pendingRoles: _valor(pendingRoles, this.pendingRoles),
       creatorEmail: _valor(creatorEmail, this.creatorEmail),
+      isShared: _valor(isShared, this.isShared),  // NUEVO: copiar valor
     );
   }
 

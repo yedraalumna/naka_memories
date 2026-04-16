@@ -45,19 +45,17 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     final categoryMemories =
         _memories.where((m) => m.category == category).toList();
     if (categoryMemories.isEmpty) {
-      return true; // Si está vacía la crea el propio usuario
+      return true;
     }
 
     final currentUser = Supabase.instance.client.auth.currentUser;
-    // Si no hay creatorId antiguo, es del usuario actual
     final ownerId = categoryMemories.first.creatorId ?? currentUser?.id;
     return currentUser?.id == ownerId;
   }
 
   /// Verifica si el usuario actual tiene permisos de 'editor' o 'admin'
-  /// para poder añadir o editar recuerdos en la categoría/carpeta
   bool _canAddOrEdit(String category) {
-    if (_isOwner(category)) return true; // El dueño siempre puede
+    if (_isOwner(category)) return true;
 
     final categoryMemories =
         _memories.where((m) => m.category == category).toList();
@@ -69,19 +67,18 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     return role == 'editor' || role == 'admin';
   }
 
-  /// Verifica si el usuario tiene permisos de 'admin' (o es el creador) para poder eliminar un recuerdo
+  /// Verifica si el usuario tiene permisos de 'admin' para eliminar
   bool _canDelete(Memory memory) {
     final currentUser = Supabase.instance.client.auth.currentUser;
     if (memory.creatorId == currentUser?.id) {
-      return true; // El dueño siempre puede
+      return true;
     }
 
     final role = memory.sharedRoles?[currentUser?.email];
     return role == 'admin';
   }
 
-  /// Método que hace que se carguen todos los recuerdos del usuario desde la base de datos
-  /// y los almacena en la lista de favoritos para que se puedan ver en toda la app
+  /// Carga todos los recuerdos del usuario desde la base de datos
   Future<void> _loadMemories() async {
     setState(() => _isLoading = true);
     try {
@@ -109,14 +106,12 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
   Map<String, List<Memory>> _groupMemoriesByCategory() {
     Map<String, List<Memory>> grouped = {};
     for (var memory in _memories) {
-      grouped.putIfAbsent(memory.category, () => []).add(
-          memory); // Agrega la memoria a la categoría (PutIfAbsent es un if/else compacto)
+      grouped.putIfAbsent(memory.category, () => []).add(memory);
     }
     return grouped;
   }
 
-  /// Coge el último recuerdo añadido a la categoría para usarlo como miniatura de la carpeta
-  /// Si no hay recuerdos, devuelve null para mostrar el icono de carpeta vacía
+  /// Coge el último recuerdo añadido a la categoría para usarlo como miniatura
   Memory? _getLastMemoryForCategory(
       String category, Map<String, List<Memory>> grouped) {
     final memories = grouped[category];
@@ -124,7 +119,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     return memories.last;
   }
 
-  /// Maneja el evento de tocar una carpeta. Si tiene PIN, se abre el diálogo del PIN antes de abrirla
+  /// Maneja el evento de tocar una carpeta. Si tiene PIN, se abre el diálogo
   Future<void> _onFolderTap(
       String category, Map<String, List<Memory>> grouped) async {
     final categoryProvider =
@@ -158,7 +153,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Proteger Carpeta'),
         content: SingleChildScrollView(
-          // hace que el teclado no tape el contenido
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -211,9 +205,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                 }
 
                 _loadMemories();
-                if (!context.mounted) {
-                  return;
-                }
+                if (!context.mounted) return;
 
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -232,7 +224,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  /// Navega al formulario para crear un recuerdo y si hay una categoría seleccionada, se la asigna
+  /// Navega al formulario para crear un recuerdo
   void _navigateToCreateMemory() {
     const ubicacionPorDefecto = LatLng(0.0, 0.0);
 
@@ -252,10 +244,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
             : null,
         onSave: (newMemory) async {
           await _memoryService.saveMemory(newMemory);
-          if (!context.mounted) {
-            return;
-          }
-
+          if (!context.mounted) return;
           Navigator.pop(context);
           _loadMemories();
         },
@@ -264,7 +253,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  /// Muestra el modal para escribir el nombre y crear una nueva carpeta vacía
+  /// Muestra el modal para crear una nueva carpeta vacía
   void _showNewCategoryDialog() {
     final TextEditingController controller = TextEditingController();
 
@@ -272,8 +261,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           contentPadding: const EdgeInsets.all(24),
           title: const Text('Nueva Carpeta',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -340,8 +328,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                             );
                           }
                         },
-                        child:
-                            const Text('Crear', style: TextStyle(fontSize: 18)),
+                        child: const Text('Crear', style: TextStyle(fontSize: 18)),
                       ),
                     ),
                   ],
@@ -354,7 +341,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  /// Muestra el modal para dar o eliminar permisos (roles) a otros usuarios por correo sobre toda la categoría/carpeta
+  /// Muestra el modal para compartir carpeta con otros usuarios
   void _showShareCategoryDialog(String categoryToShare) {
     final categoryMemories =
         _memories.where((m) => m.category == categoryToShare).toList();
@@ -395,8 +382,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
         return StatefulBuilder(builder: (context, setDialogState) {
           return AlertDialog(
             backgroundColor: isDarkMode ? cardDark : Colors.white,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             contentPadding: const EdgeInsets.all(24),
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -438,7 +424,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 16),
-
                   Text(
                     'Escribe un correo electrónico:',
                     style: TextStyle(
@@ -447,7 +432,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                         color: isDarkMode ? textLight : Colors.black87),
                   ),
                   const SizedBox(height: 8),
-
                   TextField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -457,8 +441,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                     decoration: InputDecoration(
                       hintText: 'amigo@correo.com',
                       hintStyle: TextStyle(
-                          color:
-                              isDarkMode ? Colors.grey[500] : Colors.grey[600]),
+                          color: isDarkMode ? Colors.grey[500] : Colors.grey[600]),
                       fillColor: isDarkMode ? cardDark : Colors.white,
                       filled: true,
                       contentPadding: const EdgeInsets.symmetric(
@@ -483,7 +466,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
                   DropdownButtonFormField<String>(
                     initialValue: selectedRole,
                     isExpanded: true,
@@ -496,8 +478,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                       labelText: 'Permiso otorgado',
                       labelStyle: TextStyle(
                           fontSize: 14,
-                          color:
-                              isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+                          color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
                       contentPadding: const EdgeInsets.symmetric(
                           vertical: 16, horizontal: 16),
                       border: OutlineInputBorder(
@@ -542,8 +523,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                       }
                     },
                   ),
-
-                  // Lista de usuarios con acceso y sus roles
                   if (categoryMemories.first.sharedRoles != null &&
                       categoryMemories.first.sharedRoles!.isNotEmpty) ...[
                     const SizedBox(height: 24),
@@ -556,14 +535,12 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color:
-                            isDarkMode ? Colors.grey[900] : Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: isDarkMode
-                                ? Colors.grey[800]!
-                                : Colors.grey.shade200),
-                      ),
+                          color: isDarkMode ? Colors.grey[900] : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: isDarkMode
+                                  ? Colors.grey[800]!
+                                  : Colors.grey.shade200)),
                       child: Column(
                         children: categoryMemories.first.sharedRoles!.entries
                             .map((entry) {
@@ -582,8 +559,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                                                 ? Colors.grey[300]
                                                 : Colors.black87))),
                                 const SizedBox(width: 8),
-
-                                // Menú de permisos por usuario con la opción de cambiar rol o quitar (eliminarlo)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 2),
@@ -773,7 +748,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  /// Muestra el modal de detalles del recuerdo, con todas, alguna o ninguna opción depende del rol del usuario
+  /// Muestra el modal de detalles del recuerdo
   void _showMemoryDetails(BuildContext context, Memory memory) {
     showModalBottomSheet(
       context: context,
@@ -782,7 +757,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
       builder: (context) => MemoryDetailScreen(
         memory: memory,
         onEdit: () async {
-          // Solo puede editar si tiene permiso
           if (!_canAddOrEdit(memory.category)) {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text(
@@ -805,7 +779,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           }
         },
         onDelete: () async {
-          // Solo puede borrar si tiene permiso
           if (!_canDelete(memory)) {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text(
@@ -817,17 +790,11 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           }
           try {
             await _memoryService.deleteMemory(memory.id);
-
-            if (!context.mounted) {
-              return;
-            }
-
+            if (!context.mounted) return;
             Navigator.pop(context);
             _loadMemories();
           } catch (e) {
-            if (!context.mounted) {
-              return;
-            }
+            if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
             );
@@ -876,6 +843,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
         final cat = categories[index];
         final lastMemory = _getLastMemoryForCategory(cat, grouped);
         final isProtected = categoryProvider.isCategoryProtected(cat);
+        final isShared = lastMemory?.sharedWith.isNotEmpty ?? false;
 
         final bool isMine = _isOwner(cat);
         final bool isSharedByMe =
@@ -937,10 +905,11 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                           ),
                         ),
                       ),
+                    // Candado (carpeta protegida con PIN)
                     if (isProtected)
                       Positioned(
                         bottom: 0,
-                        right: 0,
+                        left: 0,
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
@@ -950,6 +919,25 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                           ),
                           child: const Icon(
                             Icons.lock,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    // Icono de compartido (misma posición que el candado)
+                    if (isShared)
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: lilaFuerte,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.people,
                             size: 16,
                             color: Colors.white,
                           ),
@@ -970,8 +958,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-
-                // Etiqueta del propietario o número de recuerdos que hay dentro depende de si el usuario es el dueño o no de la carpeta
                 if (!isMine && lastMemory?.creatorEmail != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
@@ -1003,7 +989,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     );
   }
 
-  /// Construye el grid secundario que muestra los recuerdos una vez dentro de una carpeta
+  /// Construye el grid secundario que muestra los recuerdos dentro de una carpeta
   Widget _buildMemoryList(
     BuildContext context,
     List<Memory> memories,
@@ -1105,7 +1091,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
     return Scaffold(
       backgroundColor: themeProvider.isDarkMode ? backgroundDark : Colors.white,
       appBar: AppBar(
-        // Título y Subtítulo del AppBar
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1116,11 +1101,9 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
                   fontWeight: FontWeight.bold,
                   fontSize: 18),
             ),
-            // Si la carpeta no es del usuario, se muestra el dueño
             if (_selectedCategory != null && !_isOwner(_selectedCategory!))
               Builder(
                 builder: (context) {
-                  // Si no hay creatorId antiguo, es del usuario actual
                   final memoryWithOwner = _memories.firstWhere(
                     (m) =>
                         m.category == _selectedCategory &&
@@ -1154,7 +1137,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               )
             : null,
         actions: [
-          // Solo el propietario ve el botón de proteger carpeta con PIN
           if (_selectedCategory != null && _isOwner(_selectedCategory!))
             IconButton(
               iconSize: 32,
@@ -1163,8 +1145,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               tooltip: 'Proteger esta carpeta con PIN',
               onPressed: () => _showProtectFolderDialog(_selectedCategory!),
             ),
-
-          // Solo el propietario ve el botón de compartir carpeta con otros usuarios
           if (_selectedCategory != null && _isOwner(_selectedCategory!))
             IconButton(
               iconSize: 32,
@@ -1173,8 +1153,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               tooltip: 'Compartir esta carpeta con un usuario',
               onPressed: () => _showShareCategoryDialog(_selectedCategory!),
             ),
-
-          // Los lectores no ven el boton de agregar recuerdo en la carpeta, los editores y administradores si
           if (_selectedCategory != null && _canAddOrEdit(_selectedCategory!))
             IconButton(
               iconSize: 32,
@@ -1183,8 +1161,6 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
               tooltip: 'Agregar recuerdo a esta carpeta',
               onPressed: _navigateToCreateMemory,
             ),
-
-          // Solo se muestra el botón de crear nueva carpeta si el usuario no está dentro de una (en la vista principal)
           if (_selectedCategory == null)
             IconButton(
               iconSize: 32,

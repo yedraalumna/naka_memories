@@ -16,7 +16,6 @@ class MemoryService {
     return _uuid.v4();
   }
 
-  /// Obtiene la URL pública de un archivo en el bucket de almacenamiento
   String getPublicUrl(String path) {
     try {
       return _supabase.storage.from(_storageBucket).getPublicUrl(path);
@@ -26,21 +25,18 @@ class MemoryService {
     }
   }
 
-  // Método helper para obtener URL pública con cache buster
   String _getPublicUrlWithCacheBuster(String path) {
     try {
       final publicUrl = getPublicUrl(path);
       return '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
     } catch (e) {
-      print('Error obteniendo URL pública con cache buster: $e');
+      print('Error obteniendo URL con cache buster: $e');
       return '';
     }
   }
 
   Future<String?> uploadAvatar(Uint8List bytes, String userId) async {
     try {
-      print('Subiendo avatar para usuario: $userId');
-
       final String fileName = 'avatar_$userId.jpg';
       final String path = 'avatars/$fileName';
 
@@ -53,27 +49,21 @@ class MemoryService {
             ),
           );
 
-      final String cacheBusterUrl = _getPublicUrlWithCacheBuster(path);
-      print('Avatar subido exitosamente: $cacheBusterUrl');
-      return cacheBusterUrl;
+      return _getPublicUrlWithCacheBuster(path);
     } catch (e) {
       print('Error subiendo avatar: $e');
       return null;
     }
   }
 
-  // obtenemos los recuerdos - AHORA SIEMPRE USA SUPABASE SI HAY USUARIO
   Future<List<Memory>> getMemories() async {
     try {
       final user = _supabase.auth.currentUser;
 
       if (user != null) {
         try {
-          print('Intentando obtener de Supabase para usuario: ${user.id}');
           final supabaseMemories = await _getMemoriesFromSupabase();
-
           if (supabaseMemories.isNotEmpty) {
-            print('${supabaseMemories.length} recuerdos cargados de Supabase');
             await _syncLocalWithSupabase(supabaseMemories);
             return supabaseMemories;
           }
@@ -82,7 +72,6 @@ class MemoryService {
         }
       }
 
-      print('Cargando desde almacenamiento local...');
       return await _getMemoriesFromLocal();
     } catch (e) {
       print('Error general obteniendo recuerdos: $e');
@@ -90,22 +79,24 @@ class MemoryService {
     }
   }
 
-  // Sincronizar almacenamiento local con Supabase
   Future<void> _syncLocalWithSupabase(List<Memory> supabaseMemories) async {
     try {
       final localMemories = await _getMemoriesFromLocal();
       final prefs = await SharedPreferences.getInstance();
 
-      // Crear mapa de memorias de Supabase por ID
-      final Map<String, Memory> supabaseMap = {
-        for (var m in supabaseMemories) m.id: m
-      };
+      final Map<String, Memory> supabaseMap = {};
+      for (var m in supabaseMemories) {
+        supabaseMap[m.id] = m;
+      }
 
-      // Combinar memorias
-      final Set<String> allIds = {
-        ...supabaseMap.keys,
-        ...localMemories.map((m) => m.id)
-      };
+      final Set<String> allIds = {};
+      for (var id in supabaseMap.keys) {
+        allIds.add(id);
+      }
+      for (var m in localMemories) {
+        allIds.add(m.id);
+      }
+
       final List<Memory> mergedMemories = [];
 
       for (final id in allIds) {
@@ -117,35 +108,26 @@ class MemoryService {
         }
       }
 
-      // Guardar versión sincronizada localmente
-      final memoriesJson =
-          mergedMemories.map((m) => jsonEncode(m.toMap())).toList();
+      final List<String> memoriesJson = [];
+      for (var m in mergedMemories) {
+        memoriesJson.add(jsonEncode(m.toMap()));
+      }
       await prefs.setStringList(_memoriesKey, memoriesJson);
-
-      print(
-          'Sincronización local completada: ${mergedMemories.length} recuerdos');
     } catch (e) {
       print('Error sincronizando con local: $e');
     }
   }
 
-  // Obtener recuerdos de Supabase (Propios y Compartidos)
   Future<List<Memory>> _getMemoriesFromSupabase() async {
     try {
       final user = _supabase.auth.currentUser;
       final userId = user?.id;
-      final userEmail = user
-          ?.email; // Necesitamos el correo para saber qué nos han compartido
+      final userEmail = user?.email;
 
       if (userId == null) {
-        print('Usuario no autenticado en Supabase');
         return [];
       }
 
-      print(
-          'Buscando recuerdos para usuario: $userId o compartidos con: $userEmail');
-
-      // 🔥 ARREGLO 1: Quitadas las comillas dobles de $userEmail para que coincida en Supabase 🔥
       final response = await _supabase
           .from('nayeka memories')
           .select()
@@ -154,14 +136,11 @@ class MemoryService {
 
       final List<Memory> memories = [];
 
-      print('${response.length} registros encontrados en Supabase');
-
       for (var item in response) {
         try {
-          final memory = Memory.fromMap(item);
-          memories.add(memory);
+          memories.add(Memory.fromMap(item));
         } catch (e) {
-          print('Error procesando item: $e');
+          // Error silencioso
         }
       }
 
@@ -172,41 +151,24 @@ class MemoryService {
     }
   }
 
-  double _parseDouble(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) {
-      try {
-        return double.parse(value);
-      } catch (e) {
-        return 0.0;
-      }
-    }
-    return 0.0;
-  }
-
-  // Compartir todos los recuerdos de una categoría con un correo
   Future<void> shareCategoryWithRole(
       String category, String emailToShare, String selectedRole) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null || emailToShare.isEmpty) return;
 
-      // Obtenemos los recuerdos de la categoría
       final response = await _supabase
           .from('nayeka memories')
           .select()
           .eq('user_id', user.id)
           .eq('category', category);
 
-      // Actualizamos cada recuerdo de la carpeta
       for (var item in response) {
-        // 1. Cargamos las listas actuales
         List<String> currentShared = [];
         if (item['shared_with'] != null) {
-          currentShared =
-              List<String>.from(item['shared_with'].map((e) => e.toString()));
+          for (var e in item['shared_with']) {
+            currentShared.add(e.toString());
+          }
         }
 
         Map<String, dynamic> currentRoles = {};
@@ -219,21 +181,16 @@ class MemoryService {
           currentPending = Map<String, dynamic>.from(item['pending_roles']);
         }
 
-        // 2. Lógica de Quitar o Invitar
         if (selectedRole == 'quitar') {
-          // Si lo quitamos, lo borramos de TODAS partes
           currentShared.remove(emailToShare);
           currentRoles.remove(emailToShare);
           currentPending.remove(emailToShare);
         } else {
-          // Si lo invitamos, lo metemos SOLO a pendientes (y le quitamos accesos si los tuviera de antes)
           currentShared.remove(emailToShare);
           currentRoles.remove(emailToShare);
-
           currentPending[emailToShare] = selectedRole;
         }
 
-        // 3. Subimos los cambios a Supabase
         await _supabase.from('nayeka memories').update({
           'shared_with': currentShared,
           'shared_roles': currentRoles,
@@ -248,12 +205,10 @@ class MemoryService {
     }
   }
 
-  // Obtener recuerdos de almacenamiento local
   Future<List<Memory>> _getMemoriesFromLocal() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final memoriesJson = prefs.getStringList(_memoriesKey) ?? [];
-      print('${memoriesJson.length} recuerdos en almacenamiento local');
 
       final List<Memory> memories = [];
 
@@ -262,7 +217,7 @@ class MemoryService {
           final map = jsonDecode(json);
           memories.add(Memory.fromMap(map));
         } catch (e) {
-          print('Error parseando memoria local: $e');
+          // Error silencioso
         }
       }
 
@@ -273,29 +228,18 @@ class MemoryService {
     }
   }
 
-  // subir imagen a Supabase
   Future<String?> uploadImage(Uint8List imageBytes) async {
     try {
-      if (imageBytes.isEmpty) {
-        print('Bytes de imagen vacíos');
-        return null;
-      }
+      if (imageBytes.isEmpty) return null;
 
       final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) {
-        print('Usuario no autenticado para subir imagen');
-        return null;
-      }
+      if (userId == null) return null;
 
-      // Generamos un nombre único para el archivo
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final random = _uuid.v4().substring(0, 8);
       final fileName = '${userId}_${timestamp}_$random.jpg';
       final path = 'memories/$fileName';
 
-      print('Subiendo imagen: $path (${imageBytes.length} bytes)');
-
-      // Subida a Supabase Storage
       await _supabase.storage.from(_storageBucket).uploadBinary(
             path,
             imageBytes,
@@ -306,57 +250,57 @@ class MemoryService {
             ),
           );
 
-      print('Imagen subida exitosamente a Storage');
-
-      // Obtener URL pública con cache buster
-      final String cacheBusterUrl = _getPublicUrlWithCacheBuster(path);
-
-      print('URL final generada: $cacheBusterUrl');
-      return cacheBusterUrl;
+      return _getPublicUrlWithCacheBuster(path);
     } catch (e) {
-      print('Error general subiendo imagen: $e');
-
-      if (e is StorageException) {
-        print('Detalles del error de Storage:');
-        print('Código: ${e.statusCode}');
-        print('Mensaje: ${e.message}');
-
-        if (e.statusCode == '404') {
-          print('Error: El bucket "$_storageBucket" no existe.');
-          print('Crea el bucket en Supabase Dashboard > Storage');
-        }
-      }
+      print('Error subiendo imagen: $e');
       return null;
     }
   }
 
-  // 🔥 ARREGLO 2: Función de Herencia de Permisos 🔥
   Future<Memory> _inheritSharedUsers(Memory memory) async {
     if (memory.category == 'Sin categoría' || memory.category.isEmpty) {
       return memory;
     }
     try {
       final localMemories = await _getMemoriesFromLocal();
-      final categoryMemories =
-          localMemories.where((m) => m.category == memory.category).toList();
-
-      Set<String> allSharedEmails = {...memory.sharedWith};
-      // Cogemos los roles existentes de la carpeta
-      Map<String, dynamic> allRoles = {...(memory.sharedRoles ?? {})};
-
-      for (var m in categoryMemories) {
-        if (m.sharedWith.isNotEmpty) {
-          allSharedEmails.addAll(m.sharedWith);
-        }
-        // Si algún recuerdo de la carpeta tiene roles, los copiamos
-        if (m.sharedRoles != null && m.sharedRoles!.isNotEmpty) {
-          allRoles.addAll(m.sharedRoles!);
+      final List<Memory> categoryMemories = [];
+      for (var m in localMemories) {
+        if (m.category == memory.category) {
+          categoryMemories.add(m);
         }
       }
 
+      Set<String> allSharedEmails = {};
+      for (var email in memory.sharedWith) {
+        allSharedEmails.add(email);
+      }
+
+      Map<String, dynamic> allRoles = {};
+      if (memory.sharedRoles != null) {
+        for (var entry in memory.sharedRoles!.entries) {
+          allRoles[entry.key] = entry.value;
+        }
+      }
+
+      for (var m in categoryMemories) {
+        for (var email in m.sharedWith) {
+          allSharedEmails.add(email);
+        }
+        if (m.sharedRoles != null) {
+          for (var entry in m.sharedRoles!.entries) {
+            allRoles[entry.key] = entry.value;
+          }
+        }
+      }
+
+      final List<String> sharedList = [];
+      for (var email in allSharedEmails) {
+        sharedList.add(email);
+      }
+
       return memory.copyWith(
-        sharedWith: allSharedEmails.toList(),
-        sharedRoles: allRoles, // Aplicamos los roles heredados
+        sharedWith: sharedList,
+        sharedRoles: allRoles,
       );
     } catch (e) {
       print('Error heredando usuarios y roles: $e');
@@ -364,30 +308,18 @@ class MemoryService {
     }
   }
 
-  // Guardamos el recuerdo con imagen
   Future<String> saveMemoryWithImage({
     required Memory memory,
     required Uint8List imageBytes,
   }) async {
-    print('Guardando recuerdo con imagen');
-
     try {
       final memoryId = memory.id.isNotEmpty ? memory.id : _generateId();
-      print('ID generado para memoria: $memoryId');
 
       String? imageUrl;
       final user = _supabase.auth.currentUser;
 
       if (user != null) {
-        print('Intentando subir imagen a Supabase');
         imageUrl = await uploadImage(imageBytes);
-        if (imageUrl != null) {
-          print('Imagen subida: $imageUrl');
-        } else {
-          print('No se pudo subir la imagen');
-        }
-      } else {
-        print('Sin usuario autenticado, omitiendo subida de imagen');
       }
 
       Memory finalMemory = memory.copyWith(
@@ -395,18 +327,14 @@ class MemoryService {
         imageAsset: imageUrl,
       );
 
-      // 🔥 Aplicamos la herencia 🔥
       finalMemory = await _inheritSharedUsers(finalMemory);
-
       await _saveMemoryToLocal(finalMemory);
-      print('Memoria guardada localmente: $memoryId');
 
       if (user != null) {
         try {
           await _saveMemoryToSupabase(finalMemory);
-          print('Memoria guardada en Supabase: $memoryId');
         } catch (e) {
-          print('Error guardando en Supabase, pero guardado localmente: $e');
+          // Error guardando en Supabase, pero local está guardado
         }
       }
       return memoryId;
@@ -416,7 +344,6 @@ class MemoryService {
     }
   }
 
-  // Método específico para subir video a Supabase
   Future<String?> uploadVideo(Uint8List videoBytes) async {
     try {
       if (videoBytes.isEmpty) return null;
@@ -429,9 +356,6 @@ class MemoryService {
       final fileName = '${userId}_${timestamp}_$random.mp4';
       final path = 'videos/$fileName';
 
-      print('Subiendo video: $path (${videoBytes.length} bytes)');
-
-      // Subida usando uploadBinary
       await _supabase.storage.from(_storageBucket).uploadBinary(
             path,
             videoBytes,
@@ -442,24 +366,17 @@ class MemoryService {
             ),
           );
 
-      // Obtener URL pública con cache buster
-      final String cacheBusterUrl = _getPublicUrlWithCacheBuster(path);
-
-      print('Video subido: $cacheBusterUrl');
-      return cacheBusterUrl;
+      return _getPublicUrlWithCacheBuster(path);
     } catch (e) {
       print('Error subiendo video: $e');
       return null;
     }
   }
 
-  // Guardar recuerdo con video
   Future<Memory> saveMemoryWithVideo({
     required Memory memory,
     required Uint8List videoBytes,
   }) async {
-    print('Guardando recuerdo con video...');
-
     try {
       final memoryId = memory.id.isNotEmpty ? memory.id : _generateId();
       String? videoUrl;
@@ -475,18 +392,14 @@ class MemoryService {
         imageAsset: videoUrl,
       );
 
-      // 🔥 Aplicamos la herencia 🔥
       finalMemory = await _inheritSharedUsers(finalMemory);
-
       await _saveMemoryToLocal(finalMemory);
-      print('Memoria (video) guardada localmente: $memoryId');
 
       if (user != null) {
         try {
           await _saveMemoryToSupabase(finalMemory);
-          print('Memoria (video) guardada en Supabase: $memoryId');
         } catch (e) {
-          print('Error guardando en Supabase, pero guardado localmente: $e');
+          // Error guardando en Supabase, pero local está guardado
         }
       }
 
@@ -497,17 +410,13 @@ class MemoryService {
     }
   }
 
-  // Guardar recuerdo en Supabase
   Future<void> _saveMemoryToSupabase(Memory memory) async {
     try {
       final currentUser = _supabase.auth.currentUser;
       if (currentUser == null) throw Exception('Usuario no autenticado');
 
-      // 1. El ID del dueño original o el actual si es nuevo
       final String finalUserId = memory.creatorId ?? currentUser.id;
 
-      // 2. El Email del dueño original o el actual si es nuevo
-      // IMPORTANTE: memory.creatorEmail DEBE venir del formulario para no perderse
       final String? finalUserEmail = (memory.creatorId != null)
           ? memory.creatorEmail
           : (memory.creatorEmail ?? currentUser.email);
@@ -540,7 +449,6 @@ class MemoryService {
     }
   }
 
-  // Guardamos en local
   Future<void> _saveMemoryToLocal(Memory memory) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -553,41 +461,33 @@ class MemoryService {
 
       if (existingIndex >= 0) {
         memories[existingIndex] = finalMemory;
-        print('Actualizando memoria local: $memoryId');
       } else {
         memories.add(finalMemory);
-        print('Agregando nueva memoria local: $memoryId');
       }
 
-      final memoriesJson = memories.map((m) => jsonEncode(m.toMap())).toList();
+      final List<String> memoriesJson = [];
+      for (var m in memories) {
+        memoriesJson.add(jsonEncode(m.toMap()));
+      }
       await prefs.setStringList(_memoriesKey, memoriesJson);
-
-      print('Total de recuerdos locales: ${memories.length}');
     } catch (e) {
       print('Error guardando localmente: $e');
       throw Exception('Error al guardar localmente: $e');
     }
   }
 
-  // Guardamos recuerdo sin imagen
   Future<void> saveMemory(Memory memory) async {
     try {
-      print('Guardando recuerdo: ${memory.id}');
-
       final memoryId = memory.id.isNotEmpty ? memory.id : _generateId();
       Memory finalMemory = memory.copyWith(id: memoryId);
 
-      // 🔥 Aplicamos la herencia 🔥
       finalMemory = await _inheritSharedUsers(finalMemory);
-
       await _saveMemoryToLocal(finalMemory);
 
       final user = _supabase.auth.currentUser;
       if (user != null) {
         await _saveMemoryToSupabase(finalMemory);
       }
-
-      print('Recuerdo guardado exitosamente: $memoryId');
     } catch (e) {
       print('Error guardando recuerdo: $e');
       rethrow;
@@ -596,37 +496,32 @@ class MemoryService {
 
   Future<void> updateFavoriteStatus(String memoryId, bool isFavorite) async {
     try {
-      // 1. Actualizar en Almacenamiento Local
       final prefs = await SharedPreferences.getInstance();
       final memories = await _getMemoriesFromLocal();
 
       final index = memories.indexWhere((m) => m.id == memoryId);
       if (index >= 0) {
         memories[index] = memories[index].copyWith(isFavorite: isFavorite);
-        final memoriesJson =
-            memories.map((m) => jsonEncode(m.toMap())).toList();
+        final List<String> memoriesJson = [];
+        for (var m in memories) {
+          memoriesJson.add(jsonEncode(m.toMap()));
+        }
         await prefs.setStringList(_memoriesKey, memoriesJson);
-        print('Estado de favorito actualizado localmente: $isFavorite');
       }
 
-      // 2. Actualizar en Supabase
       final user = _supabase.auth.currentUser;
       if (user != null) {
-        final userId = user.id;
         await _supabase
             .from('nayeka memories')
             .update({'isFavorite': isFavorite})
             .eq('id', memoryId)
-            .eq('user_id', userId);
-        print('Favorito actualizado en Supabase: $memoryId -> $isFavorite');
+            .eq('user_id', user.id);
       }
     } catch (e) {
       print('Error actualizando estado de favorito: $e');
     }
   }
 
-  /// Obtiene el mapa de contraseñas de carpetas leyendo recuerdos existentes.
-  /// Fuente cloud: tabla `nayeka memories` (has_password/password_hash).
   Future<Map<String, String?>> getCategoryPasswordsFromMemories() async {
     final Map<String, String?> result = {};
 
@@ -646,54 +541,68 @@ class MemoryService {
           final hash = row['password_hash']?.toString();
 
           if (category == null || category.trim().isEmpty) continue;
-          if (!hasPassword || hash == null || hash.isEmpty) continue;
+          if (hasPassword != true) continue;
+          if (hash == null || hash.isEmpty) continue;
 
-          // Conserva el primer hash válido por categoría.
-          result.putIfAbsent(category, () => hash);
+          if (!result.containsKey(category)) {
+            result[category] = hash;
+          }
         }
       }
     } catch (e) {
-      print('Error cargando contraseñas de categorías desde Supabase: $e');
+      print('Error cargando contraseñas desde Supabase: $e');
     }
 
-    // Fallback/merge local para modo offline.
     try {
       final localMemories = await _getMemoriesFromLocal();
       for (final memory in localMemories) {
-        if (!memory.hasPassword || memory.passwordHash == null) continue;
+        if (memory.hasPassword != true) continue;
+        if (memory.passwordHash == null) continue;
         if (memory.passwordHash!.isEmpty) continue;
-        result.putIfAbsent(memory.category, () => memory.passwordHash);
+        if (!result.containsKey(memory.category)) {
+          result[memory.category] = memory.passwordHash;
+        }
       }
     } catch (e) {
-      print('Error cargando contraseñas de categorías desde local: $e');
+      print('Error cargando contraseñas desde local: $e');
     }
 
     return result;
   }
 
-  /// Aplica/elimina PIN a todos los recuerdos de una categoría y lo sincroniza.
   Future<void> applyCategoryPasswordToMemories(
       String categoryName, String? passwordHash) async {
     try {
-      final hasPassword = passwordHash != null && passwordHash.isNotEmpty;
+      final hasPassword = (passwordHash != null && passwordHash.isNotEmpty);
 
-      // 1) Local
       final prefs = await SharedPreferences.getInstance();
       final memories = await _getMemoriesFromLocal();
-      final updated = memories.map((m) {
-        if (m.category != categoryName) return m;
-        return m.copyWith(
-          hasPassword: hasPassword,
-          passwordHash: hasPassword ? passwordHash : null,
-        );
-      }).toList();
 
-      await prefs.setStringList(
-        _memoriesKey,
-        updated.map((m) => jsonEncode(m.toMap())).toList(),
-      );
+      final List<Memory> updated = [];
+      for (var m in memories) {
+        if (m.category != categoryName) {
+          updated.add(m);
+        } else {
+          if (hasPassword) {
+            updated.add(m.copyWith(
+              hasPassword: true,
+              passwordHash: passwordHash,
+            ));
+          } else {
+            updated.add(m.copyWith(
+              hasPassword: false,
+              passwordHash: null,
+            ));
+          }
+        }
+      }
 
-      // 2) Supabase
+      final List<String> memoriesJson = [];
+      for (var m in updated) {
+        memoriesJson.add(jsonEncode(m.toMap()));
+      }
+      await prefs.setStringList(_memoriesKey, memoriesJson);
+
       final user = _supabase.auth.currentUser;
       if (user != null) {
         await _supabase
@@ -710,103 +619,8 @@ class MemoryService {
     }
   }
 
-  // Método para verificar y crear bucket
-  Future<void> verifyStorageBucket() async {
-    try {
-      print('Verificando bucket de Storage...');
-
-      try {
-        final files = await _supabase.storage.from(_storageBucket).list();
-        print('Bucket "$_storageBucket" accesible');
-        print('Archivos en bucket: ${files.length}');
-
-        // Verificar carpetas
-        final folders = ['avatars', 'memories', 'videos'];
-        for (final folder in folders) {
-          try {
-            final contents =
-                await _supabase.storage.from(_storageBucket).list(path: folder);
-            print('Carpeta $folder encontrada: ${contents.length} archivos');
-          } catch (e) {
-            print(
-                'La carpeta "$folder" se creará automáticamente al subir archivos');
-          }
-        }
-      } catch (e) {
-        if (e is StorageException && e.message.contains('not found')) {
-          print('El bucket "$_storageBucket" no existe');
-          print('Ve a Supabase Dashboard > Storage y:');
-          print('1. Click en "Create a new bucket"');
-          print('2. Nombre: "$_storageBucket"');
-          print('3. Marca "Make it public"');
-          print('4. Click "Create bucket"');
-        } else {
-          print('Error accediendo al bucket: $e');
-        }
-      }
-    } catch (e) {
-      print('Error verificando bucket: $e');
-    }
-  }
-
-  // Método completo de prueba
-  Future<void> testSupabaseConnection() async {
-    try {
-      print('PRUEBA COMPLETA DE SUPABASE 🧪');
-      print('=' * 50);
-
-      final user = _supabase.auth.currentUser;
-      if (user == null) {
-        print('Usuario no autenticado');
-        return;
-      }
-      print('Usuario autenticado: ${user.id}');
-
-      // 1. Verificar tabla
-      print('\nVerificamos la tabla "nayeka memories"...');
-      try {
-        final response = await _supabase
-            .from('nayeka memories')
-            .select('id')
-            .eq('user_id', user.id)
-            .limit(1);
-
-        print('Tabla accesible');
-      } catch (e) {
-        print('Error accediendo a tabla: $e');
-        print('''
-          CREATE TABLE "nayeka memories" (  
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            user_id TEXT NOT NULL,
-            title TEXT NOT NULL,
-            description TEXT,
-            date TEXT NOT NULL,
-            latitude TEXT,
-            longitude TEXT,
-            imageAsset TEXT,
-            category TEXT,
-            isFavorite BOOLEAN DEFAULT FALSE,
-            cookies_accepted BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-        ''');
-      }
-
-      // 2. Verificar Storage
-      print('\nVerificando storage...');
-      await verifyStorageBucket();
-
-      print('\n${'=' * 50}');
-      print('Prueba completa');
-    } catch (e) {
-      print('Error en testSupabaseConnection: $e');
-    }
-  }
-
-  // Eliminar recuerdo
   Future<void> deleteMemory(String id) async {
     try {
-      print('Eliminando recuerdo: $id');
       await _deleteMemoryFromLocal(id);
 
       final user = _supabase.auth.currentUser;
@@ -823,13 +637,18 @@ class MemoryService {
       final prefs = await SharedPreferences.getInstance();
       final memories = await _getMemoriesFromLocal();
 
-      final updatedMemories = memories.where((m) => m.id != id).toList();
-      final memoriesJson =
-          updatedMemories.map((m) => jsonEncode(m.toMap())).toList();
+      final List<Memory> updatedMemories = [];
+      for (var m in memories) {
+        if (m.id != id) {
+          updatedMemories.add(m);
+        }
+      }
 
+      final List<String> memoriesJson = [];
+      for (var m in updatedMemories) {
+        memoriesJson.add(jsonEncode(m.toMap()));
+      }
       await prefs.setStringList(_memoriesKey, memoriesJson);
-      print('Recuerdo eliminado localmente: $id');
-      print('Recuerdos restantes: ${updatedMemories.length}');
     } catch (e) {
       print('Error eliminando localmente: $e');
     }
@@ -844,14 +663,12 @@ class MemoryService {
             .delete()
             .eq('id', id)
             .eq('user_id', userId);
-        print('Recuerdo eliminado de Supabase: $id');
       }
     } catch (e) {
       print('Error eliminando de Supabase: $e');
     }
   }
 
-  // Limpiar todos los recuerdos
   Future<void> clearAllMemories() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -861,8 +678,6 @@ class MemoryService {
       if (user != null) {
         await _clearAllMemoriesFromSupabase();
       }
-
-      print('Todos los recuerdos eliminados');
     } catch (e) {
       print('Error limpiando recuerdos: $e');
     }
@@ -873,60 +688,59 @@ class MemoryService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId != null) {
         await _supabase.from('nayeka memories').delete().eq('user_id', userId);
-
-        print('Todos los recuerdos eliminados de Supabase');
       }
     } catch (e) {
       print('Error limpiando Supabase: $e');
     }
   }
 
-  /// Obtiene todas las categorías únicas de los recuerdos
-  // 1. Obtener categorías REALES (solo las que tienen recuerdos)
-  // ============ GESTIÓN DE CARPETAS (ÚNICA VERSIÓN) ============
-
-  // Obtiene solo las categorías que tienen recuerdos reales + General
   Future<List<String>> getAllCategories() async {
-  try {
-    final user = _supabase.auth.currentUser;
-    Set<String> uniqueCategories = {'General'};
+    try {
+      final user = _supabase.auth.currentUser;
+      Set<String> uniqueCategories = {'General'};
 
-    // 1. Obtener categorías de recuerdos reales
-    if (user != null) {
-      final userEmail = user.email;
-      final response = await _supabase
-          .from('nayeka memories')
-          .select('category')
-          .or('user_id.eq.${user.id},shared_with.cs.{$userEmail}');
+      if (user != null) {
+        final userEmail = user.email;
+        final response = await _supabase
+            .from('nayeka memories')
+            .select('category')
+            .or('user_id.eq.${user.id},shared_with.cs.{$userEmail}');
 
-      for (var item in response) {
-        final cat = item['category'] as String?;
-        if (cat != null && cat.trim().isNotEmpty) uniqueCategories.add(cat);
+        for (var item in response) {
+          final cat = item['category'] as String?;
+          if (cat != null && cat.trim().isNotEmpty) {
+            uniqueCategories.add(cat);
+          }
+        }
+      } else {
+        final localMemories = await _getMemoriesFromLocal();
+        for (var m in localMemories) {
+          uniqueCategories.add(m.category);
+        }
       }
-    } else {
-      final localMemories = await _getMemoriesFromLocal();
-      for (var m in localMemories) {
-        uniqueCategories.add(m.category);
+
+      final prefs = await SharedPreferences.getInstance();
+      final customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
+      for (var cat in customCategories) {
+        uniqueCategories.add(cat);
       }
+
+      List<String> result = [];
+      for (var cat in uniqueCategories) {
+        result.add(cat);
+      }
+      result.sort();
+      return result;
+    } catch (e) {
+      print('Error en getAllCategories: $e');
+      return ['General'];
     }
-
-    // incluimos categorías personalizadas (las que se crean sin recuerdos)
-    final prefs = await SharedPreferences.getInstance();
-    final customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
-    uniqueCategories.addAll(customCategories);
-
-    List<String> result = uniqueCategories.toList();
-    result.sort();
-    return result;
-  } catch (e) {
-    return ['General'];
   }
-}
+
   Future<void> renameCategory(String oldName, String newName) async {
     if (oldName == 'General' || oldName == newName) return;
 
     try {
-      // 1. Actualizar recuerdos reales en Supabase
       final user = _supabase.auth.currentUser;
       if (user != null) {
         await _supabase
@@ -936,80 +750,94 @@ class MemoryService {
             .eq('user_id', user.id);
       }
 
-      // 2. Actualizar recuerdos locales
       final prefs = await SharedPreferences.getInstance();
       final memories = await _getMemoriesFromLocal();
-      final updated = memories.map((m) {
-        return m.category == oldName ? m.copyWith(category: newName) : m;
-      }).toList();
-      await prefs.setStringList(
-          _memoriesKey, updated.map((m) => jsonEncode(m.toMap())).toList());
 
-      // 3. Actualizar en SharedPreferences (categorías personalizadas)
-      final customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
-      if (customCategories.contains(oldName)) {
-        customCategories.remove(oldName);
-        customCategories.add(newName);
-        await prefs.setStringList(_customCategoriesKey, customCategories);
+      final List<Memory> updated = [];
+      for (var m in memories) {
+        if (m.category == oldName) {
+          updated.add(m.copyWith(category: newName));
+        } else {
+          updated.add(m);
+        }
       }
 
-      print('Categoría renombrada: $oldName → $newName');
+      final List<String> memoriesJson = [];
+      for (var m in updated) {
+        memoriesJson.add(jsonEncode(m.toMap()));
+      }
+      await prefs.setStringList(_memoriesKey, memoriesJson);
+
+      final customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
+      final List<String> updatedCategories = [];
+      for (var cat in customCategories) {
+        if (cat == oldName) {
+          updatedCategories.add(newName);
+        } else {
+          updatedCategories.add(cat);
+        }
+      }
+      await prefs.setStringList(_customCategoriesKey, updatedCategories);
     } catch (e) {
       print('Error renombrando categoría: $e');
       throw Exception('No se pudo renombrar la categoría: $e');
     }
   }
 
-  // Lo dejamos vacío para que no haga NADA
-  /// Restaura las carpetas predeterminadas
-Future<void> restoreDefaultCategories() async {
-  print('Restaurando carpetas predeterminadas en MemoryService...');
-  
-  final List<String> defaultCategories = [
-    'Viajes', 'Amigos', 'Familia', 'Comida', 'Estudio'
-  ];
-  
-  try {
-    for (var category in defaultCategories) {
-      // Crear la categoría en SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      List<String> customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
-      
-      if (!customCategories.contains(category)) {
-        customCategories.add(category);
-        await prefs.setStringList(_customCategoriesKey, customCategories);
-        print('Categoría guardada: $category');
+  Future<void> restoreDefaultCategories() async {
+    final List<String> defaultCategories = [
+      'Viajes', 'Amigos', 'Familia', 'Comida', 'Estudio'
+    ];
+    
+    try {
+      for (var category in defaultCategories) {
+        final prefs = await SharedPreferences.getInstance();
+        List<String> customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
+        
+        bool existe = false;
+        for (var cat in customCategories) {
+          if (cat == category) {
+            existe = true;
+            break;
+          }
+        }
+        
+        if (!existe) {
+          customCategories.add(category);
+          await prefs.setStringList(_customCategoriesKey, customCategories);
+        }
       }
+    } catch (e) {
+      print('Error al restaurar categorías: $e');
+      rethrow;
     }
-    print('Carpetas predeterminadas restauradas correctamente');
-  } catch (e) {
-    print('Error al restaurar: $e');
-    rethrow;
   }
-}
 
-  /// Crear una nueva categoría (opcionalmente asignada a un recuerdo)
   Future<void> createCategory(String categoryName, {String? memoryId}) async {
     if (categoryName.isEmpty) return;
 
     try {
       if (memoryId != null) {
-        // Asignar a un recuerdo existente
         final memory = await _getMemoryById(memoryId);
         if (memory != null) {
           final updatedMemory = memory.copyWith(category: categoryName);
           await saveMemory(updatedMemory);
-          print('Categoría "$categoryName" asignada al recuerdo $memoryId');
         }
       } else {
-        // Guardar la categoría en SharedPreferences (persiste aunque no tenga recuerdos)
         final prefs = await SharedPreferences.getInstance();
-        List<String> customCategories =
-            prefs.getStringList(_customCategoriesKey) ?? [];
-        if (!customCategories.contains(categoryName)) {
+        List<String> customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
+        
+        bool existe = false;
+        for (var cat in customCategories) {
+          if (cat == categoryName) {
+            existe = true;
+            break;
+          }
+        }
+        
+        if (!existe) {
           customCategories.add(categoryName);
           await prefs.setStringList(_customCategoriesKey, customCategories);
-          print('Categoría guardada localmente: $categoryName');
         }
       }
     } catch (e) {
@@ -1018,14 +846,12 @@ Future<void> restoreDefaultCategories() async {
     }
   }
 
-  /// Eliminar una categoría (mueve todos los recuerdos a "General")
   Future<void> deleteCategory(String categoryName) async {
     if (categoryName == 'General') {
       throw Exception('No se puede eliminar la categoría "General"');
     }
 
     try {
-      // 1. Mover recuerdos reales a "General"
       final allMemories = await getMemories();
       int movedCount = 0;
 
@@ -1037,72 +863,76 @@ Future<void> restoreDefaultCategories() async {
         }
       }
 
-      // 2. SIEMPRE eliminar de SharedPreferences (aunque no tenga recuerdos)
       final prefs = await SharedPreferences.getInstance();
-      List<String> customCategories =
-          prefs.getStringList(_customCategoriesKey) ?? [];
-      if (customCategories.contains(categoryName)) {
-        customCategories.remove(categoryName);
-        await prefs.setStringList(_customCategoriesKey, customCategories);
-        print('Categoría "$categoryName" eliminada de SharedPreferences');
+      List<String> customCategories = prefs.getStringList(_customCategoriesKey) ?? [];
+      
+      final List<String> updatedCategories = [];
+      for (var cat in customCategories) {
+        if (cat != categoryName) {
+          updatedCategories.add(cat);
+        }
       }
-
-      print(
-          'Categoría eliminada: $categoryName ($movedCount recuerdos movidos a General)');
+      await prefs.setStringList(_customCategoriesKey, updatedCategories);
     } catch (e) {
       print('Error eliminando categoría: $e');
       throw Exception('No se pudo eliminar la categoría: $e');
     }
   }
 
-  /// Helper: Obtener un recuerdo por ID
   Future<Memory?> _getMemoryById(String id) async {
     try {
       final allMemories = await getMemories();
-      try {
-        return allMemories.firstWhere((m) => m.id == id);
-      } catch (e) {
-        return null;
+      for (var m in allMemories) {
+        if (m.id == id) {
+          return m;
+        }
       }
+      return null;
     } catch (e) {
       return null;
     }
   }
 
-  /// Obtener el número de recuerdos por categoría
   Future<int> getMemoryCountByCategory(String category) async {
     try {
       final allMemories = await getMemories();
-      return allMemories.where((m) => m.category == category).length;
+      int count = 0;
+      for (var m in allMemories) {
+        if (m.category == category) {
+          count++;
+        }
+      }
+      return count;
     } catch (e) {
       print('Error contando recuerdos para $category: $e');
       return 0;
     }
   }
 
-  // 1. Obtener las invitaciones pendientes para un correo
-  Future<List<Map<String, dynamic>>> getPendingInvitations(
-      String userEmail) async {
+  Future<List<Map<String, dynamic>>> getPendingInvitations(String userEmail) async {
     try {
-      // Traemos todos los recuerdos (esto se puede optimizar en el futuro, pero funciona perfecto)
       final response = await _supabase.from('nayeka memories').select();
 
       List<Map<String, dynamic>> invitations = [];
-      Set<String> seenCategories =
-          {}; // Para no repetir invitaciones de la misma carpeta
+      Set<String> seenCategories = {};
 
       for (var item in response) {
-        if (item['pending_roles'] != null &&
-            item['pending_roles'][userEmail] != null) {
+        if (item['pending_roles'] != null && item['pending_roles'][userEmail] != null) {
           String category = item['category'];
           String ownerEmail = item['creator_email'] ?? 'Un usuario';
           String role = item['pending_roles'][userEmail];
           String ownerId = item['user_id'];
-
-          // Usamos una clave única (dueño + categoría) para mostrar solo 1 invitación por carpeta
           String uniqueKey = '${ownerId}_$category';
 
-          if (!seenCategories.contains(uniqueKey)) {
+          bool yaVista = false;
+          for (var seen in seenCategories) {
+            if (seen == uniqueKey) {
+              yaVista = true;
+              break;
+            }
+          }
+
+          if (!yaVista) {
             seenCategories.add(uniqueKey);
             invitations.add({
               'category': category,
@@ -1120,11 +950,9 @@ Future<void> restoreDefaultCategories() async {
     }
   }
 
-  // 2. Aceptar o Rechazar una invitación
   Future<void> respondToInvitation(
       String category, String ownerId, String userEmail, bool accept) async {
     try {
-      // Buscamos todas las fotos de esa carpeta exacta
       final response = await _supabase
           .from('nayeka memories')
           .select()
@@ -1132,32 +960,41 @@ Future<void> restoreDefaultCategories() async {
           .eq('category', category);
 
       for (var item in response) {
-        Map<String, dynamic> currentPending = item['pending_roles'] != null
-            ? Map<String, dynamic>.from(item['pending_roles'])
-            : {};
-        Map<String, dynamic> currentRoles = item['shared_roles'] != null
-            ? Map<String, dynamic>.from(item['shared_roles'])
-            : {};
-        List<String> currentShared = item['shared_with'] != null
-            ? List<String>.from(item['shared_with'].map((e) => e.toString()))
-            : [];
+        Map<String, dynamic> currentPending = {};
+        if (item['pending_roles'] != null) {
+          currentPending = Map<String, dynamic>.from(item['pending_roles']);
+        }
 
-        // Si este recuerdo tiene a la persona en pendientes
+        Map<String, dynamic> currentRoles = {};
+        if (item['shared_roles'] != null) {
+          currentRoles = Map<String, dynamic>.from(item['shared_roles']);
+        }
+
+        List<String> currentShared = [];
+        if (item['shared_with'] != null) {
+          for (var e in item['shared_with']) {
+            currentShared.add(e.toString());
+          }
+        }
+
         if (currentPending.containsKey(userEmail)) {
           String role = currentPending[userEmail];
-
-          // 1. Lo quitamos de pendientes sí o sí
           currentPending.remove(userEmail);
 
-          // 2. Si acepta, lo metemos en los oficiales
           if (accept) {
             currentRoles[userEmail] = role;
-            if (!currentShared.contains(userEmail)) {
+            bool yaCompartido = false;
+            for (var email in currentShared) {
+              if (email == userEmail) {
+                yaCompartido = true;
+                break;
+              }
+            }
+            if (!yaCompartido) {
               currentShared.add(userEmail);
             }
           }
 
-          // 3. Subimos los cambios a ese recuerdo
           await _supabase.from('nayeka memories').update({
             'pending_roles': currentPending,
             'shared_roles': currentRoles,
@@ -1170,10 +1007,50 @@ Future<void> restoreDefaultCategories() async {
       throw Exception('No se pudo procesar la invitación');
     }
   }
+
+  Future<void> verifyStorageBucket() async {
+    try {
+      await _supabase.storage.from(_storageBucket).list();
+    } catch (e) {
+      if (e is StorageException && e.message.contains('not found')) {
+        print('El bucket "$_storageBucket" no existe. Créalo en Supabase Dashboard > Storage');
+      } else {
+        print('Error accediendo al bucket: $e');
+      }
+    }
+  }
+
+  Future<void> testSupabaseConnection() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        print('Usuario no autenticado');
+        return;
+      }
+
+      await verifyStorageBucket();
+
+      final response = await _supabase
+          .from('nayeka memories')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1);
+    } catch (e) {
+      print('Error en testSupabaseConnection: $e');
+    }
+  }
 }
 
-// Extensión para copiar Memory
+// Extensión para copiar Memory (sin usar ??)
 extension MemoryCopyWith on Memory {
+  T _valor<T>(T? nuevo, T actual) {
+    if (nuevo != null) {
+      return nuevo;
+    } else {
+      return actual;
+    }
+  }
+
   Memory copyWith({
     String? id,
     String? title,
@@ -1192,21 +1069,21 @@ extension MemoryCopyWith on Memory {
     String? creatorEmail,
   }) {
     return Memory(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      description: description ?? this.description,
-      date: date ?? this.date,
-      location: location ?? this.location,
-      imageAsset: imageAsset ?? this.imageAsset,
-      category: category ?? this.category,
-      isFavorite: isFavorite ?? this.isFavorite,
-      sharedWith: sharedWith ?? this.sharedWith,
-      hasPassword: hasPassword ?? this.hasPassword,
-      passwordHash: passwordHash ?? this.passwordHash,
-      creatorId: creatorId ?? this.creatorId,
-      sharedRoles: sharedRoles ?? this.sharedRoles,
-      pendingRoles: pendingRoles ?? this.pendingRoles,
-      creatorEmail: creatorEmail ?? this.creatorEmail,
+      id: _valor(id, this.id),
+      title: _valor(title, this.title),
+      description: _valor(description, this.description),
+      date: _valor(date, this.date),
+      location: _valor(location, this.location),
+      imageAsset: _valor(imageAsset, this.imageAsset),
+      category: _valor(category, this.category),
+      isFavorite: _valor(isFavorite, this.isFavorite),
+      sharedWith: _valor(sharedWith, this.sharedWith),
+      hasPassword: _valor(hasPassword, this.hasPassword),
+      passwordHash: _valor(passwordHash, this.passwordHash),
+      creatorId: _valor(creatorId, this.creatorId),
+      sharedRoles: _valor(sharedRoles, this.sharedRoles),
+      pendingRoles: _valor(pendingRoles, this.pendingRoles),
+      creatorEmail: _valor(creatorEmail, this.creatorEmail),
     );
   }
 }

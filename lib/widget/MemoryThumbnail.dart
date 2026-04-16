@@ -1,14 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-// Para kIsWeb
 import '../constants/colors.dart';
 
+// Widget que muestra una miniatura (imagen pequeña) para un recuerdo.
 class MemoryThumbnail extends StatelessWidget {
   final String? imagePath;
   final double width;
   final double height;
   final double borderRadius;
-  final bool isShared;
 
   const MemoryThumbnail({
     super.key,
@@ -16,33 +15,47 @@ class MemoryThumbnail extends StatelessWidget {
     this.width = 60,
     this.height = 60,
     this.borderRadius = 8,
-    this.isShared = false,
   });
+
+  Widget _buildContainer({required Color color, required Widget child}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: Container(
+        width: width,
+        height: height,
+        color: color,
+        alignment: Alignment.center,
+        child: child,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    // 1. Limpieza y validación básica
     final path = imagePath?.trim();
 
-    // Creamos el contenido base
     Widget content;
 
+    // Caso 1: No hay ruta de imagen
     if (path == null || path.isEmpty) {
       content = _buildContainer(
         color: pinkLighter,
-        child:
-            const Icon(Icons.image_not_supported, color: pinkPrimary, size: 20),
+        child: const Icon(Icons.image_not_supported, color: pinkPrimary, size: 20),
       );
-    } else if (path.toLowerCase().contains('mp4') ||
+    }
+    // Caso 2: Es un video
+    else if (path.toLowerCase().contains('mp4') ||
         path.toLowerCase().contains('mov')) {
       content = _buildContainer(
         color: Colors.black87,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            double size = (constraints.maxWidth < constraints.maxHeight
-                    ? constraints.maxWidth
-                    : constraints.maxHeight) *
-                0.5;
+            double size;
+            if (constraints.maxWidth < constraints.maxHeight) {
+              size = constraints.maxWidth * 0.5;
+            } else {
+              size = constraints.maxHeight * 0.5;
+            }
             return Icon(
               Icons.play_circle_fill,
               color: Colors.white.withOpacity(0.9),
@@ -51,7 +64,9 @@ class MemoryThumbnail extends StatelessWidget {
           },
         ),
       );
-    } else if (path.startsWith('http')) {
+    }
+    // Caso 3: Imagen de internet
+    else if (path.startsWith('http')) {
       content = ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: Image.network(
@@ -62,15 +77,21 @@ class MemoryThumbnail extends StatelessWidget {
           fit: BoxFit.cover,
           cacheWidth: 150,
           loadingBuilder: (ctx, child, loading) {
-            if (loading == null) return child;
-            return _buildContainer(
-              color: Colors.grey[200]!,
-              child: const SizedBox(
+            if (loading == null) {
+              return child;
+            } else {
+              return _buildContainer(
+                color: Colors.grey[200]!,
+                child: const SizedBox(
                   width: 15,
                   height: 15,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: pinkPrimary)),
-            );
+                    strokeWidth: 2,
+                    color: pinkPrimary
+                  ),
+                ),
+              );
+            }
           },
           errorBuilder: (ctx, err, stack) => _buildContainer(
             color: Colors.red.withOpacity(0.1),
@@ -78,7 +99,9 @@ class MemoryThumbnail extends StatelessWidget {
           ),
         ),
       );
-    } else if (path.startsWith('assets/')) {
+    }
+    // Caso 4: Asset interno
+    else if (path.startsWith('assets/')) {
       content = ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: Image.asset(
@@ -88,7 +111,9 @@ class MemoryThumbnail extends StatelessWidget {
           fit: BoxFit.cover,
         ),
       );
-    } else {
+    }
+    // Caso 5: Archivo local
+    else {
       File file = File(path);
       if (file.existsSync()) {
         content = ClipRRect(
@@ -103,47 +128,12 @@ class MemoryThumbnail extends StatelessWidget {
         );
       } else {
         content = _buildContainer(
-            color: Colors.grey,
-            child: const Icon(Icons.help_outline, color: Colors.white));
+          color: Colors.grey,
+          child: const Icon(Icons.help_outline, color: Colors.white)
+        );
       }
     }
 
-    return Stack(
-      children: [
-        content,
-        if (isShared)
-          Positioned(
-            top: 5,
-            right: 5,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.black
-                    .withOpacity(0.6), 
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.people, 
-                color: Colors.white,
-                size: 20, 
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // Helper para construir los cajitas redondeadas
-  Widget _buildContainer({required Color color, required Widget child}) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: Container(
-        width: width,
-        height: height,
-        color: color,
-        alignment: Alignment.center,
-        child: child,
-      ),
-    );
+    return content;
   }
 }
