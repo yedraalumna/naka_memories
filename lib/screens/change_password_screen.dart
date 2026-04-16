@@ -5,6 +5,7 @@ import '../providers/app_auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../constants/colors.dart';
 
+// Pantalla para solicitar cambio de contraseña
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
 
@@ -13,21 +14,121 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  // Controladores para los campos de texto
+  // Controlador para el campo de email
   final emailController = TextEditingController();
+  
+  // Llave para validar el formulario
   final formKey = GlobalKey<FormState>();
+  
+  // Muestra el circulo de carga
   bool isLoading = false;
+  
+  // Variables para el contador de 60 segundos
+  int tiempoRestante = 0;
+  bool puedeReenviar = true;
+
+  // Iniciar contador despues de enviar el correo
+  void iniciarCuentaAtras() {
+    setState(() {
+      tiempoRestante = 60;
+      puedeReenviar = false;
+    });
+    
+    Future.delayed(const Duration(seconds: 1), actualizarCuentaAtras);
+  }
+
+  // Actualizar el contador cada segundo
+  void actualizarCuentaAtras() {
+    if (tiempoRestante > 0) {
+      setState(() {
+        tiempoRestante--;
+      });
+      Future.delayed(const Duration(seconds: 1), actualizarCuentaAtras);
+    } else {
+      setState(() {
+        puedeReenviar = true;
+      });
+    }
+  }
+
+  // Enviar correo de recuperacion
+  Future<void> enviarCorreo() async {
+    // Validar el formulario
+    if (!formKey.currentState!.validate()) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+    final email = emailController.text.trim();
+    final success = await authProvider.resetPassword(email);
+
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+
+      if (success) {
+        // Mostrar mensaje de exito
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Se ha enviado un codigo de recuperacion a tu correo'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        // Iniciar contador
+        iniciarCuentaAtras();
+
+        // Navegar a pantalla para ingresar el codigo
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ResetPasswordScreen(
+              email: email,
+            ),
+          ),
+        );
+      } else {
+        // Mostrar mensaje de error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.errorMessage ?? 'Error al enviar el correo'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     // Obtener providers
-      final themeProvider = Provider.of<ThemeProvider>(context);
-      final authProvider = Provider.of<AppAuthProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final authProvider = Provider.of<AppAuthProvider>(context);
     
-    // Definir colores según el tema
-      Color backgroundColor = themeProvider.isDarkMode ? backgroundDark : textLight;
-      Color iconColor = themeProvider.isDarkMode ? Colors.white : pinkPrimary;
-      Color textColor = themeProvider.isDarkMode ? Colors.white : Colors.black87;
+    // Definir colores segun el tema
+    Color backgroundColor;
+    Color iconColor;
+    Color textColor;
+    Color textoDescriptivoColor;
+    Color borderColor;
+    
+    if (themeProvider.isDarkMode) {
+      backgroundColor = backgroundDark;
+      iconColor = Colors.white;
+      textColor = Colors.white;
+      textoDescriptivoColor = Colors.grey[400]!;
+      borderColor = Colors.grey[700]!;
+    } else {
+      backgroundColor = textLight;
+      iconColor = pinkPrimary;
+      textColor = Colors.black87;
+      textoDescriptivoColor = Colors.grey;
+      borderColor = Colors.grey[300]!;
+    }
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -48,40 +149,41 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               const SizedBox(height: 30),
 
               // Icono decorativo
-                Icon(Icons.lock_reset, size: 80, color: iconColor),
-                const SizedBox(height: 20),
+              Icon(Icons.lock_reset, size: 80, color: iconColor),
+              const SizedBox(height: 20),
 
-              // Título
-                Text(
+              // Titulo
+              Text(
                 'Cambiar Contraseña',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: iconColor,
-                  ),
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: iconColor,
                 ),
-                const SizedBox(height: 10),
+              ),
+              const SizedBox(height: 10),
 
               // Texto descriptivo
-                Text(
-                  'Introduce tu correo electrónico para restablecer la contraseña.',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey,
-                  ),
+              Text(
+                'Introduce tu correo electronico para restablecer la contraseña.',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: textoDescriptivoColor,
                 ),
-                const SizedBox(height: 30),
+              ),
+              const SizedBox(height: 30),
 
-            // Formulario
+              // Formulario
               Form(
                 key: formKey,
                 child: Column(
                   children: [
+                    // Campo de email
                     TextFormField(
                       controller: emailController,
                       style: TextStyle(color: textColor),
                       decoration: InputDecoration(
-                        labelText: 'Correo Electrónico',
+                        labelText: 'Correo Electronico',
                         labelStyle: TextStyle(color: iconColor),
                         prefixIcon: Icon(Icons.email, color: iconColor),
                         border: const OutlineInputBorder(),
@@ -89,9 +191,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           borderSide: BorderSide(color: pinkPrimary),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!,
-                          ),
+                          borderSide: BorderSide(color: borderColor),
                         ),
                       ),
                       keyboardType: TextInputType.emailAddress,
@@ -100,57 +200,26 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           return 'Ingresa tu correo';
                         }
                         if (!value.contains('@') || !value.contains('.')) {
-                          return 'Correo no válido';
+                          return 'Correo no valido';
                         }
                         return null;
                       },
                     ),
                     const SizedBox(height: 20),
 
+                    // Boton de enviar
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: isLoading ? null :  () async { 
-                          if (formKey.currentState!.validate()) {
-                               setState(() => isLoading = true);
-
-                                final email = emailController.text.trim();
-                                final success = await authProvider.resetPassword(email);
-                                
-                                if (mounted) {
-                                  setState(() => isLoading = false);
-                                  
-                                  if (success) {
-                                    // Mostrar mensaje de éxito
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Se ha enviado un código de recuperación a tu correo'),
-                                        backgroundColor: Colors.green,
-                                        duration: Duration(seconds: 3),
-                                      ),
-                                    );
-
-                                    // Navegar a pantalla para ingresar el código OTP
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ResetPasswordScreen(  
-                                          email: email,
-                                        ),
-                                      ),
-                                    );
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(authProvider.errorMessage ?? 'Error al enviar el correo'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  }
-                                }
-                             }
-                        },
+                        onPressed: () {
+                          // Si esta cargando o no puede reenviar, deshabilitar
+                          if (isLoading || !puedeReenviar) {
+                            return null;
+                          } else {
+                            return enviarCorreo;
+                          }
+                        }(),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: pinkPrimary,
                           foregroundColor: Colors.white,
@@ -159,18 +228,33 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        child: isLoading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              )
-                            : const Text(
+                        child: () {
+                          if (isLoading) {
+                            return const CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            );
+                          } else {
+                            // Mostrar texto del boton con contador si aplica
+                            if (!puedeReenviar) {
+                              return Text(
+                                'Espera $tiempoRestante segundos',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            } else {
+                              return const Text(
                                 'Enviar Correo de Recuperación',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
-                              ),
+                              );
+                            }
+                          }
+                        }(),
                       ),
                     ),
                   ],
