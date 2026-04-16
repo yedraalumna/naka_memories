@@ -8,23 +8,18 @@ class AppAuthProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
-  // Getters
   User? get user => _user;
   bool get isAuthenticated => _user != null;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  // Cliente de Supabase
   final SupabaseClient _supabase = Supabase.instance.client;
-  
-  // Generador de UUIDs
   final _uuid = Uuid();
 
   AppAuthProvider() {
     _checkCurrentUser();
   }
 
-  // Verificamos la sesión actual de Supabase al iniciar la aplicación
   Future<void> _checkCurrentUser() async {
     _isLoading = true;
     notifyListeners();
@@ -42,10 +37,8 @@ class AppAuthProvider with ChangeNotifier {
     notifyListeners();
   }
   
-  // Getter para la URL del avatar guardada en metadatos
   String? get avatarUrl => _user?.userMetadata?['avatar_url'];
 
-  // actualizamos la URL del avatar
   Future<bool> updateProfilePhoto(String url) async {
     try {
       _isLoading = true;
@@ -74,7 +67,6 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // eliminamos la URL del avatar
   Future<bool> removeProfilePhoto() async {
     try {
       _isLoading = true;
@@ -98,7 +90,6 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // refrescamos los metadatos del usuario
   Future<void> refreshUserMetadata() async {
     try {
       final session = _supabase.auth.currentSession;
@@ -111,7 +102,6 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // Funciones para autenticar y cerrar sesión o iniciar sesión
   Future<bool> login(String email, String password) async {
     try {
       _isLoading = true;
@@ -143,50 +133,47 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-Future<bool> register(String email, String password) async {
-  try {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
+  Future<bool> register(String email, String password) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
 
-    // URL diferente según la plataforma (Web o Android/iOS)
-    const redirectUrl = kIsWeb
-        ? 'https://nayekamemories.cloud-ip.cc/callback'
-        : 'io.nayekamemories.app://callback';
+      const redirectUrl = kIsWeb
+          ? 'https://nayekamemories.cloud-ip.cc/callback'
+          : 'io.nayekamemories.app://callback';
 
-    final response = await _supabase.auth.signUp(
-      email: email,
-      password: password,
-      emailRedirectTo: redirectUrl,
-      data: {
-        'avatar_url': null,
-        'registered_at': DateTime.now().toIso8601String(),
-      },
-    );
+      final response = await _supabase.auth.signUp(
+        email: email,
+        password: password,
+        emailRedirectTo: redirectUrl,
+        data: {
+          'avatar_url': null,
+          'registered_at': DateTime.now().toIso8601String(),
+        },
+      );
 
-    _user = response.user;
+      _user = response.user;
 
-    // Guardar cookies_accepted = true
-    if (_user != null && _user!.id.isNotEmpty) {
-      await _guardarCookiesEnSupabase(_user!.id);
+      if (_user != null && _user!.id.isNotEmpty) {
+        await _guardarCookiesEnSupabase(_user!.id);
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+
+    } on AuthException catch (e) {
+      _handleSupabaseError(e);
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error inesperado';
+      _isLoading = false;
+      notifyListeners();
+      return false;
     }
-
-    _isLoading = false;
-    notifyListeners();
-    return true;
-
-  } on AuthException catch (e) {
-    _handleSupabaseError(e);
-    return false;
-  } catch (e) {
-    _errorMessage = 'Error inesperado';
-    _isLoading = false;
-    notifyListeners();
-    return false;
   }
-}
 
-  // Reenviar email de verificación
   Future<bool> resendVerificationEmail({String? unverifiedEmail}) async {
     try {
       _isLoading = true;
@@ -220,7 +207,6 @@ Future<bool> register(String email, String password) async {
     }
   }
 
-  //Refrescar datos del usuario (para verificar si ya confirmó email)
   Future<void> refreshUserData() async {
     try {
       final session = _supabase.auth.currentSession;
@@ -233,19 +219,14 @@ Future<bool> register(String email, String password) async {
     }
   }
 
-  //Getter para saber si necesita verificación de email
   bool get needsEmailVerification {
     return _user != null && _user!.emailConfirmedAt == null;
   }
 
-  // Getter para saber si el email está confirmado
   bool get isEmailVerified {
     return _user?.emailConfirmedAt != null;
   }
 
-  // ===== FUNCIONES DE COOKIES =====
-
-  // Guardar cookies para usuarios nuevos
   Future<void> _guardarCookiesEnSupabase(String userId) async {
     try {
       print('Guardando cookies para usuario nuevo: $userId');
@@ -273,12 +254,10 @@ Future<bool> register(String email, String password) async {
     }
   }
 
-  // Actualizar cookies para usuarios existentes
   Future<bool> actualizarAceptacionCookies(String userId) async {
     try {
       print('Actualizando cookies para usuario: $userId');
       
-      // Buscar si existe algún registro
       final resultados = await _supabase
           .from('nayeka memories')
           .select('id')
@@ -286,7 +265,6 @@ Future<bool> register(String email, String password) async {
           .limit(1);
       
       if (resultados.isEmpty) {
-        // No existe - crear nuevo registro
         print('No existe registro, creando uno nuevo...');
         final nuevoId = _uuid.v4();
         
@@ -304,7 +282,6 @@ Future<bool> register(String email, String password) async {
         });
         
       } else {
-        // Ya existe al menos un registro - actualizar TODOS
         print('Registros existentes encontrados, actualizando...');
         await _supabase
             .from('nayeka memories')
@@ -312,7 +289,6 @@ Future<bool> register(String email, String password) async {
             .eq('user_id', userId);
       }
       
-      // Verificar que se guardó
       final verificacion = await _supabase
           .from('nayeka memories')
           .select('cookies_accepted')
@@ -334,7 +310,6 @@ Future<bool> register(String email, String password) async {
     }
   }
 
-  // Verificar cookies - AHORA SIEMPRE LEE DE SUPABASE
   Future<bool> usuarioAceptoCookies(String userId) async {
     try {
       final resultados = await _supabase
@@ -357,26 +332,16 @@ Future<bool> register(String email, String password) async {
   void _handleSupabaseError(AuthException e) {
     print('Auth error: ${e.statusCode} - ${e.message}');
     
-    switch (e.statusCode) {
-      case '400':
-        if (e.message.contains('Invalid login credentials')) {
-          _errorMessage = 'Credenciales inválidas';
-        } else if (e.message.contains('Email not confirmed')) {
-          _errorMessage = 'Email no confirmado';
-        } else {
-          _errorMessage = 'Error en la solicitud';
-        }
-        break;
-      case '422':
-        if (e.message.contains('already registered')) {
-          _errorMessage = 'Este correo ya está registrado';
-        } else {
-          _errorMessage = 'Datos inválidos';
-        }
-        break;
-      default:
-        _errorMessage = 'Error de autenticación';
+    if (e.message.toLowerCase().contains('already registered')) {
+      _errorMessage = 'Este correo ya está registrado';
+    } else if (e.message.toLowerCase().contains('invalid login credentials')) {
+      _errorMessage = 'Credenciales inválidas';
+    } else if (e.message.toLowerCase().contains('email not confirmed')) {
+      _errorMessage = 'Email no confirmado';
+    } else {
+      _errorMessage = 'Error de autenticación';
     }
+    
     _isLoading = false;
     notifyListeners();
   }
@@ -469,20 +434,16 @@ Future<bool> register(String email, String password) async {
   bool get hasAvatar => avatarUrl != null && avatarUrl!.isNotEmpty;
   String? get registeredAt => _user?.userMetadata?['registered_at'];
 
-  // Método para verificar si hay un deep link pendiente
   Future<void> handleDeepLink(Uri uri) async {
     final tokenHash = uri.queryParameters['token_hash'];
     final type = uri.queryParameters['type'];
     
     if (tokenHash != null && type == 'email') {
       print('Procesando verificación de email desde deep link');
-      // Supabase ya maneja la verificación automáticamente
-      // Solo refrescamos los datos del usuario
       await refreshUserData();
     }
   }
 
-  // Verificar codigo OTP de 6 u 8 digitos
   Future<bool> verifyOTP(String email, String token) async {
     try {
       _isLoading = true;
@@ -526,8 +487,6 @@ Future<bool> register(String email, String password) async {
     }
   }
 
-
-  // Enviar correo de recuperación de contraseña
   Future<bool> resetPassword(String email) async {
     try {
       _isLoading = true;
@@ -557,14 +516,12 @@ Future<bool> register(String email, String password) async {
     }
   }
 
-  // Verificar OTP para recuperación de contraseña y actualizar contraseña
   Future<bool> verifyResetAndChangePassword(String email, String token, String newPassword) async {
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
-      // Primero verificar el OTP
       final response = await _supabase.auth.verifyOTP(
         email: email,
         token: token,
@@ -574,7 +531,6 @@ Future<bool> register(String email, String password) async {
       if (response.user != null) {
         _user = response.user;
         
-        // Luego actualizar la contraseña
         await _supabase.auth.updateUser(
           UserAttributes(password: newPassword),
         );
@@ -600,4 +556,4 @@ Future<bool> register(String email, String password) async {
       return false;
     }
   }
-  }
+}

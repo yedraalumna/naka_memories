@@ -7,7 +7,6 @@ import '../providers/theme_provider.dart';
 import 'home_screen.dart';
 import 'terms_screen.dart';
 import '../constants/colors.dart';
-import 'email_verification_screen.dart';
 import 'verify_code_screen.dart';
 
 // Pantalla de registro de usuarios
@@ -21,38 +20,37 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  // Controladores para capturar lo que escribe el usuario en cada campo
+  // Controladores para los campos de texto
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmarController = TextEditingController();
-
-  // Llave para validar todo el formulario junto
+  
+  // Llave para validar el formulario
   final formKey = GlobalKey<FormState>();
   
-  // Para mostrar u ocultar la contraseña (ojito)
+  // Para mostrar u ocultar la contraseña (el ojito)
   bool ocultarPassword = true;
   bool ocultarConfirmar = true;
   
-  // Para saber si el usuario marcó el checkbox de aceptar términos
+  // Para saber si el usuario acepto los terminos
   bool aceptaCookies = false;
 
+  // Liberar memoria cuando se cierra la pantalla
   @override
   void dispose() {
-    // Limpiar los controladores cuando la pantalla se cierra (libera memoria)
     emailController.dispose();
     passwordController.dispose();
     confirmarController.dispose();
     super.dispose();
   }
 
-  // Guarda en el móvil que el usuario aceptó las cookies
+  // Guardar en el telefono que el usuario acepto las cookies
   Future<void> guardarCookiesAceptadas() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('cookies_accepted', true);
-    print('Cookies aceptadas guardadas en SharedPreferences');
   }
 
-  // Muestra un mensaje flotante abajo (SnackBar)
+  // Mostrar mensaje flotante
   void mostrarMensaje(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -63,7 +61,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Va a la pantalla de términos y condiciones
+  // Ir a la pantalla de terminos y condiciones
   void irATermsScreen() {
     Navigator.push(
       context,
@@ -71,60 +69,85 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Función principal para registrar al usuario
+  // Funcion principal para registrar al usuario
   Future<void> registrar(BuildContext context) async {
-    // Primero: verificar que aceptó los términos
+    // Verificar que acepto los terminos
     if (!aceptaCookies) {
       mostrarMensaje('Debes aceptar los términos para registrarte');
       return;
     }
 
-    // Segundo: validar que todos los campos estén correctos
+    // Validar que los campos esten correctos
     if (!formKey.currentState!.validate()) return;
     
     final auth = Provider.of<AppAuthProvider>(context, listen: false);
+    auth.clearError();
 
-    // Tercero: intentar registrar en Supabase
+    // Intentar registrar en Supabase
     final success = await auth.register(
       emailController.text.trim(),
       passwordController.text,
     );
 
-    // Si se registró bien
-    if (success && context.mounted) {
+    // Si fallo el registro
+    if (!success && mounted) {
+      final errorMsg = auth.errorMessage ?? '';
+      
+      // Verificar si el error es por email ya registrado
+      if (errorMsg.toLowerCase().contains('already registered') || 
+          errorMsg.toLowerCase().contains('registrado')) {
+        mostrarMensaje('Este correo ya esta registrado. Usa otro o inicia sesion.');
+      } 
+      // Verificar si es por muchos intentos
+      else if (errorMsg.contains('429')) {
+        mostrarMensaje('Espera un momento antes de intentar de nuevo');
+      } 
+      // Otro tipo de error
+      else {
+        mostrarMensaje(errorMsg);
+      }
+      return;
+    }
+
+    // Si se registro bien
+    if (success && mounted) {
       // Verificar que el usuario existe
       if (auth.user == null) {
         mostrarMensaje('Error: No se pudo crear el usuario');
         return;
       }
-    }
       
-    // Guardar que aceptó cookies
-    await guardarCookiesAceptadas();
+      // Guardar que acepto cookies
+      await guardarCookiesAceptadas();
 
-    // Ir a la pantalla para verificar el código que llega por email
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => VerifyCodeScreen(
-          email: emailController.text.trim(),
+      // Ir a la pantalla de verificacion de codigo
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => VerifyCodeScreen(
+            email: emailController.text.trim(),
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Obtener los providers para el tema y la autenticación
     final auth = Provider.of<AppAuthProvider>(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
 
-    // Definir colores según el tema (oscuro o claro)
+    // Definir colores segun el tema (oscuro o claro)
     Color backgroundColor;
     Color textColor;
     Color iconColor;
     Color borderColor;
     Color focusedBorderColor;
+    Color textoDescriptivoColor;
+    Color errorTextColor;
+    Color errorIconColor;
+    Color errorBorderColor;
+    Color errorFondoColor;
     
     if (themeProvider.isDarkMode) {
       backgroundColor = backgroundDark;
@@ -132,12 +155,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       iconColor = Colors.white;
       borderColor = Colors.grey[700]!;
       focusedBorderColor = Colors.white;
+      textoDescriptivoColor = Colors.grey[400]!;
+      errorTextColor = Colors.red[300]!;
+      errorIconColor = Colors.red[300]!;
+      errorBorderColor = Colors.red[700]!;
+      errorFondoColor = Colors.red[900]!.withOpacity(0.3);
     } else {
       backgroundColor = textLight;
       textColor = Colors.black;
       iconColor = pinkPrimary;
       borderColor = pinkLight;
       focusedBorderColor = pinkPrimary;
+      textoDescriptivoColor = Colors.grey;
+      errorTextColor = Colors.black;
+      errorIconColor = Colors.red;
+      errorBorderColor = Colors.red.shade200;
+      errorFondoColor = Colors.red.shade50;
     }
 
     return Scaffold(
@@ -148,95 +181,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context), // Volver atrás
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView( // Permite scroll si el teclado tapa algo
+        child: SingleChildScrollView(
           child: Column(
             children: [
               const SizedBox(height: 30),
-
-              // Icono decorativo arriba del todo
+              
+              // Icono decorativo
               Icon(Icons.person_add, size: 80, color: iconColor),
               const SizedBox(height: 20),
-
-              // Título principal
+              
+              // Titulo principal
               Text(
                 'Crear Nueva Cuenta',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: iconColor,
-                ),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: iconColor),
               ),
               const SizedBox(height: 10),
-
-              // Texto pequeño debajo del título
+              
+              // Texto descriptivo
               Text(
                 'Completa el formulario para registrarte',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey,
-                ),
+                style: TextStyle(fontSize: 16, color: textoDescriptivoColor),
               ),
               const SizedBox(height: 30),
 
-              // Cartel rojo con mensaje de error (si hay error)
+              // Mostrar mensaje de error si existe
               if (auth.errorMessage != null)
                 Container(
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 15),
                   decoration: BoxDecoration(
-                    color: () {
-                      if (themeProvider.isDarkMode) {
-                        return Colors.red[900]?.withOpacity(0.3);
-                      } else {
-                        return Colors.red.shade50;
-                      }
-                    }(),
+                    color: errorFondoColor,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: () {
-                        if (themeProvider.isDarkMode) {
-                          return Colors.red[700]!;
-                        } else {
-                          return Colors.red.shade200;
-                        }
-                      }(),
-                    ),
+                    border: Border.all(color: errorBorderColor),
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.warning,
-                        color: () {
-                          if (themeProvider.isDarkMode) {
-                            return Colors.red[300];
-                          } else {
-                            return Colors.red;
-                          }
-                        }(),
-                      ),
+                      Icon(Icons.warning, color: errorIconColor),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           auth.errorMessage!,
-                          style: TextStyle(
-                            color: () {
-                              if (themeProvider.isDarkMode) {
-                                return Colors.red[300];
-                              } else {
-                                return Colors.black;
-                              }
-                            }(),
-                          ),
+                          style: TextStyle(color: errorTextColor),
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close, size: 18),
-                        onPressed: auth.clearError, // Limpiar el error
+                        onPressed: auth.clearError,
                       ),
                     ],
                   ),
@@ -247,7 +242,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 key: formKey,
                 child: Column(
                   children: [
-                    // Campo: Correo Electrónico
+                    // Campo de email
                     TextFormField(
                       controller: emailController,
                       style: TextStyle(color: textColor),
@@ -255,15 +250,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Correo Electrónico',
                         labelStyle: TextStyle(color: iconColor),
                         prefixIcon: Icon(Icons.email, color: iconColor),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: borderColor),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: borderColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: focusedBorderColor),
-                        ),
+                        border: OutlineInputBorder(borderSide: BorderSide(color: borderColor)),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: borderColor)),
+                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: focusedBorderColor)),
                         filled: themeProvider.isDarkMode,
                         fillColor: () {
                           if (themeProvider.isDarkMode) {
@@ -286,40 +275,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    // Campo contraseña
+                    // Campo de contraseña
                     TextFormField(
                       controller: passwordController,
                       style: TextStyle(color: textColor),
+                      obscureText: ocultarPassword,
                       decoration: InputDecoration(
                         labelText: 'Contraseña',
                         labelStyle: TextStyle(color: iconColor),
                         prefixIcon: Icon(Icons.lock, color: iconColor),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            () {
-                              if (ocultarPassword) {
-                                return Icons.visibility_off;
-                              } else {
-                                return Icons.visibility;
-                              }
-                            }(),
-                            color: iconColor,
-                          ),
+                          icon: () {
+                            if (ocultarPassword) {
+                              return Icon(Icons.visibility_off, color: iconColor);
+                            } else {
+                              return Icon(Icons.visibility, color: iconColor);
+                            }
+                          }(),
                           onPressed: () {
                             setState(() {
                               ocultarPassword = !ocultarPassword;
                             });
                           },
                         ),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: borderColor),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: borderColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: focusedBorderColor),
-                        ),
+                        border: OutlineInputBorder(borderSide: BorderSide(color: borderColor)),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: borderColor)),
+                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: focusedBorderColor)),
                         filled: themeProvider.isDarkMode,
                         fillColor: () {
                           if (themeProvider.isDarkMode) {
@@ -329,7 +310,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           }
                         }(),
                       ),
-                      obscureText: ocultarPassword,
                       validator: (valor) {
                         if (valor == null || valor.isEmpty) {
                           return 'Crea una contraseña';
@@ -342,40 +322,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    // Campo confirmar contraseña
+                    // Campo de confirmar contraseña
                     TextFormField(
                       controller: confirmarController,
                       style: TextStyle(color: textColor),
+                      obscureText: ocultarConfirmar,
                       decoration: InputDecoration(
                         labelText: 'Confirmar Contraseña',
                         labelStyle: TextStyle(color: iconColor),
                         prefixIcon: Icon(Icons.lock_outline, color: iconColor),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            () {
-                              if (ocultarConfirmar) {
-                                return Icons.visibility_off;
-                              } else {
-                                return Icons.visibility;
-                              }
-                            }(),
-                            color: iconColor,
-                          ),
+                          icon: () {
+                            if (ocultarConfirmar) {
+                              return Icon(Icons.visibility_off, color: iconColor);
+                            } else {
+                              return Icon(Icons.visibility, color: iconColor);
+                            }
+                          }(),
                           onPressed: () {
                             setState(() {
                               ocultarConfirmar = !ocultarConfirmar;
                             });
                           },
                         ),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: borderColor),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: borderColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: focusedBorderColor),
-                        ),
+                        border: OutlineInputBorder(borderSide: BorderSide(color: borderColor)),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: borderColor)),
+                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: focusedBorderColor)),
                         filled: themeProvider.isDarkMode,
                         fillColor: () {
                           if (themeProvider.isDarkMode) {
@@ -385,7 +357,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           }
                         }(),
                       ),
-                      obscureText: ocultarConfirmar,
                       validator: (valor) {
                         if (valor == null || valor.isEmpty) {
                           return 'Confirma tu contraseña';
@@ -398,13 +369,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Checkbox para aceptar términos y condiciones
+                    // Checkbox para aceptar terminos
                     CheckboxListTile(
                       value: aceptaCookies,
                       activeColor: pinkPrimary,
                       onChanged: (bool? valor) {
                         setState(() {
-                          aceptaCookies = valor ?? false;
+                          if (valor == null) {
+                            aceptaCookies = false;
+                          } else {
+                            aceptaCookies = valor;
+                          }
                         });
                       },
                       controlAffinity: ListTileControlAffinity.leading,
@@ -413,8 +388,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         text: TextSpan(
                           style: TextStyle(
                             fontSize: 14,
-                            color: themeProvider.isDarkMode ? Colors.white : Colors.black87,
-                            fontFamily: 'Roboto',
+                            color: () {
+                              if (themeProvider.isDarkMode) {
+                                return Colors.white;
+                              } else {
+                                return Colors.black87;
+                              }
+                            }(),
                           ),
                           children: [
                             const TextSpan(text: "Acepto los "),
@@ -425,8 +405,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 decoration: TextDecoration.underline,
                                 fontWeight: FontWeight.bold,
                               ),
-                              recognizer: TapGestureRecognizer()
-                                ..onTap = irATermsScreen, // Al tocar va a los términos
+                              recognizer: TapGestureRecognizer()..onTap = irATermsScreen,
                             ),
                           ],
                         ),
@@ -434,13 +413,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    // Botón de registro (se deshabilita si está cargando o no aceptó términos)
+                    // Boton de registro
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
                         onPressed: () {
-                          // Si está cargando o no aceptó términos, no hace nada
+                          // Si esta cargando o no acepto terminos, no hace nada
                           if (auth.isLoading || !aceptaCookies) {
                             return null;
                           } else {
@@ -473,7 +452,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
             ],
           ),
         ),
