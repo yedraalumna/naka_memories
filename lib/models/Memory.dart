@@ -17,7 +17,7 @@ class Memory {
   final Map<String, dynamic>? sharedRoles;
   final Map<String, dynamic>? pendingRoles;
   final String? creatorEmail;
-  final bool isShared;  // NUEVO: indica si el recuerdo es compartido
+  final bool isShared;  // indica si el recuerdo es compartido
 
   // Lista de las categorias predeterminadas
   static const List<String> categoriesList = [
@@ -45,7 +45,7 @@ class Memory {
     this.sharedRoles,
     this.pendingRoles,
     this.creatorEmail,
-    this.isShared = false,  // NUEVO: por defecto false
+    this.isShared = false,  // por defecto false
   });
 
   static const List<String> defaultCategories = [
@@ -129,7 +129,7 @@ class Memory {
       'shared_roles': sharedRoles,
       'pending_roles': pendingRoles,
       'creator_email': creatorEmail,
-      'is_shared': isShared,  // NUEVO: guardar en la base de datos
+      'is_shared': isShared,  // guardar en la base de datos
     };
   }
 
@@ -137,12 +137,10 @@ class Memory {
   factory Memory.fromMap(Map<String, dynamic> map) {
     try {
       //datos básicos
-      final id = _safeString(map['id'],
-          defaultValue: DateTime.now().millisecondsSinceEpoch.toString());
+      final id = _safeString(map['id'], defaultValue: DateTime.now().millisecondsSinceEpoch.toString());
       final title = _safeString(map['title'], defaultValue: 'Sin título');
       final description = _safeString(map['description']);
-      final date = _safeString(map['date'],
-          defaultValue: DateTime.now().toIso8601String());
+      final date = _safeString(map['date'],defaultValue: DateTime.now().toIso8601String());
       final latitude = _safeDouble(map['latitude']);
       final longitude = _safeDouble(map['longitude']);
 
@@ -152,10 +150,8 @@ class Memory {
         imageAsset = map['imageAsset'].toString();
       }
 
-      final category =
-          _safeString(map['category'], defaultValue: 'Sin categoría');
-      final isFavorite =
-          (map['isFavorite'] == true) || (map['is_favorite'] == true);
+      final category = _safeString(map['category'], defaultValue: 'Sin categoría');
+      final isFavorite = (map['isFavorite'] == true) || (map['is_favorite'] == true);
 
       // Buscamos la lista de usuarios compartidos
       dynamic sharedRaw = map['shared_with'];
@@ -171,8 +167,7 @@ class Memory {
       }
 
       // la contraseña se determina por el hash, si el hash existe y no es vacío, entonces hay contraseña
-      final hasPassword =
-          (map['has_password'] == true) || (map['hasPassword'] == true);
+      final hasPassword = (map['has_password'] == true) || (map['hasPassword'] == true);
 
       // Buscamos el hash de la contraseña
       String? passwordHash;
@@ -224,7 +219,7 @@ class Memory {
         parsedPendingRoles = Map<String, dynamic>.from(pendingRaw);
       }
 
-      // NUEVO: leer si es compartido
+      // leer si es compartido
       final isShared = (map['is_shared'] == true) || (map['isShared'] == true);
 
       return Memory(
@@ -246,7 +241,7 @@ class Memory {
         sharedRoles: parsedSharedRoles,
         pendingRoles: parsedPendingRoles,
         creatorEmail: creatorEmail,
-        isShared: isShared,  // NUEVO: asignar valor
+        isShared: isShared,  // asignar valor
       );
     } catch (e) {
       print('Error en Memory.fromMap: $e');
@@ -266,7 +261,7 @@ class Memory {
         sharedRoles: null,
         pendingRoles: null,
         creatorEmail: null,
-        isShared: false,  // NUEVO: por defecto false
+        isShared: false,  // por defecto false
       );
     }
   }
@@ -301,7 +296,7 @@ class Memory {
 
     // miramos si es un numero entero
     if (value is int) {
-      return value.toDouble(); // Lo convierte a decimal (40 → 40.0)
+      return value.toDouble(); // Lo convierte a decimal (40 --> 40.0)
     }
 
     // miramos si es un texto que representa un número
@@ -342,7 +337,7 @@ class Memory {
     Map<String, dynamic>? sharedRoles,
     Map<String, dynamic>? pendingRoles,
     String? creatorEmail,
-    bool? isShared,  // NUEVO: parámetro opcional
+    bool? isShared,  // parámetro opcional
   }) {
     return Memory(
       id: _valor(id, this.id),
@@ -360,7 +355,7 @@ class Memory {
       sharedRoles: _valor(sharedRoles, this.sharedRoles),
       pendingRoles: _valor(pendingRoles, this.pendingRoles),
       creatorEmail: _valor(creatorEmail, this.creatorEmail),
-      isShared: _valor(isShared, this.isShared),  // NUEVO: copiar valor
+      isShared: _valor(isShared, this.isShared),  // copiar valor
     );
   }
 
